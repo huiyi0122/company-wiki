@@ -112,4 +112,33 @@
   transition: 0.3s;
 }
 
+.wmde-markdown {
+  text-align: left !important; /* 左对齐 */
+  max-width: 100% !important;  /* 不限制宽度 */
+}
 
+.wmde-markdown h1,
+.wmde-markdown h2,
+.wmde-markdown h3,
+.wmde-markdown p,
+.wmde-markdown ul,
+.wmde-markdown ol,
+.wmde-markdown blockquote {
+  text-align: left !important; /* 所有标题和段落左对齐 */
+  margin-left: 0 !important;   /* 去掉自动 margin */
+}
+
+.mk-down{
+    flex: 1 1 0%;
+    background: rgb(255, 255, 255);
+    border: 1px solid rgb(204, 204, 204);
+    border-radius: 8px;
+    height: 500px;
+    overflow-y: auto;
+    text-align: left;
+    max-width: 800px;
+    width: 100%;
+    display: flex;
+    margin: 0 auto;
+    padding: 50px;
+}
