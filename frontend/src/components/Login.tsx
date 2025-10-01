@@ -32,7 +32,7 @@ export default function Login({ setCurrentUser }: LoginProps) {
         console.error("Invalid username or password!");
         return;
       }
-      
+
       const data = await res.json();
       localStorage.setItem("token", data.token);
 
@@ -52,21 +52,24 @@ export default function Login({ setCurrentUser }: LoginProps) {
 
   return (
     <div className="login-container">
-      <div className="login-box text-center">
-        <h2>Login</h2>
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button onClick={handleLogin}>Login</button>
+      <div className="login-split">
+        <div className="login-image" />
+        <div className="login-box text-center">
+          <h2>Login</h2>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button onClick={handleLogin}>Login</button>
+        </div>
       </div>
     </div>
   );
