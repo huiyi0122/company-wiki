@@ -1,0 +1,153 @@
+/* src/styles/EditorPage.css */
+
+.edit-top {
+    margin: 50px;
+}
+
+.edit-top label {
+    display: block;
+    margin-bottom: 8px;
+    color: #2d3748;
+    font-weight: 600;
+    font-size: 1em;
+}
+
+.edit-top input[type="text"],
+.edit-top select {
+    width: 100%;
+    max-width: 600px;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background: white;
+    color: #2d3748;
+}
+
+.edit-top input[type="text"]:focus,
+.edit-top select:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    transform: translateY(-1px);
+}
+
+
+/* ===== Markdown 编辑器样式容器 ===== */
+.editor-container {
+    margin: 25px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+}
+
+/* 自定义 MDEditor 样式 (覆盖组件默认样式) */
+.w-md-editor {
+    border-radius: 12px !important;
+    border: none !important;
+}
+
+.w-md-editor-toolbar {
+    background: #1a202c !important;
+    border-bottom: 1px solid #2d3748 !important;
+    padding: 12px 16px !important;
+}
+
+.w-md-editor-toolbar ul {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.w-md-editor-toolbar li {
+    margin: 0 !important;
+}
+
+.w-md-editor-toolbar li>button {
+    background: transparent !important;
+    border: none !important;
+    color: #cbd5e0 !important;
+    padding: 6px 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s ease !important;
+}
+
+.w-md-editor-toolbar li>button:hover {
+    background: #2d3748 !important;
+    color: #4299e1 !important;
+    transform: none !important;
+}
+
+.w-md-editor-text {
+    background: #f8fafc !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+
+.w-md-editor-preview {
+    background: white !important;
+    padding: 20px !important;
+}
+
+/* MDEditor 预览内容的样式 */
+.w-md-editor-preview .wmde-markdown {
+    background: transparent !important;
+    color: #2d3748 !important;
+}
+
+.w-md-editor-preview h1,
+.w-md-editor-preview h2,
+.w-md-editor-preview h3,
+.w-md-editor-preview h4,
+.w-md-editor-preview h5,
+.w-md-editor-preview h6 {
+    color: #2d3748 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 16px !important;
+}
+
+.w-md-editor-preview code {
+    background: #edf2f7 !important;
+    color: #2d3748 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+
+.w-md-editor-preview pre {
+    background: #1a202c !important;
+    border: 1px solid #2d3748 !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+}
+
+.w-md-editor-preview pre code {
+    background: transparent !important;
+    color: #cbd5e0 !important;
+}
+
+/* 编辑器操作按钮 (保存/返回) */
+button.save {
+    background: #4299e1;
+    color: white;
+    padding: 12px 30px;
+    font-size: 16px;
+}
+
+button.back {
+    background: #a0aec0;
+    color: white;
+    padding: 12px 30px;
+    font-size: 16px;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+    .edit-top {
+        margin: 15px;
+    }
+    .editor-container {
+        min-height: 400px;
+    }
+}

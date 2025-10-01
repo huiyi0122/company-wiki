@@ -1,0 +1,60 @@
+/* src/styles/Login.css */
+
+/* ===== 登录页面样式 ===== */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+}
+
+.login-box {
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-box h2 {
+    margin-bottom: 30px;
+    color: #2d3748;
+    font-size: 2em;
+}
+
+.login-box input {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background: white;
+    color: #2d3748;
+}
+
+.login-box input:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.login-box button {
+    width: 100%;
+    margin-top: 20px;
+    background: #4299e1;
+    color: white;
+    padding: 15px;
+    font-size: 16px;
+    border-radius: 8px;
+    margin: 20px 0 0 0; /* 覆盖通用 button 的 margin */
+}
+
+.login-box button:hover {
+    background: #3182ce;
+}

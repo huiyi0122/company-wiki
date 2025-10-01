@@ -1,0 +1,26 @@
+/* src/styles/DocDetail.css */
+
+.doc-top {
+    margin: 50px;
+}
+
+/* 文档详情内容区域样式 */
+#doc-content {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    margin-top: 25px;
+    border: 1px solid #e2e8f0;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+    .doc-top {
+        margin: 15px;
+    }
+
+    #doc-content {
+        padding: 15px;
+    }
+}
