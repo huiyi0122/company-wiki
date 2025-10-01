@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
-// src/components/Docs.tsx (Corrected)
+import MDEditor from "@uiw/react-md-editor";
 
 // Import the values (things that exist at runtime)
 import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
@@ -85,7 +85,7 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
         {filteredDocs.map((doc) => (
           <div key={doc.id} className="doc-card">
             <h3>{doc.title || "Untitled"}</h3>
-            <p>{doc.content.substring(0, 50)}...</p>
+            <MDEditor.Markdown source={doc.content.substring(0, 50) + "..."} />
             <p>Category: {doc.category}</p>
             <p>Author: {doc.author || "Unknown"}</p>
 

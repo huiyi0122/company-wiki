@@ -11,6 +11,7 @@ import Login from "./components/Login";
 import Docs from "./components/Docs";
 import DocDetail from "./components/DocDetail";
 import EditorPage from "./components/EditorPage";
+import Dashboard from './components/Dashboard';
 
 // 导入全局/布局样式
 // src/App.tsx (Corrected)
@@ -44,6 +45,8 @@ export default function App() {
         <Route path="/" element={<Navigate to="/docs" replace />} />
         {/* 登录页面 */}
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
+
+        <Route path="/dashboard" element={<Dashboard currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
         
         {/* 文档列表页 (含侧边栏) */}
         <Route path="/docs" element={<Docs currentUser={currentUser} setCurrentUser={setCurrentUser} />} />

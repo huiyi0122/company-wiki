@@ -151,3 +151,11 @@ button.back {
         min-height: 400px;
     }
 }
+
+.top {
+  display: flex;
+  gap: 43px;
+  justify-content: flex-start;
+  width: auto;
+  align-items: flex-end;
+}

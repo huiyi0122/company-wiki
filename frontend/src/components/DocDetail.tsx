@@ -7,12 +7,8 @@ import html2canvas from "html2canvas";
 import { Document, Packer, Paragraph, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
 import Sidebar from "./Sidebar";
-// ----------------------------------------------------------------------
-// ✅ FIX: DocItem is a type, so it must be imported with 'import type'.
-// User is also a type, so it should be moved to import type for consistency.
 import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
-import type { User, DocItem } from "./CommonTypes"; 
-// ----------------------------------------------------------------------
+import type { User, DocItem } from "./CommonTypes";
 import "../styles/DocDetail.css";
 
 interface DocDetailProps {
@@ -25,7 +21,6 @@ export default function DocDetail({
   setCurrentUser,
 }: DocDetailProps) {
   const { id } = useParams<{ id: string }>();
-  // DocItem is used here as a type, which is fine after the import fix.
   const [doc, setDoc] = useState<DocItem | null>(null);
   const navigate = useNavigate();
 
@@ -37,7 +32,6 @@ export default function DocDetail({
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      // DocItem is used here as a type, which is fine after the import fix.
       .then((data: DocItem) => setDoc(data))
       .catch((err) => console.error(err));
   }, [id]);
@@ -68,7 +62,6 @@ export default function DocDetail({
     if (!element) return alert("Cannot find content to export!");
 
     try {
-      // 使用较高的缩放比例以获得更好的清晰度
       const canvas = await html2canvas(element, {
         scale: 2,
         scrollY: -window.scrollY,
@@ -101,7 +94,7 @@ export default function DocDetail({
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => {}} // DocDetail 不需要设置 Category
+        setCategory={() => {}}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
@@ -117,10 +110,7 @@ export default function DocDetail({
 
           <div className="doc-buttons" style={{ marginBottom: "20px" }}>
             {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-              <button
-                className="edit"
-                onClick={() => navigate(`/editor/${id}`)}
-              >
+              <button className="edit" onClick={() => navigate(`/editor/${id}`)}>
                 Edit
               </button>
             )}
@@ -146,11 +136,15 @@ export default function DocDetail({
               padding: "20px",
               background: "#fff",
               border: "1px solid #ccc",
+              borderRadius: "12px",
             }}
           >
-            <MDEditor.Markdown
-              source={doc.content}
-              style={{ whiteSpace: "pre-wrap" }}
+            {/* ✅ 这里设置 height={700}，替换默认 200 */}
+            <MDEditor
+              value={doc.content}
+              preview="preview"
+              hideToolbar={true}
+              height={700}
             />
           </div>
         </div>

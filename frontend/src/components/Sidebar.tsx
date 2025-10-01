@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 // ----------------------------------------------------------------------
-// ✅ FIX: Separating value imports (getCategories, PERMISSIONS) from type imports (User)
 import { getCategories, PERMISSIONS } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 // ----------------------------------------------------------------------
@@ -30,14 +29,22 @@ export default function Sidebar({
     navigate("/login");
   };
 
-  // 1. 判断 Articles 是否激活
+  // 1. 判断 Dashboard 是否激活
+  const isDashboardActive = location.pathname === "/dashboard";
+
+  // 2. 判断 Editor-New 是否激活
+  // 只有路径精确匹配 /editor/ 且没有 ID 时，才激活 "Add New Article"
+  const isNewArticleActive = location.pathname === "/editor";
+
+  // 3. 判断 Articles 是否激活
+  // 在 /docs/*, 根目录 /，或在任何 /editor/:id 路由下（编辑模式）时都激活 Articles
   const isArticlesActive =
-    location.pathname.startsWith("/docs") || location.pathname === "/";
+    location.pathname.startsWith("/docs") || 
+    location.pathname === "/" ||
+    (location.pathname.startsWith("/editor/") && !isNewArticleActive); 
+    // ^ 使用 !isNewArticleActive 确保排除 /editor
 
-  // 2. 判断 Editor 是否激活
-  const isEditorActive = location.pathname.startsWith("/editor");
-
-  // 3. 辅助函数：点击分类时，如果不在 /docs 页面，则跳转到 /docs
+  // 4. 辅助函数：点击分类时，如果不在 /docs 页面，则跳转到 /docs
   const handleCategoryClick = (cat: string) => {
     setCategory(cat);
     // 如果当前不在 /docs 路由下，跳转到 /docs 列表页
@@ -50,6 +57,17 @@ export default function Sidebar({
     <aside className="sidebar">
       <h2>Company Wiki</h2>
       <ul>
+        {/* Dashboard 链接 */}
+        {currentUser &&
+          PERMISSIONS[currentUser.role].includes("edit") && (
+            <li
+              onClick={() => navigate("/dashboard")}
+              className={isDashboardActive ? "active" : ""}
+            >
+              Dashboard
+            </li>
+          )}
+
         <li
           onClick={() => navigate("/docs")}
           className={isArticlesActive ? "active" : ""}
@@ -60,7 +78,7 @@ export default function Sidebar({
           PERMISSIONS[currentUser.role].includes("edit") && (
             <li
               onClick={() => navigate("/editor")}
-              className={isEditorActive ? "active" : ""}
+              className={isNewArticleActive ? "active" : ""} // 使用新的激活状态
             >
               Add New Article
             </li>

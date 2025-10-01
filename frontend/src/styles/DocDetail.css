@@ -5,14 +5,7 @@
 }
 
 /* 文档详情内容区域样式 */
-#doc-content {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    margin-top: 25px;
-    border: 1px solid #e2e8f0;
-}
+.wmde-markdown-var, .w-md-editor, .w-md-editor-show-preview{}
 
 /* 响应式调整 */
 @media (max-width: 480px) {

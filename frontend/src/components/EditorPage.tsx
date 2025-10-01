@@ -2,11 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
 import Sidebar from "./Sidebar";
-// ----------------------------------------------------------------------
-// ✅ FIX: Separating value imports from type imports to satisfy verbatimModuleSyntax
 import { PERMISSIONS, getCategories, API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
-// ----------------------------------------------------------------------
 import "../styles/EditorPage.css";
 
 interface EditorPageProps {
@@ -50,35 +47,49 @@ export default function EditorPage({
   }, [id]); // 监听 id 变化
 
   const handleSave = async () => {
-    // IMPORTANT: Replacing window.alert/confirm with console logs for now as we haven't implemented a custom modal yet.
-    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save"))
-      return console.error("No permission to save!");
-    if (!title || !content || !category) return console.error("Title, content, and category are required.");
-    
-    const token = localStorage.getItem("token");
-    if (!token) return;
+  if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
+    return alert("No permission to save!");
+  }
+  if (!title || !content) {
+    return alert("Title and content are required.");
+  }
 
-    // DocItem is used here as a type, which is fine after the import fix.
-    const payload: DocItem = { title, content, category, author: currentUser.username }; 
-    try {
-      const res = await fetch(
-        id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
-        {
-          method: id ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify(payload),
-        }
-      );
-      if (!res.ok) throw new Error("Save failed");
-      console.log("Saved successfully!");
-      navigate("/docs");
-    } catch (err) {
-      console.error(err);
-      console.error("Save failed!");
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  // ✅ 只发 id、title、content
+  const payload = id
+    ? { id: Number(id), title, content }
+    : { title, content };
+
+  try {
+    const res = await fetch(
+      id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(`Save failed: ${data.message || res.statusText}`);
     }
-  };
 
-  return (
+    alert("Article saved successfully!");
+    navigate("/docs");
+  } catch (err) {
+    console.error(err);
+    alert("Save failed! Check console for details.");
+  }
+};
+
+
+    return (
     <div className="layout">
       <Sidebar
         setCategory={() => {}} // EditorPage 不需要设置 Category
@@ -88,17 +99,43 @@ export default function EditorPage({
       <div className="main-content-with-sidebar">
         <div className="edit-top">
           <h2>{id ? "Edit Article" : "New Article"}</h2>
-          <label>Title:</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <label style={{ marginTop: "15px" }}>Category:</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
-          </select>
-
-          <div className="editor-container" style={{ display: "flex", gap: "20px" }}>
-            <MDEditor value={content} onChange={(val) => setContent(val || "")} height={500} style={{ flex: 1 }} />
+          <div className="top">
+            <div className="title">
+              <label>Title:</label>
+ 
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+ 
+            <div className="Category">
+              <label style={{ marginTop: "15px" }}>Category:</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-
+          <div
+            className="editor-container"
+            style={{ display: "flex", gap: "20px" }}
+          >
+            <MDEditor
+              value={content}
+              onChange={(val) => setContent(val || "")}
+              height={500}
+              style={{ flex: 1 }}
+            />
+          </div>
+ 
           <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
             <button className="save" onClick={handleSave}>
               Save
