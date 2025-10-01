@@ -54,14 +54,32 @@ router.get("/:id", async (req: Request, res: Response) => {
 router.put("/:id", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { title, content } = req.body;
-  if (!title || !content)
-    return res.status(400).json({ error: "Title and content required" });
+
+  if (!title && !content) {
+    return res.status(400).json({ error: "At least one field required" });
+  }
 
   try {
+    // 构造动态 SQL
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (title) {
+      fields.push("title = ?");
+      values.push(title);
+    }
+    if (content) {
+      fields.push("content = ?");
+      values.push(content);
+    }
+
+    values.push(id); // 最后是 WHERE id = ?
+
     await database.query(
-      "UPDATE articles SET title = ?, content = ? WHERE id = ?",
-      [title, content, id]
+      `UPDATE articles SET ${fields.join(", ")} WHERE id = ?`,
+      values
     );
+
     res.json({ id, title, content });
   } catch (err) {
     console.error(err);
