@@ -147,6 +147,9 @@ export default function DocDetail({
               height={700}
             />
           </div>
+            <button className="view" onClick={() => navigate("/docs")}>
+    Back to Docs
+  </button>
         </div>
       </div>
     </div>

@@ -1,4 +1,3 @@
-// src/components/CommonTypes.ts
 
 export type Role = "admin" | "editor" | "viewer";
 
@@ -21,6 +20,7 @@ export interface DocItem {
   content: string;
   category: string;
   author?: string;
+  role?: Role;   // ✅ 新增
 }
 
 // ===== 权限定义 =====

@@ -1,744 +1,108 @@
 
-/* App.css - 现代化响应式Wiki应用样式 - 黑色白色灰色蓝色主题 */
-
 /* ===== 基础样式重置 ===== */
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.6;
-  color: #333;
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-  min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+    min-height: 100vh;
 }
 
 /* ===== 布局容器 ===== */
 .layout {
-  display: flex;
-  min-height: 100vh;
-  gap: 0;
+    display: flex;
+    min-height: 100vh;
+    gap: 0;
 }
 
-.main-content {
-  flex: 1;
-  background: #f7fafc;
-  padding: 30px;
-  overflow-y: auto;
-  min-height: 100vh;
+.main-content { /* 通用主内容样式 */
+    flex: 1;
+    background: #f7fafc;
+    padding: 30px;
+    overflow-y: auto;
+    min-height: 100vh;
 }
 
-/* ===== 侧边栏样式 - 固定高度和位置 ===== */
-.sidebar {
-  width: 280px;
-  background: #1a202c;
-  color: white;
-  padding: 25px 24px;
-  height: 100vh;
-  position: fixed;
-  left: 0;
-  top: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-}
-
-.sidebar-content {
-  padding: 0 25px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar h2 {
-  color: #4299e1;
-  margin-bottom: 30px;
-  font-size: 1.5em;
-  text-align: center;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #2d3748;
-}
-
-.sidebar h3 {
-  color: #e2e8f0;
-  margin: 25px 0 15px 0;
-  font-size: 1.1em;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 600;
-}
-
-.sidebar ul {
-  list-style: none;
-  margin-bottom: 20px;
-}
-
-.sidebar li {
-  padding: 12px 16px;
-  margin: 6px 0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: #cbd5e0;
-  font-weight: 500;
-  position: relative;
-  overflow: hidden;
-}
-
-.sidebar li:hover {
-  background: #2d3748;
-  color: #4299e1;
-  transform: translateX(5px);
-}
-
-/* 激活状态的样式 (关键：解决点击后高亮问题) */
-.sidebar li.active {
-  background: #2d3748;
-  color: #4299e1;
-  border-left: 4px solid #4299e1;
-}
-
-/* ===== 侧边栏用户区域 - 固定在底部 ===== */
-.sidebar-user {
-  margin-top: auto;
-  padding: 20px 25px 0;
-  border-top: 1px solid #2d3748;
-  background: #1a202c;
-}
-
-.sidebar-user p {
-  color: #e2e8f0;
-  margin-bottom: 15px;
-  font-size: 0.9em;
-}
-
-.sidebar-user button {
-  width: 100%;
-  background: #4299e1;
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.sidebar-user button:hover {
-  background: #3182ce;
-  transform: translateY(-2px);
-}
-
-/* ===== 主内容区域调整，为固定侧边栏留出空间 ===== */
+/* 主内容区域调整，为固定侧边栏留出空间 */
 .main-content-with-sidebar {
-  margin-left: 280px;
-  width: calc(100% - 280px);
-  min-height: 100vh;
-  background: #f7fafc;
+    margin-left: 280px;
+    width: calc(100% - 280px);
+    min-height: 100vh;
+    background: #f7fafc;
 }
 
-/* ===== Editor Page 专用样式 ===== */
-.editor-page {
-  padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.editor-header {
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.editor-header h2 {
-  color: #2d3748;
-  font-size: 2em;
-  margin-bottom: 20px;
-  font-weight: 700;
-}
-
-.editor-form {
-  background: white;
-  padding: 30px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e2e8f0;
-}
-
-.form-group {
-  margin-bottom: 25px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #2d3748;
-  font-weight: 600;
-  font-size: 1em;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  max-width: 400px;
-  padding: 12px 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  background: white;
-  color: #2d3748;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-  transform: translateY(-1px);
-}
-
-/* ===== Markdown 编辑器样式 ===== */
-.editor-container {
-  margin: 25px 0;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
-}
-
-/* 自定义 MDEditor 样式 */
-.w-md-editor {
-  border-radius: 12px !important;
-  border: none !important;
-}
-
-.w-md-editor-toolbar {
-  background: #1a202c !important;
-  border-bottom: 1px solid #2d3748 !important;
-  padding: 12px 16px !important;
-}
-
-.w-md-editor-toolbar ul {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-}
-
-.w-md-editor-toolbar li {
-  margin: 0 !important;
-}
-
-.w-md-editor-toolbar li>button {
-  background: transparent !important;
-  border: none !important;
-  color: #cbd5e0 !important;
-  padding: 6px 8px !important;
-  border-radius: 4px !important;
-  transition: all 0.2s ease !important;
-}
-
-.w-md-editor-toolbar li>button:hover {
-  background: #2d3748 !important;
-  color: #4299e1 !important;
-  transform: none !important;
-}
-
-.w-md-editor-text {
-  background: #f8fafc !important;
-  border-right: 1px solid #e2e8f0 !important;
-}
-
-.w-md-editor-preview {
-  background: white !important;
-  padding: 20px !important;
-}
-
-.w-md-editor-preview .wmde-markdown {
-  background: transparent !important;
-  color: #2d3748 !important;
-}
-
-.w-md-editor-preview h1,
-.w-md-editor-preview h2,
-.w-md-editor-preview h3,
-.w-md-editor-preview h4,
-.w-md-editor-preview h5,
-.w-md-editor-preview h6 {
-  color: #2d3748 !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  padding-bottom: 8px !important;
-  margin-bottom: 16px !important;
-}
-
-.w-md-editor-preview code {
-  background: #edf2f7 !important;
-  color: #2d3748 !important;
-  padding: 2px 6px !important;
-  border-radius: 4px !important;
-}
-
-.w-md-editor-preview pre {
-  background: #1a202c !important;
-  border: 1px solid #2d3748 !important;
-  border-radius: 8px !important;
-  padding: 16px !important;
-}
-
-.w-md-editor-preview pre code {
-  background: transparent !important;
-  color: #cbd5e0 !important;
-}
-
-/* ===== 编辑器操作按钮 ===== */
-.editor-actions {
-  display: flex;
-  gap: 15px;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.btn-primary {
-  background: #4299e1;
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary:hover {
-  background: #3182ce;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(66, 153, 225, 0.3);
-}
-
-.btn-secondary {
-  background: #718096;
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-secondary:hover {
-  background: #4a5568;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(113, 128, 150, 0.3);
-}
-
-/* ===== 其他页面样式 ===== */
-.edit-top {
-  margin: 50px;
-}
-
-.doc-top {
-  margin: 50px;
-}
-
-.docs-top {
-  margin: 50px 50px 0 50px;
-}
-
-/* ===== 搜索框样式 ===== */
-.search-input {
-  width: 100%;
-  max-width: 300px;
-  padding: 15px 20px;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 16px;
-  margin-bottom: 25px;
-  transition: all 0.3s ease;
-  background: white;
-  color: #2d3748;
-  margin-left: 50px;
-  margin-top: 50px;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-  transform: translateY(-2px);
-}
-
-.search-input::placeholder {
-  color: #a0aec0;
-}
-
-/* ===== 文档卡片样式 ===== */
-.doc-card {
-  background: white;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  margin: 20px 50px;
-}
-
-.doc-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
-  border-color: #4299e1;
-}
-
-.doc-card h3 {
-  color: #2d3748;
-  margin-bottom: 12px;
-  font-size: 1.3em;
-}
-
-.doc-card p {
-  color: #718096;
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-
-.doc-card .doc-meta {
-  display: flex;
-  gap: 15px;
-  margin-top: 10px;
-  font-size: 0.9em;
-}
-
-.doc-card .doc-meta span {
-  background: #edf2f7;
-  padding: 4px 10px;
-  border-radius: 6px;
-  color: #4a5568;
-}
-
-/* ===== 按钮样式 ===== */
+/* ===== 通用按钮样式 (其他组件会用到) ===== */
 button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  margin: 5px;
-  font-size: 14px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    margin: 5px;
+    font-size: 14px;
 }
 
 button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* 按钮颜色变体 */
 button.edit {
-  background: #4299e1;
-  color: white;
+    background: #4299e1;
+    color: white;
 }
 
 button.delete {
-  background: #e53e3e;
-  color: white;
+    background: #e53e3e;
+    color: white;
 }
 
 button.view {
-  background: #718096;
-  color: white;
+    background: #718096;
+    color: white;
 }
 
-button.save {
-  background: #4299e1;
-  color: white;
-  padding: 12px 30px;
-  font-size: 16px;
+.doc-buttons { /* 按钮容器 */
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
 }
 
-button.back {
-  background: #a0aec0;
-  color: white;
-  padding: 12px 30px;
-  font-size: 16px;
+/* ===== 动画效果和滚动条 (保留全局效果) ===== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.doc-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 15px;
+.main-content-with-sidebar, .doc-card, .login-box, .edit-top, .doc-top {
+    animation: fadeIn 0.6s ease-out;
 }
 
-/* ===== 登录页面样式 ===== */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #718096; }
 
-.login-box {
-  background: white;
-  padding: 40px;
-  border-radius: 15px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  width: 100%;
-  max-width: 400px;
-  text-align: center;
-}
-
-.login-box h2 {
-  margin-bottom: 30px;
-  color: #2d3748;
-  font-size: 2em;
-}
-
-.login-box input {
-  width: 100%;
-  padding: 15px;
-  margin: 10px 0;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  background: white;
-  color: #2d3748;
-}
-
-.login-box input:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-
-.login-box button {
-  width: 100%;
-  margin-top: 20px;
-  background: #4299e1;
-  color: white;
-  padding: 15px;
-  font-size: 16px;
-  border-radius: 8px;
-}
-
-.login-box button:hover {
-  background: #3182ce;
-}
-
-/* ===== 文档详情样式 ===== */
-#doc-content {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  margin-top: 25px;
-  border: 1px solid #e2e8f0;
-}
-
-/* ===== 响应式设计 ===== */
+/* ===== 响应式设计 (全局) ===== */
 @media (max-width: 1024px) {
-  .sidebar {
-    width: 250px;
-  }
-
-  .main-content-with-sidebar {
-    margin-left: 250px;
-    width: calc(100% - 250px);
-  }
-
-  .editor-page {
-    padding: 30px;
-  }
+    .main-content-with-sidebar {
+        margin-left: 250px;
+        width: calc(100% - 250px);
+    }
 }
 
 @media (max-width: 768px) {
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
-  .main-content-with-sidebar {
-    margin-left: 0;
-    width: 100%;
-  }
-
-  .editor-page {
-    padding: 20px;
-  }
-
-  .editor-form {
-    padding: 20px;
-  }
-
-  .editor-actions {
-    flex-direction: column;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .mobile-menu-toggle {
-    display: block;
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 1001;
-    background: #4299e1;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .doc-buttons {
-    justify-content: center;
-  }
-
-  .login-box {
-    padding: 30px 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .main-content {
-    padding: 15px;
-  }
-
-  .editor-page {
-    padding: 15px;
-  }
-
-  .doc-card {
-    padding: 20px;
-    margin: 10px 15px;
-  }
-
-  button {
-    padding: 8px 16px;
-    font-size: 12px;
-  }
-
-  .editor-container {
-    min-height: 400px;
-  }
-}
-
-/* ===== 动画效果 ===== */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.main-content,
-.login-box,
-.doc-card,
-.editor-container {
-  animation: fadeIn 0.6s ease-out;
-}
-
-/* ===== 滚动条样式 ===== */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #4a5568;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #718096;
-}
-
-.sidebar::-webkit-scrollbar-track {
-  background: #2d3748;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-  background: #4a5568;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-  background: #718096;
-}
-
-/* ===== 工具提示 ===== */
-.tooltip {
-  position: relative;
-  display: inline-block;
-}
-
-.tooltip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #2d3748;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-}
-
-.tooltip:hover::after {
-  opacity: 1;
-}
-
-/* ===== 加载状态 ===== */
-.loading {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #fff;
-  animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+    .main-content-with-sidebar {
+        margin-left: 0;
+        width: 100%;
+    }
 }

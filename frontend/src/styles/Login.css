@@ -78,7 +78,7 @@
 
 .login-image {
   flex: 1;
-  background-image: url("C:\Users\user\company-wiki\frontend\src\assets\1637216404193.jpg"); /* ✅ Replace with your actual image path */
+  background-image: url("../assets/1637216404193.jpg"); /* ✅ Replace with your actual image path */
   background-size: cover;
   background-position: center;
 }
