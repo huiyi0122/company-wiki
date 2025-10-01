@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import jsPDF from "jspdf";
@@ -44,13 +44,24 @@ const PERMISSIONS: Record<Role, string[]> = {
 // ===== 默认分类 =====
 const DEFAULT_CATEGORIES = ["HR", "Tech", "Onboarding"];
 function getCategories(): string[] {
-
-    return DEFAULT_CATEGORIES;
+  return DEFAULT_CATEGORIES;
 }
 
-// ===== Navbar =====
-function Navbar({ currentUser, setCurrentUser }: { currentUser: User | null; setCurrentUser: React.Dispatch<React.SetStateAction<User | null>> }) {
+// ===== Sidebar =====
+function Sidebar({
+  setCategory,
+  currentUser,
+  setCurrentUser,
+}: {
+  setCategory: React.Dispatch<React.SetStateAction<string>>;
+  currentUser: User | null;
+  setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
+}) {
+  const [categories, setCategories] = useState<string[]>(getCategories());
   const navigate = useNavigate();
+
+  useEffect(() => setCategories(getCategories()), []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     setCurrentUser(null);
@@ -58,39 +69,38 @@ function Navbar({ currentUser, setCurrentUser }: { currentUser: User | null; set
   };
 
   return (
-    <nav>
-      <div className="nav-left">
-        <Link to="/">Company Wiki</Link>
-        <Link to="/docs">Articles</Link>
-        {currentUser && PERMISSIONS[currentUser.role].includes("edit") && <Link to="/editor">Add New Article</Link>}
-      </div>
-      <div className="nav-right">
-        {currentUser ? (
-          <>
-            <span>{currentUser.username} ({currentUser.role})</span>
-            <button onClick={handleLogout}>Logout</button>
-          </>
-        ) : (
-          <Link to="/login">Login</Link>
-        )}
-      </div>
-    </nav>
-  );
-}
-
-// ===== Sidebar =====
-function Sidebar({ setCategory }: { setCategory: React.Dispatch<React.SetStateAction<string>> }) {
-  const [categories, setCategories] = useState<string[]>(getCategories());
-  useEffect(() => setCategories(getCategories()), []);
-  return (
     <aside className="sidebar">
+      <h2>Company Wiki</h2>
+      <ul>
+        <li onClick={() => navigate("/docs")}>Articles</li>
+        {currentUser &&
+          PERMISSIONS[currentUser.role].includes("edit") && (
+            <li onClick={() => navigate("/editor")}>Add New Article</li>
+          )}
+      </ul>
+
       <h3>Categories</h3>
       <ul>
         <li onClick={() => setCategory("")}>All</li>
         {categories.map((cat) => (
-          <li key={cat} onClick={() => setCategory(cat)}>{cat}</li>
+          <li key={cat} onClick={() => setCategory(cat)}>
+            {cat}
+          </li>
         ))}
       </ul>
+
+      <div className="sidebar-user">
+        {currentUser ? (
+          <>
+            <p>
+              {currentUser.username} ({currentUser.role})
+            </p>
+            <button onClick={handleLogout}>Logout</button>
+          </>
+        ) : (
+          <button onClick={() => navigate("/login")}>Login</button>
+        )}
+      </div>
     </aside>
   );
 }
@@ -105,7 +115,7 @@ function Login({ setCurrentUser }: { setCurrentUser: React.Dispatch<React.SetSta
     if (!username || !password) return alert("Please fill all fields!");
 
     try {
-      const res = await fetch("http://192.168.0.11:3000/login", {
+      const res = await fetch("http://192.168.0.17:3000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -125,7 +135,7 @@ function Login({ setCurrentUser }: { setCurrentUser: React.Dispatch<React.SetSta
 
   return (
     <div className="login-container">
-      <div className="login-box">
+      <div className="login-box text-center">
         <h2>Login</h2>
         <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -136,53 +146,77 @@ function Login({ setCurrentUser }: { setCurrentUser: React.Dispatch<React.SetSta
 }
 
 // ===== Docs 列表页 =====
-function Docs({ currentUser }: { currentUser: User | null }) {
+function Docs({
+  currentUser,
+  setCurrentUser,
+}: {
+  currentUser: User | null;
+  setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
+}) {
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [search, setSearch] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const fetchDocs = () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch("http://192.168.0.11:3000/articles", {
+    fetch("http://192.168.0.17:3000/articles", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data: DocItem[]) => setDocs(data))
       .catch((err) => console.error("Fetch articles error:", err));
-  }, []);
+  };
 
-  const filteredDocs = docs.filter(
-    (d) => (category === "" || d.category === category) && (d.content.toLowerCase().includes(search.toLowerCase()) || d.title.toLowerCase().includes(search.toLowerCase()))
-  );
+  useEffect(() => {
+    fetchDocs();
+  }, []);
 
   const handleDelete = async (id?: number) => {
     if (!id) return;
-    if (!window.confirm("Are you sure to delete?")) return;
+    if (!window.confirm("Are you sure to delete this document?")) return;
+
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
-      const res = await fetch(`http://192.168.0.11:3000/articles/${id}`, {
+      const res = await fetch(`http://192.168.0.17:3000/articles/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Delete failed");
-      setDocs(docs.filter((d) => d.id !== id));
-      alert("Article deleted!");
+      alert("Deleted!");
+      fetchDocs();
     } catch (err) {
       console.error(err);
       alert("Delete failed!");
     }
   };
 
+  const filteredDocs = docs.filter(
+    (d) =>
+      (category === "" || d.category === category) &&
+      (d.content.toLowerCase().includes(search.toLowerCase()) ||
+        d.title.toLowerCase().includes(search.toLowerCase()))
+  );
+
   return (
     <div className="layout">
-      <Sidebar setCategory={setCategory} />
+      <Sidebar
+        setCategory={setCategory}
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+      />
       <div className="main-content">
-        <input type="text" placeholder="Search docs..." value={search} onChange={(e) => setSearch(e.target.value)} className="search-input" />
+        <input
+          type="text"
+          placeholder="Search docs..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="search-input"
+        />
         {filteredDocs.length === 0 && <p>No documents found.</p>}
         {filteredDocs.map((doc) => (
           <div key={doc.id} className="doc-card">
@@ -190,11 +224,16 @@ function Docs({ currentUser }: { currentUser: User | null }) {
             <p>{doc.content.substring(0, 50)}...</p>
             <p>Category: {doc.category}</p>
             <p>Author: {doc.author || "Unknown"}</p>
+
             <div className="doc-buttons">
-              {currentUser && PERMISSIONS[currentUser.role].includes("edit") && <button onClick={() => navigate(`/editor/${doc.id}`)}>Edit</button>}
-              {currentUser && ((currentUser.role === "admin") || (currentUser.role === "editor" && doc.author === currentUser.username)) && (
-                <button onClick={() => handleDelete(doc.id)}>Delete</button>
+              {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
+                <button onClick={() => navigate(`/editor/${doc.id}`)}>Edit</button>
               )}
+              {currentUser &&
+                (currentUser.role === "admin" ||
+                  (currentUser.role === "editor" && doc.author === currentUser.username)) && (
+                  <button onClick={() => handleDelete(doc.id)}>Delete</button>
+                )}
               <button onClick={() => navigate(`/docs/${doc.id}`)}>View</button>
             </div>
           </div>
@@ -214,7 +253,7 @@ function DocDetail({ currentUser }: { currentUser: User | null }) {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch(`http://192.168.0.11:3000/articles/${id}`, {
+    fetch(`http://192.168.0.17:3000/articles/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -230,7 +269,7 @@ function DocDetail({ currentUser }: { currentUser: User | null }) {
     if (!token) return;
 
     try {
-      const res = await fetch(`http://192.168.0.11:3000/articles/${id}`, {
+      const res = await fetch(`http://192.168.0.17:3000/articles/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -244,24 +283,24 @@ function DocDetail({ currentUser }: { currentUser: User | null }) {
   };
 
   const exportPDF = async () => {
-  const element = document.getElementById("doc-content");
-  if (!element) return alert("Cannot find content to export!");
+    const element = document.getElementById("doc-content");
+    if (!element) return alert("Cannot find content to export!");
 
-  try {
-    const canvas = await html2canvas(element, { scale: 2, scrollY: -window.scrollY });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "pt", "a4");
+    try {
+      const canvas = await html2canvas(element, { scale: 2, scrollY: -window.scrollY });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "pt", "a4");
 
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${doc.title || "document"}.pdf`);
-  } catch (err) {
-    console.error(err);
-    alert("Export PDF failed!");
-  }
-};
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${doc.title || "document"}.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Export PDF failed!");
+    }
+  };
 
   const exportWord = async () => {
     const lines = doc.content.split("\n");
@@ -285,22 +324,22 @@ function DocDetail({ currentUser }: { currentUser: User | null }) {
           <button onClick={() => navigate(`/editor/${id}`)}>Edit</button>
         )}
         {currentUser &&
-          ((currentUser.role === "admin") || (currentUser.role === "editor" && doc.author === currentUser.username)) && (
+          (currentUser.role === "admin" || (currentUser.role === "editor" && doc.author === currentUser.username)) && (
             <button onClick={handleDelete}>Delete</button>
           )}
         <button onClick={exportPDF}>Export PDF</button>
         <button onClick={exportWord}>Export Word</button>
       </div>
 
-        {/* 右侧：预览 */}
-        <div className="mk-down" id="doc-content">
-          <MDEditor.Markdown source={doc.content} />
-        </div>
-      </div>
-    
+      <div style={{ padding: "20px", background: "#fff", border: "1px solid #ccc" }}>
+    <MDEditor.Markdown
+      source={doc.content}
+      style={{ whiteSpace: "pre-wrap" }}
+    />
+  </div>
+    </div>
   );
 }
-
 
 // ===== EditorPage 页面 =====
 function EditorPage({ currentUser }: { currentUser: User | null }) {
@@ -316,7 +355,9 @@ function EditorPage({ currentUser }: { currentUser: User | null }) {
     if (id) {
       const token = localStorage.getItem("token");
       if (!token) return;
-      fetch(`http://192.168.0.11:3000/articles/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`http://192.168.0.17:3000/articles/${id}`, { 
+        headers: { Authorization: `Bearer ${token}` } 
+      })
         .then((res) => res.json())
         .then((data: DocItem) => {
           setTitle(data.title);
@@ -330,14 +371,15 @@ function EditorPage({ currentUser }: { currentUser: User | null }) {
   }, [id]);
 
   const handleSave = async () => {
-    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) return alert("No permission to save!");
+    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) 
+      return alert("No permission to save!");
     const token = localStorage.getItem("token");
     if (!token) return;
 
     const payload: DocItem = { title, content, category, author: currentUser.username };
     try {
       const res = await fetch(
-        id ? `http://192.168.0.11:3000/articles/${id}` : "http://192.168.0.11:3000/articles",
+        id ? `http://192.168.0.17:3000/articles/${id}` : "http://192.168.0.17:3000/articles",
         {
           method: id ? "PUT" : "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -362,25 +404,24 @@ function EditorPage({ currentUser }: { currentUser: User | null }) {
       <select value={category} onChange={(e) => setCategory(e.target.value)}>
         {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
       </select>
+
       <div className="editor-container" style={{ display: "flex", gap: "20px" }}>
-        <MDEditor
-          value={content}
-          onChange={(val) => setContent(val || "")}
-          height={500}
-          style={{ flex: 1 }}
-        />
-        <div className="md-editor" style={{ flex: 1, padding: "20px", background: "#fff", overflowY: "auto", border: "1px solid #ccc" }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {content}
-          </ReactMarkdown>
+          <MDEditor value={content} onChange={(val) => setContent(val || "")} height={500} style={{ flex: 1 }} />
         </div>
-      </div>
-      <button className="save" onClick={handleSave}>Save</button>
+
+        <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+          <button className="save" onClick={handleSave}>
+            Save
+          </button>
+          <button className="back" onClick={() => navigate("/docs")}>
+            Back to Docs
+          </button>
+        </div>
     </div>
   );
 }
 
-// ===== App 主入口 =====
+// ===== App 根组件 =====
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -389,7 +430,12 @@ export default function App() {
     if (!token) return;
     try {
       const decoded = jwtDecode<JWTPayload>(token);
-      if (decoded.exp * 1000 > Date.now()) setCurrentUser({ id: decoded.id, username: decoded.username, role: decoded.role });
+      if (decoded.exp * 1000 > Date.now())
+        setCurrentUser({
+          id: decoded.id,
+          username: decoded.username,
+          role: decoded.role,
+        });
       else localStorage.removeItem("token");
     } catch {
       localStorage.removeItem("token");
@@ -398,11 +444,10 @@ export default function App() {
 
   return (
     <Router>
-      <Navbar currentUser={currentUser} setCurrentUser={setCurrentUser} />
       <Routes>
         <Route path="/" element={<Navigate to="/docs" replace />} />
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
-        <Route path="/docs" element={<Docs currentUser={currentUser} />} />
+        <Route path="/docs" element={<Docs currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
         <Route path="/docs/:id" element={<DocDetail currentUser={currentUser} />} />
         <Route path="/editor" element={<EditorPage currentUser={currentUser} />} />
         <Route path="/editor/:id" element={<EditorPage currentUser={currentUser} />} />
