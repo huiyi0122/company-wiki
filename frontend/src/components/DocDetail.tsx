@@ -1,7 +1,8 @@
-// src/components/DocDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
+import remarkGfm from "remark-gfm";
+import remarkGemoji from "remark-gemoji";
 
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
@@ -69,7 +70,9 @@ export default function DocDetail({
             <strong>Category:</strong> {doc.category}
           </p>
           <p>
-            <strong>Author:</strong> {doc.author || "Unknown"}
+<p>
+  <strong>Username:</strong> {doc.author || currentUser?.username || "Unknown"}
+</p>
           </p>
 
           <div className="doc-buttons" style={{ marginBottom: "20px" }}>
@@ -98,13 +101,16 @@ export default function DocDetail({
               borderRadius: "0",
             }}
           >
-            {/* ✅ 这里设置 height={700}，替换默认 200 */}
-            <MDEditor
-              value={doc.content}
-              preview="preview"
-              hideToolbar={true}
-              height={700}
-            />
+<MDEditor
+  value={doc.content}
+  preview="preview"
+  hideToolbar={true}
+  height={700}
+  previewOptions={{
+    remarkPlugins: [remarkGfm, remarkGemoji],
+  }}
+/>
+
           </div>
             <button className="view" onClick={() => navigate("/docs")}>
     Back to Docs

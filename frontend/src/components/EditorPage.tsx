@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
+import remarkGfm from "remark-gfm";
+import remarkGemoji from "remark-gemoji";
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, getCategories, API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
@@ -44,52 +46,51 @@ export default function EditorPage({
       setContent("## Start writing your article...");
       setCategory(getCategories()[0] || ""); // 默认选中第一个分类
     }
-  }, [id]); // 监听 id 变化
+  }, [id]);
 
   const handleSave = async () => {
-  if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
-    return alert("No permission to save!");
-  }
-  if (!title || !content) {
-    return alert("Title and content are required.");
-  }
-
-  const token = localStorage.getItem("token");
-  if (!token) return;
-
-  // ✅ 只发 id、title、content
-  const payload = id
-    ? { id: Number(id), title, content }
-    : { title, content };
-
-  try {
-    const res = await fetch(
-      id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
-      {
-        method: id ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(`Save failed: ${data.message || res.statusText}`);
+    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
+      return alert("No permission to save!");
+    }
+    if (!title || !content) {
+      return alert("Title and content are required.");
     }
 
-    alert("Article saved successfully!");
-    navigate("/docs");
-  } catch (err) {
-    console.error(err);
-    alert("Save failed! Check console for details.");
-  }
-};
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
+    // ✅ 只发 id、title、content
+    const payload = id
+      ? { id: Number(id), title, content, category }
+      : { title, content, category };
 
-    return (
+    try {
+      const res = await fetch(
+        id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
+        {
+          method: id ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(`Save failed: ${data.message || res.statusText}`);
+      }
+
+      alert("Article saved successfully!");
+      navigate("/docs");
+    } catch (err) {
+      console.error(err);
+      alert("Save failed! Check console for details.");
+    }
+  };
+
+  return (
     <div className="layout">
       <Sidebar
         setCategory={() => {}} // EditorPage 不需要设置 Category
@@ -102,14 +103,13 @@ export default function EditorPage({
           <div className="top">
             <div className="title">
               <label>Title:</label>
- 
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
- 
+
             <div className="Category">
               <label style={{ marginTop: "15px" }}>Category:</label>
               <select
@@ -124,6 +124,7 @@ export default function EditorPage({
               </select>
             </div>
           </div>
+
           <div
             className="editor-container"
             style={{ display: "flex", gap: "20px" }}
@@ -133,9 +134,12 @@ export default function EditorPage({
               onChange={(val) => setContent(val || "")}
               height={500}
               style={{ flex: 1 }}
+              previewOptions={{
+                remarkPlugins: [remarkGfm, remarkGemoji], // ✅ 支持 GFM + Emoji
+              }}
             />
           </div>
- 
+
           <div className="edit-btn">
             <button className="save" onClick={handleSave}>
               Save
