@@ -72,7 +72,7 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <p>Category: {doc.category}</p>
             <p>
             <p>
-              {`${doc.role || currentUser?.role || "viewer"}: ${doc.author || currentUser?.username || "Unknown"}`}
+                Username: {doc.author || currentUser?.username || "Unknown"}
             </p>
             </p>
           </div>

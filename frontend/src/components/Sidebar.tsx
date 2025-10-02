@@ -40,11 +40,10 @@ export default function Sidebar({
 
   const handleCategoryClick = (cat: string) => {
     setCategory(cat);
-    if (!location.pathname.startsWith("/docs") && location.pathname !== "/") {
-      navigate("/docs");
-    }
+    navigate("/docs"); // 不管在哪，统一跳到 docs 列表
     setMobileOpen(false);
   };
+
 
   return (
     <>
