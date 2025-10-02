@@ -1,6 +1,4 @@
-/* src/styles/Sidebar.css */
 
-/* ===== 侧边栏样式 - 固定高度和位置 ===== */
 .sidebar {
     width: 280px;
     background: #1a202c;
@@ -145,8 +143,9 @@
 
 /* 移动端下拉菜单 */
 .mobile-menu {
+  display: none;
   position: fixed;
-  top: 60px; /* navbar 高度 */
+  top: 30px; /* navbar 高度 */
   left: 0;
   right: 0;
   background: #1a202c;
@@ -178,7 +177,9 @@
   .mobile-navbar {
     display: flex;
   }
-
+  .mobile-menu{
+    display: block;
+  }
   .sidebar.desktop-only {
     display: none; /* 小屏隐藏原 sidebar */
   }

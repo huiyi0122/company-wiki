@@ -9,16 +9,31 @@ interface DashboardProps {
     // 1. ✅ 新增：接收 setCurrentUser (Sidebar组件需要)
     setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
+const API_BASE_URL = "http://192.168.0.18:3000"; // 你的后端地址
 
-// ⚠️ 模拟数据获取函数
-// 实际应用中，这里会是一个 API 调用
 const fetchStats = async () => {
+  try {
+    // 从后端拿文章列表
+    const res = await fetch(`${API_BASE_URL}/articles`);
+    if (!res.ok) throw new Error("Failed to fetch articles");
+
+    const articles = await res.json();
+
     return {
-        totalArticles: 150,
-        draftsPendingReview: 12,
-        newUsersLast7Days: 5,
+      totalArticles: articles.length,   // ✅ 真实的文章数量
+      draftsPendingReview: 0,           // 暂时先用 0
+      newUsersLast7Days: 0,             // 暂时先用 0
     };
+  } catch (err) {
+    console.error("❌ Failed to fetch stats:", err);
+    return {
+      totalArticles: 0,
+      draftsPendingReview: 0,
+      newUsersLast7Days: 0,
+    };
+  }
 };
+
 
 export default function Dashboard({ currentUser, setCurrentUser }: DashboardProps) {
     const [stats, setStats] = useState({
@@ -28,7 +43,6 @@ export default function Dashboard({ currentUser, setCurrentUser }: DashboardProp
     });
     const [loading, setLoading] = useState(true);
 
-    // ⚠️ 占位函数：Dashboard页面不需要处理分类，但Sidebar组件需要这个 prop
     const setCategory = () => { };
 
     // 检查当前用户是否有编辑/管理权限
@@ -89,8 +103,8 @@ export default function Dashboard({ currentUser, setCurrentUser }: DashboardProp
             <section className="recent-activity">
                 <h2>Recent Activity</h2>
                 <ul>
-                    <li>User **jane_doe** submitted a new draft: *Q3 Marketing Strategy*.</li>
-                    <li>User **john_smith** approved article *Onboarding Flow Update*.</li>
+                    <li>User **ABC** submitted a new draft: *Q3 Marketing Strategy*.</li>
+                    <li>User **DEF** approved article *Onboarding Flow Update*.</li>
                     <li>Category **HR** created by **system**.</li>
                 </ul>
             </section>
@@ -131,13 +145,11 @@ export default function Dashboard({ currentUser, setCurrentUser }: DashboardProp
 
     return (
         <div className="layout">
-            {/* 2. ✅ 渲染 Sidebar 组件 */}
             <Sidebar
                 setCategory={setCategory}
                 currentUser={currentUser}
                 setCurrentUser={setCurrentUser}
             />
-            {/* 3. ✅ 将 Dashboard 内容放入布局容器 */}
             <div className="main-content-with-sidebar dashboard-container">
                 {dashboardContent}
             </div>

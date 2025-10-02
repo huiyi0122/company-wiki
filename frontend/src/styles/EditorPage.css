@@ -143,6 +143,12 @@ button.back {
     font-size: 16px;
 }
 
+.edit-btn{
+    margin-top: 20px; 
+    display: flex;
+    gap: 10px;
+}
+
 /* 响应式调整 */
 
 @media (max-width: 768px) {
@@ -157,6 +163,12 @@ button.back {
     }
     .editor-container {
         min-height: 400px;
+    }
+    .edit-btn{
+        margin-top: 20px; 
+        display: flex;
+        gap: 10px;
+        flex-direction: column;
     }
 }
 

@@ -136,7 +136,7 @@ export default function EditorPage({
             />
           </div>
  
-          <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+          <div className="edit-btn">
             <button className="save" onClick={handleSave}>
               Save
             </button>
