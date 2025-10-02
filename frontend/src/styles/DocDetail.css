@@ -1,7 +1,8 @@
 .doc-top {
-    margin: 50px;
+  margin: 50px;
 }
 
+<<<<<<< HEAD
 /* MDEditor 容器 */
 .w-md-editor {
     text-align: left;
@@ -74,4 +75,15 @@
     #doc-content {
         padding: 10px;
     }
+=======
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .doc-top {
+    margin: 15px;
+  }
+
+  #doc-content {
+    padding: 15px;
+  }
+>>>>>>> 14d4df4dcccd3bee06989e408f11dbad6f63d86c
 }

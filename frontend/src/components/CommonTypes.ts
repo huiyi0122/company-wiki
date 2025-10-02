@@ -1,4 +1,3 @@
-
 export type Role = "admin" | "editor" | "viewer";
 
 export interface User {
@@ -20,7 +19,7 @@ export interface DocItem {
   content: string;
   category: string;
   author?: string;
-  role?: Role;   // ✅ 新增
+  role?: Role; // ✅ 新增
 }
 
 // ===== 权限定义 =====
@@ -38,4 +37,8 @@ export function getCategories(): string[] {
 }
 
 // 假设的后端地址
+<<<<<<< HEAD
 export const API_BASE_URL = "http://192.168.0.18:3000";
+=======
+export const API_BASE_URL = "http://192.168.0.18:3000";
+>>>>>>> 14d4df4dcccd3bee06989e408f11dbad6f63d86c
