@@ -22,7 +22,7 @@
     line-height: 1.7;
     font-size: 1rem;
     color: #2d3748; /* 深灰色文字 */
-    overflow: auto;
+    overflow: scroll;
     background: transparent !important;
 }
 
