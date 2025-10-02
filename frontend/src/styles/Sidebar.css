@@ -113,13 +113,73 @@
 }
 
 /* 响应式调整 */
-@media (max-width: 768px) {
-    .sidebar {
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
+/* 顶部导航栏 (移动端) */
+.mobile-navbar {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  background: #1a202c;
+  color: white;
+  padding: 10px 20px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+}
 
-    .sidebar.mobile-open {
-        transform: translateX(0);
-    }
+.mobile-navbar h2 {
+  color: #4299e1;
+  margin: 0;
+  font-size: 1.3em;
+  cursor: pointer;
+}
+
+.mobile-navbar .hamburger {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.8em;
+  cursor: pointer;
+}
+
+/* 移动端下拉菜单 */
+.mobile-menu {
+  position: fixed;
+  top: 60px; /* navbar 高度 */
+  left: 0;
+  right: 0;
+  background: #1a202c;
+  color: white;
+  padding: 30px;
+  z-index: 1090;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: dropdown 0.3s ease;
+}
+
+@keyframes dropdown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 桌面端 Sidebar */
+.sidebar.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-navbar {
+    display: flex;
+  }
+
+  .sidebar.desktop-only {
+    display: none; /* 小屏隐藏原 sidebar */
+  }
 }

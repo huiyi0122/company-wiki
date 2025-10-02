@@ -53,6 +53,7 @@ export default function Dashboard({ currentUser, setCurrentUser }: DashboardProp
 
     // 渲染 Dashboard 内容，同时添加侧边栏
     const dashboardContent = (
+        
         <div className="dashboard-content">
             <h1>👋 Welcome back, {currentUser.username}!</h1>
             <p className="dashboard-role">

@@ -59,6 +59,7 @@
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
+    flex-wrap: wrap;
 }
 
 .w-md-editor-toolbar li {
@@ -86,8 +87,8 @@
 }
 
 .w-md-editor-preview {
-    background: white !important;
-    padding: 20px !important;
+    background: white ;
+    padding: 20px;
 }
 
 /* MDEditor 预览内容的样式 */
@@ -116,8 +117,8 @@
 }
 
 .w-md-editor-preview pre {
-    background: #1a202c !important;
-    border: 1px solid #2d3748 !important;
+    background: #ffffff;
+    border: 1px solid #999b9d !important;
     border-radius: 8px !important;
     padding: 16px !important;
 }
@@ -143,9 +144,16 @@ button.back {
 }
 
 /* 响应式调整 */
+
+@media (max-width: 768px) {
+    .edit-top {
+        margin: 100px 20px 20px;
+    }
+}
+
 @media (max-width: 480px) {
     .edit-top {
-        margin: 15px;
+        margin: 100px 20px 20px;
     }
     .editor-container {
         min-height: 400px;

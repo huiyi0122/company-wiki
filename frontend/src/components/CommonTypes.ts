@@ -38,4 +38,4 @@ export function getCategories(): string[] {
 }
 
 // 假设的后端地址
-export const API_BASE_URL = "http://192.168.0.17:3000";
+export const API_BASE_URL = "http://192.168.0.18:3000";

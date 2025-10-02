@@ -2,10 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { Document, Packer, Paragraph, HeadingLevel } from "docx";
-import { saveAs } from "file-saver";
+
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
@@ -57,39 +54,6 @@ export default function DocDetail({
     }
   };
 
-  const exportPDF = async () => {
-    const element = document.getElementById("doc-content");
-    if (!element) return alert("Cannot find content to export!");
-
-    try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        scrollY: -window.scrollY,
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "pt", "a4");
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${doc.title || "document"}.pdf`);
-    } catch (err) {
-      console.error(err);
-      alert("Export PDF failed!");
-    }
-  };
-
-  const exportWord = async () => {
-    const lines = doc.content.split("\n");
-    const children = [
-      new Paragraph({ text: doc.title || "Untitled", heading: HeadingLevel.HEADING_1 }),
-      ...lines.map((line) => new Paragraph(line)),
-    ];
-    const docx = new Document({ sections: [{ properties: {}, children }] });
-    const blob = await Packer.toBlob(docx);
-    saveAs(blob, `${doc.title || "document"}.docx`);
-  };
 
   return (
     <div className="layout">
@@ -122,21 +86,16 @@ export default function DocDetail({
                   Delete
                 </button>
               )}
-            <button className="view" onClick={exportPDF}>
-              Export PDF
-            </button>
-            <button className="view" onClick={exportWord}>
-              Export Word
-            </button>
+
           </div>
 
           <div
             id="doc-content"
             style={{
-              padding: "20px",
-              background: "#fff",
-              border: "1px solid #ccc",
-              borderRadius: "12px",
+              padding: "0",
+              background: "none",
+              border: "none",
+              borderRadius: "0",
             }}
           >
             {/* ✅ 这里设置 height={700}，替换默认 200 */}
