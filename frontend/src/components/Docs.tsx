@@ -8,7 +8,7 @@ import { API_BASE_URL } from "./CommonTypes";
 
 // Import the types (things that disappear after compilation)
 import type { User, DocItem } from "./CommonTypes";
-import "../styles/Docs.css"; 
+import "../styles/Docs.css";
 
 interface DocsProps {
   currentUser: User | null;
@@ -71,9 +71,10 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <h3>Title: {doc.title || "Untitled"}</h3>
             <p>Category: {doc.category}</p>
             <p>
-            <p>
-              {`${doc.role || currentUser?.role || "viewer"}: ${doc.author || currentUser?.username || "Unknown"}`}
-            </p>
+              <p>
+                Username:{" "}
+                {`${doc.author || currentUser?.username || "Unknown"}`}
+              </p>
             </p>
           </div>
         ))}
