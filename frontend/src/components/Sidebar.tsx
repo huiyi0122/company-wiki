@@ -4,6 +4,7 @@ import { getCategories, PERMISSIONS } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 import "../styles/Sidebar.css";
 
+
 interface SidebarProps {
   setCategory: React.Dispatch<React.SetStateAction<string>>;
   currentUser: User | null;

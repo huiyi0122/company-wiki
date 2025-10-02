@@ -71,7 +71,9 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <h3>Title: {doc.title || "Untitled"}</h3>
             <p>Category: {doc.category}</p>
             <p>
-              {doc.role ? `${doc.role}: ${doc.author || "Unknown"}` : `Author: ${doc.author || "Unknown"}`}
+            <p>
+              {`${doc.role || currentUser?.role || "viewer"}: ${doc.author || currentUser?.username || "Unknown"}`}
+            </p>
             </p>
           </div>
         ))}
