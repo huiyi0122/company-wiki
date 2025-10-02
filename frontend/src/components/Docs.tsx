@@ -8,7 +8,7 @@ import { API_BASE_URL } from "./CommonTypes";
 
 // Import the types (things that disappear after compilation)
 import type { User, DocItem } from "./CommonTypes";
-import "../styles/Docs.css"; 
+import "../styles/Docs.css";
 
 interface DocsProps {
   currentUser: User | null;
