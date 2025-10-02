@@ -1,19 +1,14 @@
-/* src/styles/DocDetail.css */
-
 .doc-top {
-    margin: 50px;
+  margin: 50px;
 }
-
-/* 文档详情内容区域样式 */
-.wmde-markdown-var, .w-md-editor, .w-md-editor-show-preview{}
 
 /* 响应式调整 */
 @media (max-width: 480px) {
-    .doc-top {
-        margin: 15px;
-    }
+  .doc-top {
+    margin: 15px;
+  }
 
-    #doc-content {
-        padding: 15px;
-    }
+  #doc-content {
+    padding: 15px;
+  }
 }
