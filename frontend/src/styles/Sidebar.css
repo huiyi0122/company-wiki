@@ -57,20 +57,17 @@
   transform: translateX(5px);
 }
 
-/* 激活状态的样式 (关键：解决点击后高亮问题) */
 .sidebar li.active {
   background: #2d3748;
   color: #4299e1;
   border-left: 4px solid #4299e1;
 }
 
-/* ===== 侧边栏用户区域 - 固定在底部 ===== */
 .sidebar-user {
   margin-top: auto;
-  padding: 20px 0 0; /* 调整：去掉水平 padding，保留上边距 */
+  padding: 20px 0 0; 
   border-top: 1px solid #2d3748;
   background: #1a202c;
-  /* 调整：如果您希望按钮和文本与 li 对齐，可能需要调整 padding */
   padding-top: 20px;
 }
 
@@ -90,7 +87,7 @@
   cursor: pointer;
   font-weight: 600;
   transition: all 0.3s ease;
-  margin: 0; /* 移除通用 button 的 margin */
+  margin: 0; 
 }
 
 .sidebar-user button:hover {
@@ -98,7 +95,6 @@
   transform: translateY(-2px);
 }
 
-/* 侧边栏滚动条样式 */
 .sidebar::-webkit-scrollbar-track {
   background: #2d3748;
 }
@@ -111,8 +107,7 @@
   background: #718096;
 }
 
-/* 响应式调整 */
-/* 顶部导航栏 (移动端) */
+
 .mobile-navbar {
   display: none;
   justify-content: space-between;
@@ -142,11 +137,10 @@
   cursor: pointer;
 }
 
-/* 移动端下拉菜单 */
 .mobile-menu {
   display: none;
   position: fixed;
-  top: 30px; /* navbar 高度 */
+  top: 42px; /* navbar 高度 */
   left: 0;
   right: 0;
   background: #1a202c;
@@ -169,7 +163,6 @@
   }
 }
 
-/* 桌面端 Sidebar */
 .sidebar.desktop-only {
   display: block;
 }
@@ -182,6 +175,6 @@
     display: block;
   }
   .sidebar.desktop-only {
-    display: none; /* 小屏隐藏原 sidebar */
+    display: none; 
   }
 }

@@ -19,7 +19,7 @@ export interface DocItem {
   content: string;
   category: string;
   author?: string;
-  role?: Role; // ✅ 新增
+  role?: Role; 
 }
 
 // ===== 权限定义 =====
@@ -36,5 +36,5 @@ export function getCategories(): string[] {
   return DEFAULT_CATEGORIES;
 }
 
-// 假设的后端地址
+// 后端地址
 export const API_BASE_URL = "http://192.168.0.19:3000";

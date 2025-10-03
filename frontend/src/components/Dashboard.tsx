@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import type { User } from "./CommonTypes";
 import { PERMISSIONS } from "./CommonTypes";
-import "../styles/Dashboard.css"; // 假设你需要一个 Dashboard.css 文件
+import "../styles/Dashboard.css"; 
 import Sidebar from "./Sidebar";
 
 interface DashboardProps {
     currentUser: User | null;
-    // 1. ✅ 新增：接收 setCurrentUser (Sidebar组件需要)
+    // 接收 setCurrentUser (Sidebar组件需要)
     setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
-const API_BASE_URL = "http://192.168.0.18:3000"; // 你的后端地址
+const API_BASE_URL = "http://192.168.0.19:3000"; 
 
 const fetchStats = async () => {
   try {
@@ -20,7 +20,7 @@ const fetchStats = async () => {
     const articles = await res.json();
 
     return {
-      totalArticles: articles.length,   // ✅ 真实的文章数量
+      totalArticles: articles.length,   
       draftsPendingReview: 0,           // 暂时先用 0
       newUsersLast7Days: 0,             // 暂时先用 0
     };
@@ -65,7 +65,6 @@ export default function Dashboard({ currentUser, setCurrentUser }: DashboardProp
         return <div className="dashboard-container">Please login to view the dashboard.</div>;
     }
 
-    // 渲染 Dashboard 内容，同时添加侧边栏
     const dashboardContent = (
         
         <div className="dashboard-content">
