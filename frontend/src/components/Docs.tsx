@@ -29,7 +29,13 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((data: DocItem[]) => setDocs(data))
+      .then((data) => {
+        if (data.success) {
+          setDocs(data.data); // ✅ 取 data.data
+        } else {
+          console.error("API error:", data.error);
+        }
+      })
       .catch((err) => console.error("Fetch articles error:", err));
   };
 

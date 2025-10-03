@@ -18,7 +18,6 @@ export default function Login({ setCurrentUser }: LoginProps) {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    // ✅ FIX 2: Replacing window.alert() with console.error()
     if (!username || !password) return console.error("Please fill all fields!");
 
     try {
@@ -27,25 +26,26 @@ export default function Login({ setCurrentUser }: LoginProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      // ✅ FIX 3: Replacing window.alert() with console.error()
-      if (!res.ok) {
-        console.error("Invalid username or password!");
+
+      const data = await res.json();
+
+      if (!data.success) {
+        console.error(data.error || "Invalid username or password!");
         return;
       }
 
-      const data = await res.json();
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("token", data.data.token);
 
-      const decoded = jwtDecode<JWTPayload>(data.token);
+      const decoded = jwtDecode<JWTPayload>(data.data.token);
       setCurrentUser({
         id: decoded.id,
         username: decoded.username,
         role: decoded.role,
       });
+
       navigate("/docs");
     } catch (err) {
       console.error(err);
-      // ✅ FIX 4: Replacing window.alert() with console.error()
       console.error("Login failed!");
     }
   };
