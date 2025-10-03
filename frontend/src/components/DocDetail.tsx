@@ -30,7 +30,13 @@ export default function DocDetail({
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((data: DocItem) => setDoc(data))
+      .then((result) => {
+        if (result.success) {
+          setDoc(result.data); // ✅ 取出 data
+        } else {
+          console.error(result.message);
+        }
+      })
       .catch((err) => console.error(err));
   }, [id]);
 
