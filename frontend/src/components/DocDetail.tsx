@@ -55,7 +55,6 @@ export default function DocDetail({
     }
   };
 
-
   return (
     <div className="layout">
       <Sidebar
@@ -70,14 +69,16 @@ export default function DocDetail({
             <strong>Category:</strong> {doc.category}
           </p>
           <p>
-<p>
-  <strong>Username:</strong> {doc.author || currentUser?.username || "Unknown"}
-</p>
+            <strong>Username:</strong>{" "}
+            {doc.author || currentUser?.username || "Unknown"}
           </p>
 
           <div className="doc-buttons" style={{ marginBottom: "20px" }}>
             {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-              <button className="edit" onClick={() => navigate(`/editor/${id}`)}>
+              <button
+                className="edit"
+                onClick={() => navigate(`/editor/${id}`)}
+              >
                 Edit
               </button>
             )}
@@ -89,7 +90,6 @@ export default function DocDetail({
                   Delete
                 </button>
               )}
-
           </div>
 
           <div
@@ -101,20 +101,19 @@ export default function DocDetail({
               borderRadius: "0",
             }}
           >
-<MDEditor
-  value={doc.content}
-  preview="preview"
-  hideToolbar={true}
-  height={700}
-  previewOptions={{
-    remarkPlugins: [remarkGfm, remarkGemoji],
-  }}
-/>
-
+            <MDEditor
+              value={doc.content}
+              preview="preview"
+              hideToolbar={true}
+              height={700}
+              previewOptions={{
+                remarkPlugins: [remarkGfm, remarkGemoji],
+              }}
+            />
           </div>
-            <button className="view" onClick={() => navigate("/docs")}>
-    Back to Docs
-  </button>
+          <button className="view" onClick={() => navigate("/docs")}>
+            Back to Docs
+          </button>
         </div>
       </div>
     </div>
