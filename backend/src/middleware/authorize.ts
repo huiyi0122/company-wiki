@@ -1,22 +1,25 @@
+// src/middleware/authorize.ts
 import { Request, Response, NextFunction } from "express";
 import { errorResponse } from "../utils/response";
-import { PERMISSIONS } from "../constants/permissions";
+import { ROLE_PERMISSIONS } from "../constants/permission";
 
-export const authorize = (action: keyof (typeof PERMISSIONS)["admin"]) => {
+/**
+ * 权限检查中间件
+ * @param requiredPermission 需要的权限（比如 PERMISSIONS.ARTICLE_CREATE）
+ */
+export const authorize = (requiredPermission: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
 
-    if (!user || !user.role) {
-      return res.status(403).json(errorResponse("Unauthorized: No role found"));
+    if (!user) {
+      return res.status(401).json(errorResponse("Unauthorized"));
     }
 
-    const role = user.role as keyof typeof PERMISSIONS;
-    const allowed = PERMISSIONS[role]?.[action];
+    const role = user.role;
+    const permissions = ROLE_PERMISSIONS[role] || [];
 
-    if (!allowed) {
-      return res
-        .status(403)
-        .json(errorResponse("Forbidden: You don't have permission"));
+    if (!permissions.includes(requiredPermission)) {
+      return res.status(403).json(errorResponse("Forbidden: no permission"));
     }
 
     next();

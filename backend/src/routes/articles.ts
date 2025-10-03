@@ -1,7 +1,8 @@
 import { Router, Request, Response } from "express";
 import database from "../db";
 import { authenticate } from "../middleware/auth";
-import { authorize } from "../middleware/authorize"; // 🔥 新加
+import { authorize } from "../middleware/authorize";
+import { PERMISSIONS } from "../constants/permission"; // ✅ 改这里
 import { successResponse, errorResponse } from "../utils/response";
 
 const router = Router();
@@ -10,7 +11,7 @@ const router = Router();
 router.post(
   "/",
   authenticate,
-  authorize("create"), // 🔥 只有 admin/editor 可以创建
+  authorize(PERMISSIONS.ARTICLE_CREATE), // ✅ 用常量
   async (req: Request, res: Response) => {
     const { title, content } = req.body;
     if (!title || !content) {
@@ -36,7 +37,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  authorize("read"), // 🔥 所有人都可以 read
+  authorize(PERMISSIONS.ARTICLE_READ), // ✅ Reader/Admin/Editor 都能读
   async (_req: Request, res: Response) => {
     try {
       const [rows]: any = await database.query("SELECT * FROM articles");
@@ -52,7 +53,7 @@ router.get(
 router.get(
   "/search",
   authenticate,
-  authorize("read"), // 🔥 read 权限就能搜索
+  authorize(PERMISSIONS.ARTICLE_READ), // ✅ 需要 READ 权限
   async (req: Request, res: Response) => {
     const { q, page = "1", limit = "10" } = req.query;
 
@@ -100,7 +101,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  authorize("read"), // 🔥 read 权限可以
+  authorize(PERMISSIONS.ARTICLE_READ), // ✅ READ 权限
   async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
@@ -123,7 +124,7 @@ router.get(
 router.put(
   "/:id",
   authenticate,
-  authorize("update"), // 🔥 只有 admin/editor 可以
+  authorize(PERMISSIONS.ARTICLE_UPDATE), // ✅ 只有 admin/editor
   async (req: Request, res: Response) => {
     const { id } = req.params;
     const { title, content } = req.body;
@@ -164,7 +165,7 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  authorize("delete"), // 🔥 只有 admin/editor 可以
+  authorize(PERMISSIONS.ARTICLE_DELETE), // ✅ 只有 admin/editor
   async (req: Request, res: Response) => {
     const { id } = req.params;
     try {

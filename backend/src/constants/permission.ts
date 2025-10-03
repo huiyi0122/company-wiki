@@ -1,12 +1,28 @@
 // src/constants/permissions.ts
 
-// 定义不同角色能做的操作
+// 权限常量
 export const PERMISSIONS = {
-  admin: ["create", "read", "update", "delete", "invite"], // 管理员能做所有事
-  editor: ["create", "read", "update", "delete"], // 编辑者能CRUD
-  viewer: ["read"], // 观众只能看
-} as const;
+  USER_INVITE: "user:invite",
+  ARTICLE_CREATE: "article:create",
+  ARTICLE_READ: "article:read",
+  ARTICLE_UPDATE: "article:update",
+  ARTICLE_DELETE: "article:delete",
+};
 
-// 可选：定义一个类型方便在 TS 里用
-export type Role = keyof typeof PERMISSIONS; // "admin" | "editor" | "viewer"
-export type Action = (typeof PERMISSIONS)[Role][number];
+// 角色 → 权限映射
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: [
+    PERMISSIONS.USER_INVITE,
+    PERMISSIONS.ARTICLE_CREATE,
+    PERMISSIONS.ARTICLE_READ,
+    PERMISSIONS.ARTICLE_UPDATE,
+    PERMISSIONS.ARTICLE_DELETE,
+  ],
+  editor: [
+    PERMISSIONS.ARTICLE_CREATE,
+    PERMISSIONS.ARTICLE_READ,
+    PERMISSIONS.ARTICLE_UPDATE,
+    PERMISSIONS.ARTICLE_DELETE,
+  ],
+  reader: [PERMISSIONS.ARTICLE_READ],
+};
