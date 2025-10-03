@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
 import remarkGfm from "remark-gfm";
 import remarkGemoji from "remark-gemoji";
+import { toast } from 'react-toastify';
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, getCategories, API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
@@ -48,48 +49,46 @@ export default function EditorPage({
     }
   }, [id]);
 
-  const handleSave = async () => {
-    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
-      return alert("No permission to save!");
-    }
-    if (!title || !content) {
-      return alert("Title and content are required.");
-    }
+const handleSave = async () => {
+  if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
+    return toast.error("No permission to save!");
+  }
+  if (!title || !content) {
+    return toast.warning("Title and content are required.");
+  }
 
-    const token = localStorage.getItem("token");
-    if (!token) return;
+  const token = localStorage.getItem("token");
+  if (!token) return;
 
-    // ✅ 只发 id、title、content
-    const payload = id
-      ? { id: Number(id), title, content, category }
-      : { title, content, category };
+  const payload = id
+    ? { id: Number(id), title, content, category }
+    : { title, content, category };
 
-    try {
-      const res = await fetch(
-        id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
-        {
-          method: id ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(`Save failed: ${data.message || res.statusText}`);
+  try {
+    const res = await fetch(
+      id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       }
+    );
 
-      alert("Article saved successfully!");
-      navigate("/docs");
-    } catch (err) {
-      console.error(err);
-      alert("Save failed! Check console for details.");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || res.statusText);
     }
-  };
 
+    toast.success("Article saved successfully!");
+    navigate("/docs");
+  } catch (err) {
+    console.error(err);
+    toast.error("Save failed! Check console for details.");
+  }
+};
   return (
     <div className="layout">
       <Sidebar
