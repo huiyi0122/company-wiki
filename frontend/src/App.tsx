@@ -1,17 +1,22 @@
 // src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useState, useEffect } from "react";
 import { jwtDecode } from "jwt-decode";
 
 // 导入类型
-import type{ User, JWTPayload } from "./components/CommonTypes";
+import type { User, JWTPayload } from "./components/CommonTypes";
 
 // 导入页面组件
 import Login from "./components/Login";
 import Docs from "./components/Docs";
 import DocDetail from "./components/DocDetail";
 import EditorPage from "./components/EditorPage";
-import Dashboard from './components/Dashboard';
+import Dashboard from "./components/Dashboard";
 
 // 导入全局/布局样式
 // src/App.tsx (Corrected)
@@ -42,23 +47,63 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Navigate to="/docs" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         {/* 登录页面 */}
-        <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
+        <Route
+          path="/login"
+          element={<Login setCurrentUser={setCurrentUser} />}
+        />
 
-        <Route path="/dashboard" element={<Dashboard currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
-        
+        <Route
+          path="/dashboard"
+          element={
+            <Dashboard
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+            />
+          }
+        />
+
         {/* 文档列表页 (含侧边栏) */}
-        <Route path="/docs" element={<Docs currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
-        
+        <Route
+          path="/docs"
+          element={
+            <Docs currentUser={currentUser} setCurrentUser={setCurrentUser} />
+          }
+        />
+
         {/* 文档详情页 (含侧边栏) */}
-        <Route path="/docs/:id" element={<DocDetail currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
-        
+        <Route
+          path="/docs/:id"
+          element={
+            <DocDetail
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+            />
+          }
+        />
+
         {/* 编辑器 - 新增 (含侧边栏) */}
-        <Route path="/editor" element={<EditorPage currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
-        
+        <Route
+          path="/editor"
+          element={
+            <EditorPage
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+            />
+          }
+        />
+
         {/* 编辑器 - 编辑 (含侧边栏) */}
-        <Route path="/editor/:id" element={<EditorPage currentUser={currentUser} setCurrentUser={setCurrentUser} />} />
+        <Route
+          path="/editor/:id"
+          element={
+            <EditorPage
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+            />
+          }
+        />
       </Routes>
     </Router>
   );
