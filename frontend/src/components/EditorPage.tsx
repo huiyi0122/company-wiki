@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
 import remarkGfm from "remark-gfm";
 import remarkGemoji from "remark-gemoji";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, getCategories, API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
@@ -20,7 +20,9 @@ export default function EditorPage({
 }: EditorPageProps) {
   const { id } = useParams<{ id: string }>();
   const [title, setTitle] = useState<string>("");
-  const [content, setContent] = useState<string>("## Start writing your article...");
+  const [content, setContent] = useState<string>(
+    "## Start writing your article..."
+  );
   const [category, setCategory] = useState<string>("");
   const [categories, setCategories] = useState<string[]>(getCategories());
   const navigate = useNavigate();
@@ -31,14 +33,19 @@ export default function EditorPage({
       // 编辑模式：获取文章详情
       const token = localStorage.getItem("token");
       if (!token) return;
+
       fetch(`${API_BASE_URL}/articles/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
-        .then((data: DocItem) => {
-          setTitle(data.title);
-          setContent(data.content);
-          setCategory(data.category);
+        .then((result) => {
+          if (result.success && result.data) {
+            setTitle(result.data.title);
+            setContent(result.data.content);
+            setCategory(result.data.category);
+          } else {
+            console.error(result.message);
+          }
         })
         .catch((err) => console.error(err));
     } else {
@@ -49,46 +56,48 @@ export default function EditorPage({
     }
   }, [id]);
 
-const handleSave = async () => {
-  if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
-    return toast.error("No permission to save!");
-  }
-  if (!title || !content) {
-    return toast.warning("Title and content are required.");
-  }
-
-  const token = localStorage.getItem("token");
-  if (!token) return;
-
-  const payload = id
-    ? { id: Number(id), title, content, category }
-    : { title, content, category };
-
-  try {
-    const res = await fetch(
-      id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
-      {
-        method: id ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.message || res.statusText);
+  const handleSave = async () => {
+    if (!currentUser || !PERMISSIONS[currentUser.role].includes("save")) {
+      return toast.error("No permission to save!");
+    }
+    if (!title || !content) {
+      return toast.warning("Title and content are required.");
     }
 
-    toast.success("Article saved successfully!");
-    navigate("/docs");
-  } catch (err) {
-    console.error(err);
-    toast.error("Save failed! Check console for details.");
-  }
-};
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const payload = id
+      ? { id: Number(id), title, content, category }
+      : { title, content, category };
+
+    try {
+      const res = await fetch(
+        id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
+        {
+          method: id ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await res.json();
+      if (!result.success) {
+        throw new Error(result.message || "Save failed");
+      }
+      toast.success("Article saved successfully!");
+      navigate("/docs");
+
+      toast.success("Article saved successfully!");
+      navigate("/docs");
+    } catch (err) {
+      console.error(err);
+      toast.error("Save failed! Check console for details.");
+    }
+  };
   return (
     <div className="layout">
       <Sidebar
