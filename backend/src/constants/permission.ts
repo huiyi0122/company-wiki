@@ -1,28 +1,57 @@
-// src/constants/permissions.ts
+// backend/constant/permission.ts
 
-// 权限常量
+import { takeCoverage } from "v8";
+
+// 定义所有可用权限
 export const PERMISSIONS = {
-  USER_INVITE: "user:invite",
+  USER_ENROLL: "user:enroll",
   ARTICLE_CREATE: "article:create",
   ARTICLE_READ: "article:read",
   ARTICLE_UPDATE: "article:update",
   ARTICLE_DELETE: "article:delete",
+  CATEGORY_CREATE: "category:create",
+  CATEGORY_READ: "category:read",
+  CATEGORY_UPDATE: "category_update",
+  CATEGORY_DELETE: "category_delete",
+  TAG_CREATE: "tag:create",
+  TAG_READ: "tag:read",
+  TAG_UPDATE: "tag.update",
+  TAG_DELETE: "tag.delete",
 };
 
-// 角色 → 权限映射
+// 每个角色对应的权限集合
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: [
-    PERMISSIONS.USER_INVITE,
+    PERMISSIONS.USER_ENROLL,
     PERMISSIONS.ARTICLE_CREATE,
     PERMISSIONS.ARTICLE_READ,
     PERMISSIONS.ARTICLE_UPDATE,
     PERMISSIONS.ARTICLE_DELETE,
+    PERMISSIONS.CATEGORY_CREATE,
+    PERMISSIONS.CATEGORY_READ,
+    PERMISSIONS.CATEGORY_UPDATE,
+    PERMISSIONS.CATEGORY_DELETE,
+    PERMISSIONS.TAG_CREATE,
+    PERMISSIONS.TAG_UPDATE,
+    PERMISSIONS.TAG_DELETE,
+    PERMISSIONS.TAG_READ,
   ],
   editor: [
     PERMISSIONS.ARTICLE_CREATE,
     PERMISSIONS.ARTICLE_READ,
     PERMISSIONS.ARTICLE_UPDATE,
-    PERMISSIONS.ARTICLE_DELETE,
+    PERMISSIONS.CATEGORY_READ,
+    PERMISSIONS.CATEGORY_CREATE,
+    PERMISSIONS.CATEGORY_DELETE,
+    PERMISSIONS.CATEGORY_UPDATE,
+    PERMISSIONS.TAG_READ,
+    PERMISSIONS.TAG_CREATE,
+    PERMISSIONS.TAG_UPDATE,
+    PERMISSIONS.TAG_DELETE,
   ],
-  reader: [PERMISSIONS.ARTICLE_READ],
+  viewer: [
+    PERMISSIONS.ARTICLE_READ,
+    PERMISSIONS.CATEGORY_READ,
+    PERMISSIONS.TAG_READ,
+  ],
 };
