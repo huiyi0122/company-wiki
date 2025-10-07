@@ -1,25 +1,19 @@
-// src/middleware/authorize.ts
+// backend/middleware/authorize.ts
 import { Request, Response, NextFunction } from "express";
-import { errorResponse } from "../utils/response";
 import { ROLE_PERMISSIONS } from "../constants/permission";
+import { errorResponse } from "../utils/response";
 
-/**
- * 权限检查中间件
- * @param requiredPermission 需要的权限（比如 PERMISSIONS.ARTICLE_CREATE）
- */
 export const authorize = (requiredPermission: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as any).user;
 
-    if (!user) {
-      return res.status(401).json(errorResponse("Unauthorized"));
+    if (!user || !user.role) {
+      return res.status(403).json(errorResponse("User not authenticated"));
     }
 
-    const role = user.role;
-    const permissions = ROLE_PERMISSIONS[role] || [];
-
-    if (!permissions.includes(requiredPermission)) {
-      return res.status(403).json(errorResponse("Forbidden: no permission"));
+    const userPermissions = ROLE_PERMISSIONS[user.role] || [];
+    if (!userPermissions.includes(requiredPermission)) {
+      return res.status(403).json(errorResponse("Forbidden: Access denied"));
     }
 
     next();

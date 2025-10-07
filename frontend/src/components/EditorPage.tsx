@@ -185,8 +185,9 @@ export default function EditorPage({
       );
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.message || "Save failed");
-
+      if (!result.success) {
+        throw new Error(result.message || "Save failed");
+      }
       toast.success("Article saved successfully!");
       navigate("/docs");
     } catch (err) {
