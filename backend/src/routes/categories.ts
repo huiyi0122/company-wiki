@@ -7,16 +7,49 @@ import { successResponse, errorResponse } from "../utils/response";
 
 const router = Router();
 
-router.get("/", authenticate, async (req: Request, res: Response) => {
-  try {
-    const [rows]: any = await database.query("SELECT * FROM categories");
-    res.json(successResponse(rows));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(errorResponse("Failed to fetch categories"));
+router.get(
+  "/",
+  authenticate,
+  authorize(PERMISSIONS.CATEGORY_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const [rows]: any = await database.query("SELECT * FROM categories");
+      res.json(successResponse(rows));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Failed to fetch categories"));
+    }
   }
-});
+);
 
+router.get(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.CATEGORY_READ),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+      const [rows]: any = await database.query(
+        `
+  SELECT 
+    c.*
+  FROM categories c
+  WHERE c.id = ?
+  `,
+        [id]
+      );
+
+      if (!rows.length) {
+        return res.status(404).json(errorResponse("Categories not found"));
+      }
+
+      res.json(successResponse(rows[0]));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Database error"));
+    }
+  }
+);
 router.post(
   "/",
   authenticate,

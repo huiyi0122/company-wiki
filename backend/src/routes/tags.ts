@@ -4,22 +4,51 @@ import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
-import { error } from "console";
 
 const router = Router();
 
-// ✅ 获取所有标签
-router.get("/", authenticate, async (req: Request, res: Response) => {
-  try {
-    const [rows]: any = await database.query("SELECT * FROM tags");
-    res.json(successResponse(rows));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(errorResponse("Failed to fetch tags"));
+// ✅ READ all tags
+router.get(
+  "/",
+  authenticate,
+  authorize(PERMISSIONS.TAG_READ),
+  async (req: Request, res: Response) => {
+    try {
+      const [rows]: any = await database.query("SELECT * FROM tags");
+      res.json(successResponse(rows));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Failed to fetch tags"));
+    }
   }
-});
+);
 
-// ✅ 新增标签（admin/editor）
+// ✅ READ one tag
+router.get(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.TAG_READ),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+      const [rows]: any = await database.query(
+        "SELECT * FROM tags WHERE id = ?",
+        [id]
+      );
+
+      if (!rows.length) {
+        return res.status(404).json(errorResponse("Tag not found"));
+      }
+
+      res.json(successResponse(rows[0]));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Database error"));
+    }
+  }
+);
+
+// ✅ CREATE tag
 router.post(
   "/",
   authenticate,
@@ -41,6 +70,7 @@ router.post(
   }
 );
 
+// ✅ UPDATE tag (admin only)
 router.put(
   "/:id",
   authenticate,
@@ -52,20 +82,22 @@ router.put(
 
     try {
       const [result]: any = await database.query(
-        "UPDATE tags SET name = ? WHERE is = ?",
+        "UPDATE tags SET name = ? WHERE id = ?",
         [name, id]
       );
 
       if (result.affectedRows === 0) {
         return res.status(404).json(errorResponse("Tag not found"));
       }
-      res.json(successResponse(`Tag Update to '${name}'`));
+
+      res.json(successResponse(`Tag updated to '${name}'`));
     } catch (err) {
       res.status(500).json(errorResponse("Failed to update tag"));
     }
   }
 );
 
+// ✅ DELETE tag (admin only)
 router.delete(
   "/:id",
   authenticate,
@@ -75,7 +107,7 @@ router.delete(
 
     try {
       const [result]: any = await database.query(
-        "DELETE FROM tags WHERE id =?",
+        "DELETE FROM tags WHERE id = ?",
         [id]
       );
 
@@ -89,4 +121,5 @@ router.delete(
     }
   }
 );
+
 export default router;

@@ -7,7 +7,6 @@ import { successResponse, errorResponse } from "../utils/response";
 
 const router = Router();
 
-// 🟢 Create article
 router.post(
   "/",
   authenticate,
@@ -73,7 +72,6 @@ router.post(
   }
 );
 
-// 🟢 Read all articles — 加入 JOIN
 router.get(
   "/",
   authenticate,
@@ -96,44 +94,93 @@ router.get(
   }
 );
 
-// 🟢 Search articles — 加入 JOIN
 router.get(
   "/search",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_READ),
   async (req: Request, res: Response) => {
-    const { q, page = "1", limit = "10" } = req.query;
+    const { q, category_id, tags, page = "1", limit = "10" } = req.query;
+
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
     const offset = (pageNum - 1) * limitNum;
 
     try {
-      let whereClause = "";
-      let values: any[] = [];
+      let whereClause = "WHERE 1=1";
+      const values: any[] = [];
 
+      // ✅ 搜索扩展: 支持标题、内容、作者、分类、标签
       if (q) {
-        whereClause = "WHERE a.title LIKE ? OR a.content LIKE ?";
-        values.push(`%${q}%`, `%${q}%`);
+        whereClause += `
+          AND (
+            a.title LIKE ?
+            OR a.content LIKE ?
+            OR u.username LIKE ?
+            OR c.name LIKE ?
+            OR a.id IN (
+              SELECT at.article_id
+              FROM article_tags at
+              JOIN tags t ON at.tag_id = t.id
+              WHERE t.name LIKE ?
+            )
+          )
+        `;
+        const keyword = `%${q}%`;
+        values.push(keyword, keyword, keyword, keyword, keyword);
       }
 
+      if (category_id) {
+        whereClause += " AND a.category_id = ?";
+        values.push(category_id);
+      }
+
+      // ✅ 保留 tags 精确筛选
+      let tagSubQuery = "";
+      if (tags) {
+        const tagList = (tags as string).split(",").map((t) => t.trim());
+        if (tagList.length > 0) {
+          tagSubQuery = `
+            AND a.id IN (
+              SELECT at.article_id
+              FROM article_tags at
+              JOIN tags t ON at.tag_id = t.id
+              WHERE t.name IN (${tagList.map(() => "?").join(",")})
+              GROUP BY at.article_id
+              HAVING COUNT(DISTINCT t.name) = ?
+            )
+          `;
+          values.push(...tagList, tagList.length);
+        }
+      }
+
+      // ✅ 主查询
       const [rows]: any = await database.query(
         `
-        SELECT 
-          a.*, 
-          u.username AS author
+        SELECT
+          a.*,
+          u.username AS author,
+          c.name AS category
         FROM articles a
         LEFT JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
         ${whereClause}
+        ${tagSubQuery}
         ORDER BY a.created_at DESC
         LIMIT ? OFFSET ?
-        `,
+      `,
         [...values, limitNum, offset]
       );
 
-      const [countRows]: any = await database.query(
-        `SELECT COUNT(*) as total FROM articles a ${whereClause}`,
-        values
-      );
+      // ✅ 计数
+      const countQuery = `
+        SELECT COUNT(DISTINCT a.id) AS total
+        FROM articles a
+        LEFT JOIN users u ON a.author_id = u.id
+        LEFT JOIN categories c ON a.category_id = c.id
+        ${whereClause}
+        ${tagSubQuery}
+      `;
+      const [countRows]: any = await database.query(countQuery, values);
 
       res.json(
         successResponse({
@@ -145,53 +192,54 @@ router.get(
           },
         })
       );
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(errorResponse("Database error"));
+    } catch (err: any) {
+      console.error("Search articles error:", err);
+      res.status(500).json(errorResponse(err.message || "Database error"));
     }
   }
 );
-
-// 🟢 Read one article — 加入 JOIN
 router.get(
   "/:id",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_READ),
-  async (req: Request, res: Response) => {
+  async (req, res) => {
     const { id } = req.params;
     try {
-      const [rows]: any = await database.query(
+      const [articles]: any = await database.query(
         `
-        SELECT 
-          a.*, 
-          u.username AS author
-        FROM articles a
-        LEFT JOIN users u ON a.author_id = u.id
-        WHERE a.id = ?
-        `,
+      SELECT a.*, u.username AS author
+      FROM articles a
+      LEFT JOIN users u ON a.author_id = u.id
+      WHERE a.id = ?
+    `,
         [id]
       );
 
-      if (!rows.length) {
+      if (!articles.length)
         return res.status(404).json(errorResponse("Article not found"));
-      }
+      const article = articles[0];
 
-      res.json(successResponse(rows[0]));
+      // ✅ 查询 tag_ids
+      const [tags]: any = await database.query(
+        `SELECT tag_id FROM article_tags WHERE article_id = ?`,
+        [id]
+      );
+      const tag_ids = tags.map((t: any) => t.tag_id);
+
+      res.json(successResponse({ ...article, tag_ids }));
     } catch (err) {
       console.error(err);
       res.status(500).json(errorResponse("Database error"));
     }
   }
 );
-
-// 🟢 Update article
 router.put(
   "/:id",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_UPDATE),
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { title, content } = req.body;
+    const { title, content, category_id, tags } = req.body; // 👈 接收 tags 数组
     const user = (req as any).user;
 
     try {
@@ -212,7 +260,7 @@ router.put(
           .json(errorResponse("You cannot edit this article"));
       }
 
-      if (!title && !content) {
+      if (!title && !content && !category_id && !tags) {
         return res
           .status(400)
           .json(errorResponse("At least one field required"));
@@ -229,15 +277,33 @@ router.put(
         fields.push("content = ?");
         values.push(content);
       }
+      if (category_id) {
+        fields.push("category_id = ?");
+        values.push(category_id);
+      }
 
-      values.push(id);
+      if (fields.length > 0) {
+        values.push(id);
+        await database.query(
+          `UPDATE articles SET ${fields.join(", ")} WHERE id = ?`,
+          values
+        );
+      }
 
-      await database.query(
-        `UPDATE articles SET ${fields.join(", ")} WHERE id = ?`,
-        values
-      );
+      if (Array.isArray(tags)) {
+        await database.query("DELETE FROM article_tags WHERE article_id = ?", [
+          id,
+        ]);
 
-      res.json(successResponse({ id, title, content }));
+        for (const tagId of tags) {
+          await database.query(
+            "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
+            [id, tagId]
+          );
+        }
+      }
+
+      res.json(successResponse({ id, title, content, category_id, tags }));
     } catch (err) {
       console.error("Update article error:", err);
       res.status(500).json(errorResponse("Database error"));
@@ -245,7 +311,6 @@ router.put(
   }
 );
 
-// 🟢 Delete article
 router.delete(
   "/:id",
   authenticate,

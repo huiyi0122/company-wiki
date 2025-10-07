@@ -1,91 +1,111 @@
 import { Router, Request, Response } from "express";
+import { PERMISSIONS } from "../constants/permission";
 import bcrypt from "bcryptjs";
 import database from "../db";
 import { authenticate } from "../middleware/auth";
 import { successResponse, errorResponse } from "../utils/response";
+import { authorize } from "../middleware/authorize";
 
 const router = Router();
 
-router.post("/enroll", authenticate, async (req: Request, res: Response) => {
-  const currentUser = (req as any).user;
-  const { username, password, role, email } = req.body;
+router.post(
+  "/enroll",
+  authenticate,
+  authorize(PERMISSIONS.USER_ENROLL),
+  async (req: Request, res: Response) => {
+    const currentUser = (req as any).user;
+    const { username, password, role, email } = req.body;
 
-  if (currentUser.role !== "admin") {
-    return res.status(403).json(errorResponse("Forbidden: Admin only"));
-  }
-
-  if (!username || !password || !role || !email) {
-    return res.status(400).json(errorResponse("All fields are required"));
-  }
-
-  const validRoles = ["admin", "editor", "viewer"];
-  if (!validRoles.includes(role)) {
-    return res.status(400).json(errorResponse("Invalid role"));
-  }
-
-  try {
-    const [existingRows]: any = await database.query(
-      "SELECT * FROM users WHERE username = ? OR email = ?",
-      [username, email]
-    );
-    if (existingRows.length > 0) {
-      return res
-        .status(400)
-        .json(errorResponse("Username or email already exists"));
+    if (!username || !password || !role || !email) {
+      return res.status(400).json(errorResponse("All fields are required"));
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await database.query(
-      "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
-      [username, email, hashedPassword, role]
-    );
+    const validRoles = ["admin", "editor", "viewer"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json(errorResponse("Invalid role"));
+    }
 
-    const [newUserRows]: any = await database.query(
-      "SELECT id, username, email, role FROM users WHERE username = ?",
-      [username]
-    );
-    const newUser = newUserRows[0];
+    try {
+      const [existingRows]: any = await database.query(
+        "SELECT * FROM users WHERE username = ? OR email = ?",
+        [username, email]
+      );
+      if (existingRows.length > 0) {
+        return res
+          .status(400)
+          .json(errorResponse("Username or email already exists"));
+      }
 
-    return res.status(201).json(
-      successResponse({
-        message: `User '${username}' enrolled successfully`,
-        user: newUser,
-      })
-    );
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json(errorResponse("Server error"));
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await database.query(
+        "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
+        [username, email, hashedPassword, role]
+      );
+
+      const [newUserRows]: any = await database.query(
+        "SELECT id, username, email, role FROM users WHERE username = ?",
+        [username]
+      );
+      const newUser = newUserRows[0];
+
+      return res.status(201).json(
+        successResponse({
+          message: `User '${username}' enrolled successfully`,
+          user: newUser,
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json(errorResponse("Server error"));
+    }
   }
-});
+);
 
-router.get("/", authenticate, async (req: Request, res: Response) => {
-  const currentUser = (req as any).user;
+router.get(
+  "/",
+  authenticate,
+  authorize(PERMISSIONS.USER_ENROLL),
+  async (req: Request, res: Response) => {
+    const currentUser = (req as any).user;
 
-  if (currentUser.role !== "admin") {
-    return res.status(403).json(errorResponse("Forbidden: Admin only"));
+    try {
+      const [rows]: any = await database.query(
+        "SELECT id, username, email, role FROM users"
+      );
+      res.json(successResponse(rows));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Failed to fetch users"));
+    }
   }
-
-  try {
-    const [rows]: any = await database.query(
-      "SELECT id, username, email, role FROM users"
-    );
-    res.json(successResponse(rows));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(errorResponse("Failed to fetch users"));
-  }
-});
+);
 
 router.put("/:id", authenticate, async (req: Request, res: Response) => {
   const currentUser = (req as any).user;
   const { id } = req.params;
   const { username, email, password, role } = req.body;
 
-  // ✅ 允许 admin 或者 当前用户自己修改自己的资料
-  if (currentUser.role !== "admin" && currentUser.id !== Number(id)) {
+  // ✅ 权限判断
+  const isSelf = currentUser.id === Number(id);
+
+  if (currentUser.role !== "admin" && !isSelf) {
     return res
       .status(403)
-      .json(errorResponse("Forbidden: Not allowed to edit other users"));
+      .json(errorResponse("Forbidden: You can only edit your own profile"));
+  }
+
+  // 如果是普通用户，只能改自己（要有 USER_EDIT_SELF 权限）
+  if (!isSelf && currentUser.role !== "admin") {
+    return res.status(403).json(errorResponse("Forbidden"));
+  }
+
+  // 普通用户改自己时：验证有 USER_EDIT_SELF 权限
+  if (isSelf && currentUser.role !== "admin") {
+    const { ROLE_PERMISSIONS } = await import("../constants/permission");
+    const rolePermissions = ROLE_PERMISSIONS[currentUser.role] || [];
+    if (!rolePermissions.includes(PERMISSIONS.USER_EDIT_SELF)) {
+      return res.status(403).json(errorResponse("Forbidden"));
+    }
   }
 
   try {
@@ -108,15 +128,15 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
       updates.push("email = ?");
       values.push(email);
     }
-    if (role && currentUser.role === "admin") {
-      // ⚠️ 只有 admin 才能改 role
-      updates.push("role = ?");
-      values.push(role);
-    }
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
       updates.push("password = ?");
       values.push(hashedPassword);
+    }
+
+    if (role && currentUser.role === "admin") {
+      updates.push("role = ?");
+      values.push(role);
     }
 
     if (updates.length === 0) {
@@ -136,32 +156,33 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/:id", authenticate, async (req: Request, res: Response) => {
-  const currentUser = (req as any).user;
-  const { id } = req.params;
+router.delete(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.USER_ENROLL),
+  async (req: Request, res: Response) => {
+    const currentUser = (req as any).user;
+    const { id } = req.params;
 
-  if (currentUser.role !== "admin") {
-    return res.status(403).json(errorResponse("Forbidden: Admin only"));
-  }
+    try {
+      const [rows]: any = await database.query(
+        "SELECT * FROM users WHERE id = ?",
+        [id]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json(errorResponse("User not found"));
+      }
 
-  try {
-    const [rows]: any = await database.query(
-      "SELECT * FROM users WHERE id = ?",
-      [id]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json(errorResponse("User not found"));
+      await database.query("DELETE FROM users WHERE id = ?", [id]);
+      res.json(
+        successResponse(`User '${rows[0].username}' deleted successfully`)
+      );
+    } catch (err) {
+      console.error(err);
+      res.status(500).json(errorResponse("Failed to delete user"));
     }
-
-    await database.query("DELETE FROM users WHERE id = ?", [id]);
-    res.json(
-      successResponse(`User '${rows[0].username}' deleted successfully`)
-    );
-  } catch (err) {
-    console.error(err);
-    res.status(500).json(errorResponse("Failed to delete user"));
   }
-});
+);
 
 router.get("/me", authenticate, async (req: Request, res: Response) => {
   const user = (req as any).user;

@@ -6,7 +6,7 @@ import remarkGemoji from "remark-gemoji";
 import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
 import { PERMISSIONS, getCategories, API_BASE_URL } from "./CommonTypes";
-import type { User, DocItem } from "./CommonTypes";
+import type { User } from "./CommonTypes";
 import "../styles/EditorPage.css";
 
 interface EditorPageProps {
@@ -90,9 +90,6 @@ export default function EditorPage({
       }
       toast.success("Article saved successfully!");
       navigate("/docs");
-
-      toast.success("Article saved successfully!");
-      navigate("/docs");
     } catch (err) {
       console.error(err);
       toast.error("Save failed! Check console for details.");
@@ -143,7 +140,7 @@ export default function EditorPage({
               height={500}
               style={{ flex: 1 }}
               previewOptions={{
-                remarkPlugins: [remarkGfm, remarkGemoji], // ✅ 支持 GFM + Emoji
+                remarkPlugins: [remarkGfm, remarkGemoji], //
               }}
             />
           </div>
