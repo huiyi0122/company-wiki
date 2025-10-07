@@ -1,0 +1,46 @@
+.profile{
+    margin: 100px;
+}
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.profile-form input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.profile-form button {
+  padding: 10px;
+  background-color: #28a745;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.profile-form button:disabled {
+  background-color: #888;
+}
+
+.profile-message {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.not-allowed {
+  padding: 50px;
+  text-align: center;
+  font-size: 1.2em;
+  color: red;
+}
+
+@media (max-width:768px){
+  .profile{
+    margin: 120px 20px;
+  }
+}

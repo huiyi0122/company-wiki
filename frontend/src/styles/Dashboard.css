@@ -1,10 +1,11 @@
+
 .dashboard-content{
   margin: 50px 10px;
 }
 
 .dashboard-container {
   padding: 30px;
-  margin: 0 auto;
+  /* margin: 0 auto; */
 }
 
 .dashboard-container h1 {
@@ -49,11 +50,11 @@
 .stat-value {
   font-size: 2.5em;
   font-weight: bold;
-  color: #007bff; /* Primary color */
+  color: #007bff; 
 }
 
 .stat-card.pending .stat-value {
-    color: #f0ad4e; /* Warning color for pending items */
+    color: #f0ad4e; 
 }
 
 .admin-actions {
@@ -107,7 +108,8 @@
 }
 
 @media (max-width: 768px){
-  .dashboard-content{
-    margin: 100px 20px;
+
+.dashboard-top{
+  margin: 120px 20px;
 }
 }

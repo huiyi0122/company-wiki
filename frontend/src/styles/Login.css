@@ -1,4 +1,3 @@
-/* ===== 登录页面样式 ===== */
 .login-container {
   display: flex;
   justify-content: center;
@@ -53,7 +52,7 @@
   padding: 15px;
   font-size: 16px;
   border-radius: 8px;
-  margin: 20px 0 0 0; /* 覆盖通用 button 的 margin */
+  margin: 20px 0 0 0; 
 }
 
 .login-box button:hover {

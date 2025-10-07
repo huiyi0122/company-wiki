@@ -140,7 +140,7 @@
 .mobile-menu {
   display: none;
   position: fixed;
-  top: 42px; /* navbar 高度 */
+  top: 42px; 
   left: 0;
   right: 0;
   background: #1a202c;

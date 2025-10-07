@@ -1,0 +1,282 @@
+.Enroll{
+  margin: 20px 50px;
+}
+
+.enroll-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 24px 28px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s ease;
+}
+
+.enroll-form:hover {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+.enroll-form label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2d3748;
+}
+
+.enroll-form input,
+.enroll-form select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e0;
+  background: #f7fafc;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.enroll-form input:focus,
+.enroll-form select:focus {
+  outline: none;
+  border-color: #3182ce;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+/* ===== Button ===== */
+.enroll-form button {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 10px rgba(66, 153, 225, 0.25);
+}
+
+.enroll-form button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2b6cb0, #2c5282);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(66, 153, 225, 0.35);
+}
+
+.enroll-form button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.25);
+}
+
+.enroll-form button:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+/* ===== Message ===== */
+.enroll-message {
+  margin-top: 10px;
+  font-weight: 600;
+  color: #2d3748;
+  text-align: center;
+  background: #edf2f7;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+}
+
+.enroll-message:empty {
+  display: none;
+}
+
+.not-allowed {
+  padding: 60px;
+  font-size: 1.2rem;
+  color: #e53e3e;
+  text-align: center;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 10px;
+  max-width: 400px;
+  margin: 80px auto;
+}
+
+.enroll-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 24px 28px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s ease;
+  margin-bottom: 40px;
+}
+
+.enroll-form:hover {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+.enroll-form label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #2d3748;
+}
+
+.enroll-form input,
+.enroll-form select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e0;
+  background: #f7fafc;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+}
+
+.enroll-form input:focus,
+.enroll-form select:focus {
+  outline: none;
+  border-color: #3182ce;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.enroll-form button {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 10px rgba(66, 153, 225, 0.25);
+}
+
+.enroll-form button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2b6cb0, #2c5282);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(66, 153, 225, 0.35);
+}
+
+.enroll-form button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.25);
+}
+
+.enroll-form button:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+.enroll-message {
+  margin-top: 10px;
+  font-weight: 600;
+  color: #2d3748;
+  text-align: center;
+  background: #edf2f7;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+}
+
+.enroll-message:empty {
+  display: none;
+}
+
+/* ===== Access Denied ===== */
+.not-allowed {
+  padding: 60px;
+  font-size: 1.2rem;
+  color: #e53e3e;
+  text-align: center;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 10px;
+  max-width: 400px;
+  margin: 80px auto;
+}
+
+/* ===== User Table ===== */
+.user-table {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  max-width: 1200px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.user-table h3 {
+  margin-bottom: 18px;
+  font-size: 1.2rem;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.user-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.user-table th,
+.user-table td {
+  text-align: left;
+  padding: 16px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.user-table th {
+  background: #f7fafc;
+  color: #2d3748;
+  font-weight: 700;
+}
+
+.user-table tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* ===== Action Buttons ===== */
+.user-table .action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-table .edit-btn {
+  background: #4299e1;
+  color: white;
+}
+
+.user-table .edit-btn:hover {
+  background: #2b6cb0;
+}
+
+.user-table .delete-btn {
+  background: #e53e3e;
+  color: white;
+}
+
+.user-table .delete-btn:hover {
+  background: #c53030;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .Enroll{
+    margin: 120px 20px;
+  }
+  .enroll-form {
+    max-width: 100%;
+  }
+  .user-table table {
+    font-size: 0.9rem;
+  }
+  .user-table th,
+  .user-table td {
+    padding: 10px;
+  }
+}

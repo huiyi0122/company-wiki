@@ -1,9 +1,9 @@
+// src/components/Sidebar.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getCategories, PERMISSIONS } from "./CommonTypes";
+import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 import "../styles/Sidebar.css";
-
 
 interface SidebarProps {
   setCategory: React.Dispatch<React.SetStateAction<string>>;
@@ -11,17 +11,39 @@ interface SidebarProps {
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
+interface Category {
+  id: number;
+  name: string;
+}
+
 export default function Sidebar({
   setCategory,
   currentUser,
   setCurrentUser,
 }: SidebarProps) {
-  const [categories, setCategories] = useState<string[]>(getCategories());
+  const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => setCategories(getCategories()), []);
+  // ✅ 获取分类数据
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_BASE_URL}/categories`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success && Array.isArray(result.data)) {
+          setCategories(result.data.map((c: any) => ({ id: c.id, name: c.name })));
+        } else {
+          console.error("Failed to load categories:", result.message);
+        }
+      })
+      .catch((err) => console.error("Error fetching categories:", err));
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -30,68 +52,103 @@ export default function Sidebar({
     setMobileOpen(false);
   };
 
-  // 判断当前激活状态
+  const handleCategoryClick = (catId: string) => {
+    setCategory(catId);
+    navigate("/docs");
+    setMobileOpen(false);
+  };
+
+  const isProfileActive = location.pathname === "/profile";
   const isDashboardActive = location.pathname === "/dashboard";
   const isNewArticleActive = location.pathname === "/editor";
   const isArticlesActive =
     location.pathname.startsWith("/docs") ||
     location.pathname === "/" ||
     (location.pathname.startsWith("/editor/") && !isNewArticleActive);
+  const isEnrollActive = location.pathname === "/enroll";
 
-  const handleCategoryClick = (cat: string) => {
-    setCategory(cat);
-    navigate("/docs"); // 不管在哪，统一跳到 docs 列表
-    setMobileOpen(false);
-  };
+  // ✅ 公共菜单列表（桌面端 & 移动端共用）
+  const renderMenuItems = () => (
+    <>
+      {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
+        <li
+          onClick={() => {
+            navigate("/dashboard");
+            setMobileOpen(false);
+          }}
+          className={isDashboardActive ? "active" : ""}
+        >
+          Dashboard
+        </li>
+      )}
 
+      <li
+        onClick={() => {
+          navigate("/docs");
+          setMobileOpen(false);
+        }}
+        className={isArticlesActive ? "active" : ""}
+      >
+        Articles
+      </li>
+
+      {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
+        <li
+          onClick={() => {
+            navigate("/editor");
+            setMobileOpen(false);
+          }}
+          className={isNewArticleActive ? "active" : ""}
+        >
+          Add New Article
+        </li>
+      )}
+
+      <li
+        onClick={() => {
+          navigate("/profile");
+          setMobileOpen(false);
+        }}
+        className={isProfileActive ? "active" : ""}
+      >
+        My Profile
+      </li>
+
+      {currentUser && currentUser.role === "admin" && (
+        <li
+          onClick={() => {
+            navigate("/enroll");
+            setMobileOpen(false);
+          }}
+          className={isEnrollActive ? "active" : ""}
+        >
+          Enroll Users
+        </li>
+      )}
+    </>
+  );
 
   return (
     <>
-      {/* 顶部导航栏 */}
+      {/* ✅ 顶部移动端导航 */}
       <div className="mobile-navbar">
         <h2 onClick={() => navigate("/")}>Company Wiki</h2>
-        <button
-          className="hamburger"
-          onClick={() => setMobileOpen((prev) => !prev)}
-        >
+        <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)}>
           ☰
         </button>
       </div>
 
-      {/* 桌面 Sidebar */}
+      {/* 🖥️ 桌面端 Sidebar */}
       <aside className="sidebar desktop-only">
         <h2>Company Wiki</h2>
-        <ul>
-          {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-            <li
-              onClick={() => navigate("/dashboard")}
-              className={isDashboardActive ? "active" : ""}
-            >
-              Dashboard
-            </li>
-          )}
-          <li
-            onClick={() => navigate("/docs")}
-            className={isArticlesActive ? "active" : ""}
-          >
-            Articles
-          </li>
-          {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-            <li
-              onClick={() => navigate("/editor")}
-              className={isNewArticleActive ? "active" : ""}
-            >
-              Add New Article
-            </li>
-          )}
-        </ul>
+        <ul>{renderMenuItems()}</ul>
 
         <h3>Categories</h3>
         <ul>
           <li onClick={() => handleCategoryClick("")}>All</li>
           {categories.map((cat) => (
-            <li key={cat} onClick={() => handleCategoryClick(cat)}>
-              {cat}
+            <li key={cat.id} onClick={() => handleCategoryClick(cat.id.toString())}>
+              {cat.name}
             </li>
           ))}
         </ul>
@@ -110,49 +167,20 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {/* 移动端下拉菜单 */}
+      {/* 📱 移动端 Sidebar */}
       {mobileOpen && (
         <div className="mobile-menu">
-          <ul>
-            {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-              <li
-                onClick={() => {
-                  navigate("/dashboard");
-                  setMobileOpen(false);
-                }}
-                className={isDashboardActive ? "active" : ""}
-              >
-                Dashboard
-              </li>
-            )}
-            <li
-              onClick={() => {
-                navigate("/docs");
-                setMobileOpen(false);
-              }}
-              className={isArticlesActive ? "active" : ""}
-            >
-              Articles
-            </li>
-            {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
-              <li
-                onClick={() => {
-                  navigate("/editor");
-                  setMobileOpen(false);
-                }}
-                className={isNewArticleActive ? "active" : ""}
-              >
-                Add New Article
-              </li>
-            )}
-          </ul>
+          <ul>{renderMenuItems()}</ul>
 
           <h3>Categories</h3>
           <ul>
             <li onClick={() => handleCategoryClick("")}>All</li>
             {categories.map((cat) => (
-              <li key={cat} onClick={() => handleCategoryClick(cat)}>
-                {cat}
+              <li
+                key={cat.id}
+                onClick={() => handleCategoryClick(cat.id.toString())}
+              >
+                {cat.name}
               </li>
             ))}
           </ul>
