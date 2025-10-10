@@ -251,6 +251,72 @@ export async function searchArticles({
   };
 }
 
+export async function getArticleById(id: number, user: any) {
+  // 1️⃣ 查文章
+  const [rows]: any = await database.query(
+    `
+    SELECT 
+      a.id,
+      a.title,
+      a.content,
+      a.category_id,
+      a.is_active,
+      a.author_id,
+      u_author.username AS author_name,
+      u_created.username AS created_by_name,
+      u_updated.username AS updated_by_name,
+      c.name AS category_name
+    FROM articles a
+    LEFT JOIN users u_author ON a.author_id = u_author.id
+    LEFT JOIN users u_created ON a.created_by = u_created.id
+    LEFT JOIN users u_updated ON a.updated_by = u_updated.id
+    LEFT JOIN categories c ON a.category_id = c.id
+    WHERE a.id = ?
+    `,
+    [id]
+  );
+
+  if (rows.length === 0) return null;
+
+  const article = rows[0];
+
+  // 2️⃣ 权限检查
+  if (
+    !article.is_active &&
+    user.role !== "admin" &&
+    article.author_id !== user.id
+  ) {
+    throw new Error("FORBIDDEN_VIEW");
+  }
+
+  // 3️⃣ 查 tags
+  const [tagRows]: any = await database.query(
+    `
+    SELECT t.name
+    FROM article_tags at
+    JOIN tags t ON at.tag_id = t.id
+    WHERE at.article_id = ?
+    `,
+    [id]
+  );
+
+  const tags = tagRows.map((t: any) => t.name);
+
+  // 4️⃣ 返回整合数据
+  return {
+    id: article.id,
+    title: article.title,
+    content: article.content,
+    category_id: article.category_id,
+    category_name: article.category_name,
+    tags,
+    author: article.author_name,
+    created_by: article.created_by_name,
+    updated_by: article.updated_by_name,
+    is_active: Boolean(article.is_active),
+  };
+}
+
 export async function updateArticle(id: string, body: any, user: any) {
   const { title, content, category_id, tags } = body;
 
@@ -274,6 +340,20 @@ export async function updateArticle(id: string, body: any, user: any) {
     );
     const originalTagObjects: { id: number; name: string }[] =
       origTagRows || [];
+    // 在 try { ... } 内，获取 original 文章后
+    const [userRows]: any = await connection.query(
+      `SELECT 
+      u_created.username AS created_by_name,
+      u_updated.username AS updated_by_name
+    FROM users u_created
+    JOIN users u_updated
+      ON 1=1
+    WHERE u_created.id = ? AND u_updated.id = ?`,
+      [original.created_by, original.updated_by]
+    );
+
+    const createdBy = userRows[0]?.created_by_name || "";
+    const updatedBy = userRows[0]?.updated_by_name || "";
 
     // 2) 计算更新后的值（如果对应字段未提供就用原来的）
     const updatedTitle = typeof title !== "undefined" ? title : original.title;
@@ -285,6 +365,13 @@ export async function updateArticle(id: string, body: any, user: any) {
           ? null
           : category_id
         : original.category_id;
+    const allowedFields = ["title", "content", "category_id", "tags"];
+    const invalidFields = Object.keys(body).filter(
+      (key) => !allowedFields.includes(key)
+    );
+    if (invalidFields.length > 0) {
+      throw new Error(`Invalid fields: ${invalidFields.join(", ")}`);
+    }
 
     // 3) 如果有传 tags（包括空数组），处理 tags 逻辑；如果没传 tags 则保持原 tags
     let finalTagObjects: { id: number; name: string }[] = originalTagObjects;
@@ -379,6 +466,12 @@ export async function updateArticle(id: string, body: any, user: any) {
       tags: finalTagObjects.map((t) => t.name),
     });
 
+    // 🔄 同步更新 articles.last_activity
+    await connection.query(
+      "UPDATE articles SET last_activity = ? WHERE id = ?",
+      ["UPDATE", id]
+    );
+
     // 6) 同步到 Elasticsearch（把完整最新内容 index/replace）
     try {
       console.log("🟡 Preparing to update Elasticsearch:", {
@@ -397,10 +490,11 @@ export async function updateArticle(id: string, body: any, user: any) {
           title: updatedTitle,
           content: updatedContent,
           category_id: updatedCategory,
-          author_id: original.author_id,
+          author_id: original.author_id, // 如果需要 username 可以加 author: authorUsername
           tags: finalTagObjects.map((t) => t.name),
-          // 🔥 转 boolean
           is_active: !!original.is_active,
+          created_by: createdBy, // 这里是用户名
+          updated_by: updatedBy, // 这里是用户名
           created_at: original.created_at,
           updated_at: new Date().toISOString(),
         },
@@ -422,9 +516,9 @@ export async function updateArticle(id: string, body: any, user: any) {
       category_id: updatedCategory,
       tags: finalTagObjects.map((t) => t.name),
       author: user.username,
+      created_by: createdBy,
+      updated_by: updatedBy,
       is_active: original.is_active,
-      created_at: original.created_at,
-      updated_at: new Date().toISOString(),
     };
   } catch (err) {
     await connection.rollback();
@@ -559,6 +653,56 @@ export async function restoreArticle(id: string, user: any) {
     connection.release();
 
     return { message: "Article restored successfully", id: parseInt(id, 10) };
+  } catch (err) {
+    await connection.rollback();
+    connection.release();
+    throw err;
+  }
+}
+
+export async function hardDeleteArticle(id: string, user: any) {
+  const connection = await database.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    // 1️⃣ 查询文章
+    const [articles]: any = await connection.query(
+      "SELECT * FROM articles WHERE id = ?",
+      [id]
+    );
+    if (!articles.length) throw new Error("Article not found");
+
+    const article = articles[0];
+
+    // 2️⃣ 权限检查
+    if (user.role !== "admin" && article.author_id !== user.id) {
+      throw new Error("You cannot delete this article");
+    }
+
+    // 3️⃣ 写日志
+    await connection.query(
+      "INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data) VALUES (?, 'DELETE', ?, ?, ?)",
+      [id, user.id, JSON.stringify(article), JSON.stringify({ deleted: true })]
+    );
+
+    // 4️⃣ 删除数据库
+    await connection.query("DELETE FROM articles WHERE id = ?", [id]);
+
+    // 5️⃣ ES同步
+    try {
+      await esClient.delete({
+        index: "articles",
+        id: id.toString(),
+        refresh: true,
+      });
+    } catch (err) {
+      console.error("❌ Elasticsearch delete failed:", err);
+    }
+
+    await connection.commit();
+    connection.release();
+
+    return { message: "Article permanently deleted" };
   } catch (err) {
     await connection.rollback();
     connection.release();

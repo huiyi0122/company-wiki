@@ -10,6 +10,8 @@ import {
   updateArticle,
   deleteArticle,
   searchArticles,
+  getArticleById,
+  hardDeleteArticle,
 } from "../services/articleService";
 
 const router = Router();
@@ -81,6 +83,35 @@ router.get(
   }
 );
 
+router.get(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.ARTICLE_READ),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const user = (req as any).user;
+
+    try {
+      const article = await getArticleById(Number(id), user);
+
+      if (!article) {
+        return res.status(404).json(errorResponse("Article not found"));
+      }
+
+      res.json(successResponse({ data: article }));
+    } catch (err: any) {
+      if (err.message === "FORBIDDEN_VIEW") {
+        return res
+          .status(403)
+          .json(errorResponse("You cannot view this article"));
+      }
+
+      console.error("GET /articles/:id error:", err);
+      res.status(500).json(errorResponse("Database error"));
+    }
+  }
+);
+
 router.put(
   "/:id",
   authenticate,
@@ -123,19 +154,50 @@ router.delete(
 );
 
 router.post(
-  "/:id",
+  "/restore/:id",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_UPDATE),
   async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const user = (req as any).user;
     try {
-      const result = await restoreArticle(id, user); // 👈 调用 service
+      const { id } = req.params;
+      const user = (req as any).user;
+
+      const result = await restoreArticle(id, user);
       res.json(successResponse(result));
     } catch (err: any) {
-      console.error("Restore article error:", err);
-      res.status(500).json(errorResponse(err.message || "Database error"));
+      if (err.message === "Article not found") {
+        return res.status(404).json(errorResponse(err.message));
+      } else if (err.message === "You cannot restore this article") {
+        return res.status(403).json(errorResponse(err.message));
+      }
+      console.error("Restore error:", err);
+      res.status(500).json(errorResponse(err.message));
     }
   }
 );
+
+router.delete(
+  "/hard/:id",
+  authenticate,
+  authorize(PERMISSIONS.ARTICLE_DELETE_HARD),
+  async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const { id } = req.params;
+
+      const result = await hardDeleteArticle(id, user);
+      res.json(successResponse(result));
+    } catch (err: any) {
+      console.error("Hard delete article error:", err);
+      if (err.message === "Article not found") {
+        res.status(404).json(errorResponse(err.message));
+      } else if (err.message.includes("cannot delete")) {
+        res.status(403).json(errorResponse(err.message));
+      } else {
+        res.status(500).json(errorResponse(err.message || "Database error"));
+      }
+    }
+  }
+);
+
 export default router;

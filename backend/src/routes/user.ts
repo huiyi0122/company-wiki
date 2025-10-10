@@ -148,7 +148,7 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
       values
     );
 
-    return res.json(successResponse("User updated successfully"));
+    return res.json(successResponse({ message: "User updated successfully" }));
   } catch (err) {
     console.error(err);
     return res.status(500).json(errorResponse("Failed to update user"));

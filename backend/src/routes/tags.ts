@@ -1,9 +1,14 @@
 import { Router, Request, Response } from "express";
-import database from "../db";
 import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
+import { createTag } from "../services/tagService";
+import { getTags } from "../services/tagService";
+import { updateTag } from "../services/tagService";
+import { deleteTag } from "../services/tagService";
+import { hardDeleteTag } from "../services/tagService";
+import { restoreTag } from "../services/tagService";
 
 const router = Router();
 
@@ -19,21 +24,12 @@ router.post(
       return res.status(400).json(errorResponse("Tag name is required"));
     }
 
-    const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
-
     try {
-      const [result]: any = await database.query(
-        `
-        INSERT INTO tags (name, slug, created_by)
-        VALUES (?, ?, ?)
-        `,
-        [name.trim(), slug, user.id]
-      );
-
+      const tag = await createTag(name, user);
       res.json(
         successResponse({
           message: `Tag '${name}' created successfully`,
-          tag: { id: result.insertId, name, slug },
+          tag,
         })
       );
     } catch (err: any) {
@@ -52,97 +48,15 @@ router.get(
   authorize(PERMISSIONS.TAG_READ),
   async (req: Request, res: Response) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-      const lastId = parseInt(req.query.lastId as string) || 0;
-      const search = (req.query.search as string)?.trim() || "";
-      const includeInactive = req.query.include_inactive === "true";
-      const withCount = req.query.with_count === "true";
+      const tags = await getTags({
+        limit: parseInt(req.query.limit as string) || 10,
+        lastId: parseInt(req.query.lastId as string) || 0,
+        search: req.query.search as string,
+        includeInactive: req.query.include_inactive === "true",
+        withCount: req.query.with_count === "true",
+      });
 
-      let whereClause = "WHERE 1=1";
-      const params: any[] = [];
-
-      if (!includeInactive) whereClause += " AND t.is_active = 1";
-      if (search) {
-        whereClause +=
-          " AND MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
-        params.push(search);
-      }
-      if (lastId > 0) {
-        whereClause += " AND t.id < ?";
-        params.push(lastId);
-      }
-
-      const [rows]: any = await database.query(
-        `
-        SELECT 
-          t.id, 
-          t.name, 
-          t.slug, 
-          t.is_active, 
-          u1.username AS created_by_name,
-          u2.username AS updated_by_name
-        FROM tags t
-        LEFT JOIN users u1 ON t.created_by = u1.id
-        LEFT JOIN users u2 ON t.updated_by = u2.id
-        ${whereClause}
-        ORDER BY t.id DESC
-        LIMIT ?
-        `,
-        [...params, limit]
-      );
-
-      // fallback for short keywords
-      let finalRows = rows;
-      if (!rows.length && search && search.length < 4) {
-        console.warn(
-          `[Fallback] No FULLTEXT results for "${search}", using LIKE fallback...`
-        );
-        const likeWhere = whereClause.replace(
-          "MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)",
-          "(t.name LIKE CONCAT('%', ?, '%') OR t.slug LIKE CONCAT('%', ?, '%'))"
-        );
-        const [fallbackRows]: any = await database.query(
-          `
-          SELECT 
-            t.id, 
-            t.name, 
-            t.slug, 
-            t.is_active, 
-            u1.username AS created_by_name,
-            u2.username AS updated_by_name
-          FROM tags t
-          LEFT JOIN users u1 ON t.created_by = u1.id
-          LEFT JOIN users u2 ON t.updated_by = u2.id
-          ${likeWhere}
-          ORDER BY t.id DESC
-          LIMIT ?
-          `,
-          [...params, search, search, limit]
-        );
-        finalRows = fallbackRows;
-      }
-
-      let total = null;
-      if (withCount) {
-        const [[countResult]]: any = await database.query(
-          `SELECT COUNT(*) as total FROM tags ${whereClause}`,
-          params
-        );
-        total = countResult.total;
-      }
-
-      res.json(
-        successResponse({
-          meta: {
-            total,
-            limit,
-            nextCursor: finalRows.length
-              ? finalRows[finalRows.length - 1].id
-              : null,
-          },
-          data: finalRows,
-        })
-      );
+      res.json(successResponse(tags));
     } catch (err) {
       console.error("GET /tags error:", err);
       res.status(500).json(errorResponse("Failed to fetch tags"));
@@ -150,104 +64,30 @@ router.get(
   }
 );
 
-router.get(
-  "/:id",
-  authenticate,
-  authorize(PERMISSIONS.TAG_READ),
-  async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    try {
-      const [rows]: any = await database.query(
-        `
-        SELECT 
-          t.id,
-          t.name,
-          t.slug,
-          t.is_active,
-          u1.username AS created_by_name,
-          u2.username AS updated_by_name
-        FROM tags t
-        LEFT JOIN users u1 ON t.created_by = u1.id
-        LEFT JOIN users u2 ON t.updated_by = u2.id
-        WHERE t.id = ?
-        `,
-        [id]
-      );
-
-      if (!rows.length) {
-        return res.status(404).json(errorResponse("Tag not found"));
-      }
-
-      res.json(successResponse(rows[0]));
-    } catch (err) {
-      console.error("GET /tags/:id error:", err);
-      res.status(500).json(errorResponse("Failed to fetch tag details"));
-    }
-  }
-);
-
-import slugify from "slugify";
-
 router.put(
   "/:id",
   authenticate,
   authorize(PERMISSIONS.TAG_UPDATE),
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, is_active } = req.body;
     const currentUser = (req as any).user;
-
-    if (!name?.trim()) {
-      return res.status(400).json(errorResponse("Name is required"));
-    }
+    const { name, is_active } = req.body;
 
     try {
-      // ✅ 1. 检查 tag 是否存在
-      const [existing]: any = await database.query(
-        "SELECT id FROM tags WHERE id = ?",
-        [id]
+      const updated = await updateTag(
+        parseInt(id),
+        { name, is_active },
+        currentUser
       );
-      if (!existing.length) {
-        return res.status(404).json(errorResponse("Tag not found"));
-      }
-
-      // ✅ 2. 自动生成 slug（统一格式）
-      const slug = slugify(name, { lower: true, strict: true });
-
-      // ✅ 3. 更新记录
-      const [result]: any = await database.query(
-        `
-        UPDATE tags
-        SET name = ?, slug = ?, is_active = COALESCE(?, is_active),
-            updated_at = NOW(), updated_by = ?
-        WHERE id = ?
-        `,
-        [name, slug, is_active, currentUser.id, id]
-      );
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json(errorResponse("Tag not found"));
-      }
-
-      // ✅ 4. 返回更新后的数据
-      const [[updatedTag]]: any = await database.query(
-        `
-        SELECT 
-          t.id, t.name, t.slug, t.is_active, 
-          u1.username AS created_by_name,
-          u2.username AS updated_by_name
-        FROM tags t
-        LEFT JOIN users u1 ON t.created_by = u1.id
-        LEFT JOIN users u2 ON t.updated_by = u2.id
-        WHERE t.id = ?
-        `,
-        [id]
-      );
-
-      res.json(successResponse(updatedTag));
-    } catch (err) {
+      res.json(successResponse(updated));
+    } catch (err: any) {
       console.error("PUT /tags/:id error:", err);
+      if (
+        err.message === "Tag not found" ||
+        err.message === "Name is required"
+      ) {
+        return res.status(404).json(errorResponse(err.message));
+      }
       res.status(500).json(errorResponse("Failed to update tag"));
     }
   }
@@ -263,57 +103,44 @@ router.delete(
     const force = req.query.force === "true";
 
     try {
-      // 1️⃣ 检查 tag 是否存在
-      const [existing]: any = await database.query(
-        "SELECT * FROM tags WHERE id = ?",
-        [id]
-      );
-      if (existing.length === 0) {
-        return res.status(404).json(errorResponse("Tag not found"));
+      const message = await deleteTag(parseInt(id), currentUser, force);
+      res.json(successResponse({ message }));
+    } catch (err: any) {
+      console.error("DELETE /tags/:id error:", err);
+      if (err.message === "Tag not found") {
+        return res.status(404).json(errorResponse(err.message));
       }
-
-      // 2️⃣ 检查关联文章
-      const [used]: any = await database.query(
-        "SELECT COUNT(*) AS count FROM article_tags WHERE tag_id = ?",
-        [id]
-      );
-      if (used[0].count > 0 && !force) {
-        return res
-          .status(400)
-          .json(
-            errorResponse(
-              "Cannot delete tag because it’s still used by articles. Use ?force=true to override."
-            )
-          );
+      if (err.message.includes("still used by articles")) {
+        return res.status(400).json(errorResponse(err.message));
       }
-
-      // 3️⃣ force 删除关联
-      if (force) {
-        await database.query("DELETE FROM article_tags WHERE tag_id = ?", [id]);
-      }
-
-      // 4️⃣ soft delete
-      const [result]: any = await database.query(
-        "UPDATE tags SET is_active = 0, updated_by = ? WHERE id = ?",
-        [currentUser.id, id]
-      );
-
-      res.json(
-        successResponse(
-          force
-            ? "Tag forcibly deactivated and unlinked from articles"
-            : "Tag deactivated successfully"
-        )
-      );
-    } catch (err) {
-      console.error("Delete tag error:", err);
       res.status(500).json(errorResponse("Failed to delete tag"));
     }
   }
 );
 
+router.delete(
+  "/hard/:id",
+  authenticate,
+  authorize(PERMISSIONS.TAG_DELETE_HARD),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const currentUser = (req as any).user;
+
+    try {
+      const message = await hardDeleteTag(parseInt(id), currentUser);
+      res.json(successResponse({ message }));
+    } catch (err: any) {
+      console.error("DELETE /tags/hard/:id error:", err);
+      if (err.message === "Tag not found") {
+        return res.status(404).json(errorResponse(err.message));
+      }
+      res.status(500).json(errorResponse(err.message || "Database error"));
+    }
+  }
+);
+
 router.patch(
-  "/:id/restore",
+  "/restore/:id",
   authenticate,
   authorize(PERMISSIONS.TAG_UPDATE),
   async (req: Request, res: Response) => {
@@ -321,36 +148,21 @@ router.patch(
     const currentUser = (req as any).user;
 
     try {
-      // 先确认分类是否存在
-      const [rows]: any = await database.query(
-        "SELECT * FROM tags WHERE id = ?",
-        [id]
-      );
-
-      if (rows.length === 0) {
-        return res.status(404).json(errorResponse("Tag not found"));
+      const message = await restoreTag(parseInt(id), currentUser);
+      res.json(successResponse({ message }));
+    } catch (err: any) {
+      console.error("PATCH /tags/:id/restore error:", err);
+      if (
+        err.message === "Tag not found" ||
+        err.message === "Tag is already active"
+      ) {
+        return res.status(404).json(errorResponse(err.message));
       }
-
-      // 如果已经是启用状态
-      if (rows[0].is_active === 1) {
-        return res.status(400).json(errorResponse("Tag is already active"));
-      }
-
-      // 恢复
-      const [result]: any = await database.query(
-        "UPDATE tags SET is_active = 1, updated_by = ? WHERE id = ?",
-        [currentUser.id, id]
-      );
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json(errorResponse("Tag not found"));
-      }
-
-      res.json(successResponse("Tag restored successfully"));
-    } catch (err) {
-      console.error("Restore tag error:", err);
-      res.status(500).json(errorResponse("Failed to restore tag"));
+      res
+        .status(500)
+        .json(errorResponse(err.message || "Failed to restore tag"));
     }
   }
 );
+
 export default router;

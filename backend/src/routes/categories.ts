@@ -54,11 +54,8 @@ router.get(
   authorize(PERMISSIONS.CATEGORY_READ),
   async (req: Request, res: Response) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 5, 100);
-      const lastId = parseInt(req.query.lastId as string) || 0;
       const search = (req.query.search as string)?.trim() || "";
       const includeInactive = req.query.include_inactive === "true";
-      const withCount = req.query.with_count === "true";
 
       let whereClause = "WHERE 1=1";
       const params: any[] = [];
@@ -69,11 +66,8 @@ router.get(
           " AND MATCH(c.name, c.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
         params.push(search);
       }
-      if (lastId > 0) {
-        whereClause += " AND c.id < ?";
-        params.push(lastId);
-      }
 
+      // 查询所有分类
       const [rows]: any = await database.query(
         `
         SELECT 
@@ -87,13 +81,12 @@ router.get(
         LEFT JOIN users u1 ON c.created_by = u1.id
         LEFT JOIN users u2 ON c.updated_by = u2.id
         ${whereClause}
-        ORDER BY c.id DESC
-        LIMIT ?
+        ORDER BY c.name ASC
         `,
-        [...params, limit]
+        params
       );
 
-      // fallback for short keywords
+      // FULLTEXT fallback（短关键词）
       let finalRows = rows;
       if (!rows.length && search && search.length < 4) {
         console.warn(
@@ -107,7 +100,7 @@ router.get(
           `
           SELECT 
             c.id, 
-          c.name, 
+            c.name, 
             c.slug, 
             c.is_active, 
             u1.username AS created_by_name,
@@ -116,33 +109,17 @@ router.get(
           LEFT JOIN users u1 ON c.created_by = u1.id
           LEFT JOIN users u2 ON c.updated_by = u2.id
           ${likeWhere}
-          ORDER BY c.id DESC
-          LIMIT ?
+          ORDER BY c.name ASC
           `,
-          [...params, search, search, limit]
+          [...params, search, search]
         );
         finalRows = fallbackRows;
       }
 
-      let total = null;
-      if (withCount) {
-        const [[countResult]]: any = await database.query(
-          `SELECT COUNT(*) as total FROM categories ${whereClause}`,
-          params
-        );
-        total = countResult.total;
-      }
-
       res.json(
         successResponse({
-          meta: {
-            total,
-            limit,
-            nextCursor: finalRows.length
-              ? finalRows[finalRows.length - 1].id
-              : null,
-          },
           data: finalRows,
+          meta: { total: finalRows.length },
         })
       );
     } catch (err) {
@@ -162,18 +139,18 @@ router.get(
     try {
       const [rows]: any = await database.query(
         `
-        SELECT 
-          c.id,
-          c.name,
-          c.slug,
-          c.is_active,
-          u1.username AS created_by_name,
-          u2.username AS updated_by_name
-        FROM categories c
-        LEFT JOIN users u1 ON c.created_by = u1.id
-        LEFT JOIN users u2 ON c.updated_by = u2.id
-        WHERE c.id = ?
-        `,
+          SELECT 
+            c.id,
+            c.name,
+            c.slug,
+            c.is_active,
+            u1.username AS created_by_name,
+            u2.username AS updated_by_name
+          FROM categories c
+          LEFT JOIN users u1 ON c.created_by = u1.id
+          LEFT JOIN users u2 ON c.updated_by = u2.id
+          WHERE c.id = ?
+          `,
         [id]
       );
 
@@ -332,6 +309,54 @@ router.delete(
     } catch (err) {
       console.error("Delete category error:", err);
       res.status(500).json(errorResponse("Failed to delete category"));
+    }
+  }
+);
+
+router.delete(
+  "/hard/:id",
+  authenticate,
+  authorize(PERMISSIONS.CATEGORY_DELETE_HARD),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const user = (req as any).user;
+    const connection = await database.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // 查询分类
+      const [categories]: any = await connection.query(
+        "SELECT * FROM categories WHERE id = ?",
+        [id]
+      );
+      if (categories.length === 0) {
+        return res.status(404).json(errorResponse("Category not found"));
+      }
+      const category = categories[0];
+
+      // 写日志
+      await connection.query(
+        "INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data) VALUES (?, 'DELETE', ?, ?, ?)",
+        [
+          id,
+          user.id,
+          JSON.stringify(category),
+          JSON.stringify({ deleted: true }),
+        ]
+      );
+
+      // 删除数据库
+      await connection.query("DELETE FROM categories WHERE id = ?", [id]);
+
+      await connection.commit();
+      connection.release();
+
+      res.json(successResponse({ message: "Category permanently deleted" }));
+    } catch (err: any) {
+      await connection.rollback();
+      connection.release();
+      console.error("Hard delete category error:", err);
+      res.status(500).json(errorResponse(err.message || "Database error"));
     }
   }
 );
