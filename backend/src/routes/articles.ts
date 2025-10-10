@@ -1,73 +1,31 @@
 import { Router, Request, Response } from "express";
-import database from "../db";
 import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
+import {
+  createArticle,
+  restoreArticle,
+  getArticles,
+  updateArticle,
+  deleteArticle,
+  searchArticles,
+} from "../services/articleService";
 
 const router = Router();
 
+// ✅ 创建文章
 router.post(
   "/",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_CREATE),
   async (req: Request, res: Response) => {
-    const { title, content, category_id, tags } = req.body;
-    const user = (req as any).user;
-
-    if (!title || !content) {
-      return res.status(400).json(errorResponse("Title and content required"));
-    }
-
     try {
-      const [result]: any = await database.query(
-        "INSERT INTO articles (title, content, category_id, author_id) VALUES (?, ?, ?, ?)",
-        [title, content, category_id || null, user.id]
-      );
-
-      const articleId = result.insertId;
-
-      if (tags && Array.isArray(tags)) {
-        for (const tagName of tags) {
-          const [existingTags]: any = await database.query(
-            "SELECT id FROM tags WHERE name = ?",
-            [tagName]
-          );
-
-          let tagId;
-          if (existingTags.length > 0) {
-            tagId = existingTags[0].id;
-          } else {
-            const [newTag]: any = await database.query(
-              "INSERT INTO tags (name) VALUES (?)",
-              [tagName]
-            );
-            tagId = newTag.insertId;
-          }
-
-          await database.query(
-            "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
-            [articleId, tagId]
-          );
-        }
-      }
-
-      res.status(201).json(
-        successResponse({
-          id: articleId,
-          title,
-          content,
-          category_id,
-          tags,
-          author: {
-            id: user.id,
-            username: user.username,
-          },
-        })
-      );
-    } catch (err) {
+      const data = await createArticle(req.body, (req as any).user);
+      res.status(201).json(successResponse({ data }));
+    } catch (err: any) {
       console.error("Create article error:", err);
-      res.status(500).json(errorResponse("Database error"));
+      res.status(500).json(errorResponse(err.message || "Server error"));
     }
   }
 );
@@ -76,190 +34,49 @@ router.get(
   "/",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_READ),
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const [rows]: any = await database.query(`
-        SELECT 
-          a.*, 
-          u.username AS author
-        FROM articles a
-        LEFT JOIN users u ON a.author_id = u.id
-        ORDER BY a.created_at DESC
-      `);
-      res.json(successResponse(rows));
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(errorResponse("Database error"));
+      const limit = Math.min(parseInt(req.query.limit as string) || 5, 100);
+      const lastId = parseInt(req.query.lastId as string) || 0;
+
+      const result = await getArticles(limit, lastId); // 👈 调用 service
+
+      res.json(successResponse(result));
+    } catch (err: any) {
+      console.error("GET /articles error:", err);
+      res.status(500).json(errorResponse(err.message || "Database error"));
     }
   }
 );
-
+// routes/articles.ts
 router.get(
   "/search",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_READ),
   async (req: Request, res: Response) => {
-    console.log("✅ /articles/search route hit!");
-    console.log("🔍 Incoming query:", req.query);
-
-    const q = (req.query.q || req.query.keyword) as string;
-    const { category_id, tags, page = "1", limit = "10" } = req.query;
-
-    if (!q && !category_id && !tags) {
-      return res
-        .status(400)
-        .json(errorResponse("No search condition provided"));
-    }
-
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
-    const offset = (pageNum - 1) * limitNum;
-
     try {
-      let whereClause = "WHERE 1=1";
-      const values: any[] = [];
+      const { page = "1", limit = "20", q, category_id, tags } = req.query;
 
-      // 🔍 Keyword 搜索（title / content / author / category / tag）
-      if (q) {
-        whereClause += `
-          AND (
-            a.title LIKE ?
-            OR a.content LIKE ?
-            OR u.username LIKE ?
-            OR c.name LIKE ?
-            OR a.id IN (
-              SELECT at.article_id
-              FROM article_tags at
-              JOIN tags t ON at.tag_id = t.id
-              WHERE t.name LIKE ?
-            )
-          )
-        `;
-        const keyword = `%${q}%`;
-        values.push(keyword, keyword, keyword, keyword, keyword);
-      }
+      const pageNumber = Math.max(parseInt(page as string, 10), 1);
+      const pageSize = Math.min(parseInt(limit as string, 10), 100);
 
-      // 🏷 分类筛选
-      if (category_id) {
-        whereClause += " AND a.category_id = ?";
-        values.push(category_id);
-      }
+      const result = await searchArticles({
+        queryString: q ? String(q) : "",
+        categoryId: category_id ? Number(category_id) : undefined,
+        tags:
+          typeof tags === "string"
+            ? tags.split(",").map((t) => t.trim())
+            : Array.isArray(tags)
+            ? tags.map((t) => String(t))
+            : undefined,
+        pageNumber,
+        pageSize,
+      });
 
-      // 🪣 Tags 筛选（重点改这里）
-      let tagSubQuery = "";
-      if (tags) {
-        // 去掉多余空格与 #
-        const tagList = (tags as string)
-          .split(",")
-          .map((t) => t.trim().replace(/^#/, "")) // 自动去掉开头的 #
-          .filter(Boolean);
-
-        if (tagList.length > 0) {
-          tagSubQuery = `
-            AND a.id IN (
-              SELECT DISTINCT at.article_id
-              FROM article_tags at
-              JOIN tags t ON at.tag_id = t.id
-              WHERE ${tagList
-                .map(() => " (t.name LIKE ? OR t.name LIKE ?) ")
-                .join(" OR ")}
-            )
-          `;
-          // 每个 tag 推入两份值，例如 tag = "news" → "%news%", "%#news%"
-          tagList.forEach((t) => {
-            values.push(`%${t}%`, `%#${t}%`);
-          });
-        }
-      }
-
-      console.log("🧩 WHERE clause:", whereClause + tagSubQuery);
-      console.log("🧩 Values:", values);
-
-      // 🧾 主查询（包含 tag name）
-      const [rows]: any = await database.query(
-        `
-        SELECT 
-          a.*, 
-          u.username AS author, 
-          c.name AS category,
-          GROUP_CONCAT(DISTINCT t.name) AS tags
-        FROM articles a
-        LEFT JOIN users u ON a.author_id = u.id
-        LEFT JOIN categories c ON a.category_id = c.id
-        LEFT JOIN article_tags at ON a.id = at.article_id
-        LEFT JOIN tags t ON at.tag_id = t.id
-        ${whereClause}
-        ${tagSubQuery}
-        GROUP BY a.id
-        ORDER BY a.created_at DESC
-        LIMIT ? OFFSET ?
-        `,
-        [...values, limitNum, offset]
-      );
-
-      console.log("✅ Search results:", rows.length);
-
-      const [countRows]: any = await database.query(
-        `
-        SELECT COUNT(DISTINCT a.id) AS total
-        FROM articles a
-        LEFT JOIN users u ON a.author_id = u.id
-        LEFT JOIN categories c ON a.category_id = c.id
-        ${whereClause}
-        ${tagSubQuery}
-        `,
-        values
-      );
-
-      res.json(
-        successResponse({
-          articles: rows,
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            total: countRows[0].total,
-          },
-        })
-      );
+      res.json(successResponse(result));
     } catch (err: any) {
-      console.error("❌ Search articles error:", err);
-      res.status(500).json(errorResponse(err.message || "Database error"));
-    }
-  }
-);
-
-router.get(
-  "/:id",
-  authenticate,
-  authorize(PERMISSIONS.ARTICLE_READ),
-  async (req, res) => {
-    const { id } = req.params;
-    try {
-      const [articles]: any = await database.query(
-        `
-      SELECT a.*, u.username AS author
-      FROM articles a
-      LEFT JOIN users u ON a.author_id = u.id
-      WHERE a.id = ?
-    `,
-        [id]
-      );
-
-      if (!articles.length)
-        return res.status(404).json(errorResponse("Article not found"));
-      const article = articles[0];
-
-      // ✅ 查询 tag_ids
-      const [tags]: any = await database.query(
-        `SELECT tag_id FROM article_tags WHERE article_id = ?`,
-        [id]
-      );
-      const tag_ids = tags.map((t: any) => t.tag_id);
-
-      res.json(successResponse({ ...article, tag_ids }));
-    } catch (err) {
-      console.error(err);
-      res.status(500).json(errorResponse("Database error"));
+      console.error("Elasticsearch search error:", err);
+      res.status(500).json(errorResponse(err.message || "Search failed"));
     }
   }
 );
@@ -269,75 +86,16 @@ router.put(
   authenticate,
   authorize(PERMISSIONS.ARTICLE_UPDATE),
   async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { title, content, category_id, tags } = req.body; // 👈 接收 tags 数组
-    const user = (req as any).user;
-
     try {
-      const [articles]: any = await database.query(
-        "SELECT author_id FROM articles WHERE id = ?",
-        [id]
+      const data = await updateArticle(
+        req.params.id,
+        req.body,
+        (req as any).user
       );
-
-      if (articles.length === 0) {
-        return res.status(404).json(errorResponse("Article not found"));
-      }
-
-      const article = articles[0];
-
-      if (user.role !== "admin" && article.author_id !== user.id) {
-        return res
-          .status(403)
-          .json(errorResponse("You cannot edit this article"));
-      }
-
-      if (!title && !content && !category_id && !tags) {
-        return res
-          .status(400)
-          .json(errorResponse("At least one field required"));
-      }
-
-      const fields: string[] = [];
-      const values: any[] = [];
-
-      if (title) {
-        fields.push("title = ?");
-        values.push(title);
-      }
-      if (content) {
-        fields.push("content = ?");
-        values.push(content);
-      }
-      if (category_id) {
-        fields.push("category_id = ?");
-        values.push(category_id);
-      }
-
-      if (fields.length > 0) {
-        values.push(id);
-        await database.query(
-          `UPDATE articles SET ${fields.join(", ")} WHERE id = ?`,
-          values
-        );
-      }
-
-      if (Array.isArray(tags)) {
-        await database.query("DELETE FROM article_tags WHERE article_id = ?", [
-          id,
-        ]);
-
-        for (const tagId of tags) {
-          await database.query(
-            "INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)",
-            [id, tagId]
-          );
-        }
-      }
-
-      res.json(successResponse({ id, title, content, category_id, tags }));
-    } catch (err) {
+      res.status(200).json(successResponse({ data }));
+    } catch (err: any) {
       console.error("Update article error:", err);
-      res.status(500).json(errorResponse("Database error"));
+      res.status(500).json(errorResponse(err.message || "Server error"));
     }
   }
 );
@@ -351,35 +109,33 @@ router.delete(
     const user = (req as any).user;
 
     try {
-      const [articles]: any = await database.query(
-        "SELECT author_id FROM articles WHERE id = ?",
-        [id]
+      const result = await deleteArticle(Number(id), user);
+      res.json(
+        successResponse({ message: "Article deleted successfully", result })
       );
-
-      if (articles.length === 0) {
-        return res.status(404).json(errorResponse("Article not found"));
-      }
-
-      const article = articles[0];
-
-      if (user.role !== "admin" && article.author_id !== user.id) {
-        return res
-          .status(403)
-          .json(errorResponse("You cannot delete this article"));
-      }
-
-      await database.query("DELETE FROM article_tags WHERE article_id = ?", [
-        id,
-      ]);
-
-      await database.query("DELETE FROM articles WHERE id = ?", [id]);
-
-      res.json(successResponse({ message: "Article deleted successfully" }));
     } catch (err: any) {
-      console.error("Delete article error:", err);
-      res.status(500).json(errorResponse(err.message || "Database error"));
+      console.error("❌ Delete article failed:", err);
+      res
+        .status(500)
+        .json(errorResponse(err.message || "Internal server error"));
     }
   }
 );
 
+router.post(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.ARTICLE_UPDATE),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const user = (req as any).user;
+    try {
+      const result = await restoreArticle(id, user); // 👈 调用 service
+      res.json(successResponse(result));
+    } catch (err: any) {
+      console.error("Restore article error:", err);
+      res.status(500).json(errorResponse(err.message || "Database error"));
+    }
+  }
+);
 export default router;

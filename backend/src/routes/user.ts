@@ -85,7 +85,6 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { username, email, password, role } = req.body;
 
-  // ✅ 权限判断
   const isSelf = currentUser.id === Number(id);
 
   if (currentUser.role !== "admin" && !isSelf) {
@@ -94,12 +93,10 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
       .json(errorResponse("Forbidden: You can only edit your own profile"));
   }
 
-  // 如果是普通用户，只能改自己（要有 USER_EDIT_SELF 权限）
   if (!isSelf && currentUser.role !== "admin") {
     return res.status(403).json(errorResponse("Forbidden"));
   }
 
-  // 普通用户改自己时：验证有 USER_EDIT_SELF 权限
   if (isSelf && currentUser.role !== "admin") {
     const { ROLE_PERMISSIONS } = await import("../constants/permission");
     const rolePermissions = ROLE_PERMISSIONS[currentUser.role] || [];
@@ -140,7 +137,9 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
     }
 
     if (updates.length === 0) {
-      return res.status(400).json(errorResponse("No fields to update"));
+      return res
+        .status(400)
+        .json(errorResponse("You're not allow to edit role!"));
     }
 
     values.push(id);

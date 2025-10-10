@@ -1,5 +1,8 @@
-export function successResponse(data: any) {
-  return { success: true, data };
+export function successResponse(payload: any) {
+  return {
+    success: true,
+    ...payload,
+  };
 }
 
 export function errorResponse(error: string) {
