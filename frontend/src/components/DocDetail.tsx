@@ -30,7 +30,7 @@ export default function DocDetail({
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const navigate = useNavigate();
 
-  // 🧩 加载分类映射
+  // 🧩 加载分类映射 (Same as before)
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -49,7 +49,7 @@ export default function DocDetail({
       .catch((err) => console.error("❌ Error loading categories:", err));
   }, []);
 
-  // 🏷️ 加载所有标签（仅一次）
+  // 🏷️ 加载所有标签
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -66,10 +66,14 @@ export default function DocDetail({
       .catch((err) => console.error("❌ Error loading tags:", err));
   }, []);
 
-  // 📄 加载文档详情
+  // 📄 加载文档详情 (修正标签依赖问题)
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token || !id) return;
+    
+    // ⚠️ 只有在标签加载完成（或至少开始加载）后，才开始加载文档详情。
+    // 但是，最关键的是确保在处理文档数据时 allTags 是最新的。
+    // 我们信任 React 的依赖数组。当 allTags 第一次加载完成时，会触发此 effect。
 
     setLoading(true);
 
@@ -79,28 +83,32 @@ export default function DocDetail({
       .then((res) => res.json())
       .then((result) => {
         if (result.success && result.data) {
-          let article = result.data;
+          let article = result.data as DocItem;
 
-          // ✅ 如果后端没有返回 tags，但有 tag_ids
+          // ✅ 如果后端没有返回 tags (对象数组)，但有 tag_ids (ID 数组)
+          // 并且 allTags 已经加载完成，则进行映射
           if (!article.tags && Array.isArray(article.tag_ids) && allTags.length > 0) {
             article.tags = allTags.filter((t) =>
-              article.tag_ids.includes(t.id)
+              article.tag_ids!.includes(t.id)
             );
           }
-
+          
+          // 如果后端直接返回 tag_ids，但没有返回 author_id 或 created_at，这里也不会报错。
           setDoc(article);
         } else {
           toast.error(result.message || "Failed to load document");
+          setDoc(null); // 设置为 null 以显示 "Document not found"
         }
       })
       .catch((err) => {
         console.error("❌ Error fetching document:", err);
         toast.error("Error fetching document!");
+        setDoc(null);
       })
       .finally(() => setLoading(false));
-  }, [id, allTags]);
+  }, [id, allTags]); // 依赖 allTags，确保标签加载完成后，文档处理逻辑能正确运行
 
-  // 🗑️ 删除文章
+  // 🗑️ 删除文章 (Same as before)
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
 
@@ -156,7 +164,7 @@ export default function DocDetail({
           </p>
 
           {/* ✅ 标签显示：支持 tag_ids / tags */}
-          {doc.tags && doc.tags.length > 0 && (
+          {doc.tags && doc.tags.length > 0 && Array.isArray(doc.tags) && (
             <p>
               <strong>Tags:</strong>{" "}
               {doc.tags.map((t) => (

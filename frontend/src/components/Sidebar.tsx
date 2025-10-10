@@ -23,27 +23,34 @@ export default function Sidebar({
 }: SidebarProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ 获取分类数据
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+// ✅ 获取分类数据（兼容分页结构）
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (!token) return;
 
-    fetch(`${API_BASE_URL}/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
+  fetch(`${API_BASE_URL}/categories`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((res) => res.json())
+    .then((result) => {
+      if (result.success) {
+        const list = Array.isArray(result.data)
+          ? result.data
+          : Array.isArray(result.data?.data)
+          ? result.data.data
+          : [];
+
+        setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
+      } else {
+        console.error("Failed to load categories:", result.message);
+      }
     })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && Array.isArray(result.data)) {
-          setCategories(result.data.map((c: any) => ({ id: c.id, name: c.name })));
-        } else {
-          console.error("Failed to load categories:", result.message);
-        }
-      })
-      .catch((err) => console.error("Error fetching categories:", err));
-  }, []);
+    .catch((err) => console.error("Error fetching categories:", err));
+}, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -53,8 +60,7 @@ export default function Sidebar({
   };
 
   const handleCategoryClick = (catId: string) => {
-    setCategory(catId);
-    navigate("/docs");
+    navigate(catId ? `/docs?category_id=${catId}` : "/docs");
     setMobileOpen(false);
   };
 
@@ -112,7 +118,7 @@ export default function Sidebar({
         className={isProfileActive ? "active" : ""}
       >
         My Profile
-      </li>
+        </li>
 
       {currentUser && currentUser.role === "admin" && (
         <li
@@ -141,17 +147,31 @@ export default function Sidebar({
       {/* 🖥️ 桌面端 Sidebar */}
       <aside className="sidebar desktop-only">
         <h2>Company Wiki</h2>
-        <ul>{renderMenuItems()}</ul>
+        <ul className="main-menu">{renderMenuItems()}</ul>
 
-        <h3>Categories</h3>
-        <ul>
-          <li onClick={() => handleCategoryClick("")}>All</li>
-          {categories.map((cat) => (
-            <li key={cat.id} onClick={() => handleCategoryClick(cat.id.toString())}>
-              {cat.name}
-            </li>
-          ))}
-        </ul>
+        {/* Categories 部分 - 可折叠 */}
+        <div className="categories-section">
+          <div 
+            className="categories-header"
+            onClick={() => setCategoriesOpen(!categoriesOpen)}
+          >
+            <span>Categories</span>
+            <span className={`collapse-icon ${categoriesOpen ? 'open' : ''}`}>
+              {categoriesOpen ? '▼' : '►'}
+            </span>
+          </div>
+          
+          {categoriesOpen && (
+            <ul className="categories-list">
+              <li onClick={() => handleCategoryClick("")}>All</li>
+              {categories.map((cat) => (
+                <li key={cat.id} onClick={() => handleCategoryClick(cat.id.toString())}>
+                  {cat.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="sidebar-user">
           {currentUser ? (
@@ -170,20 +190,34 @@ export default function Sidebar({
       {/* 📱 移动端 Sidebar */}
       {mobileOpen && (
         <div className="mobile-menu">
-          <ul>{renderMenuItems()}</ul>
+          <ul className="main-menu">{renderMenuItems()}</ul>
 
-          <h3>Categories</h3>
-          <ul>
-            <li onClick={() => handleCategoryClick("")}>All</li>
-            {categories.map((cat) => (
-              <li
-                key={cat.id}
-                onClick={() => handleCategoryClick(cat.id.toString())}
-              >
-                {cat.name}
-              </li>
-            ))}
-          </ul>
+          {/* 移动端的 Categories 部分 */}
+          <div className="categories-section">
+            <div 
+              className="categories-header"
+              onClick={() => setCategoriesOpen(!categoriesOpen)}
+            >
+              <span>Categories</span>
+              <span className={`collapse-icon ${categoriesOpen ? 'open' : ''}`}>
+                {categoriesOpen ? '▼' : '►'}
+              </span>
+            </div>
+            
+            {categoriesOpen && (
+              <ul className="categories-list">
+                <li onClick={() => handleCategoryClick("")}>All</li>
+                {categories.map((cat) => (
+                  <li
+                    key={cat.id}
+                    onClick={() => handleCategoryClick(cat.id.toString())}
+                  >
+                    {cat.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div className="sidebar-user">
             {currentUser ? (

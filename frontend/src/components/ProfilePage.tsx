@@ -12,7 +12,6 @@ export default function ProfilePage({
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }) {
   const [username, setUsername] = useState(currentUser?.username || "");
-  const [email, setEmail] = useState(currentUser?.email || ""); 
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,21 +20,9 @@ export default function ProfilePage({
     return <div className="not-allowed">Please login first.</div>;
   }
 
-  // ✅ Email 格式验证函数
-  const validateEmail = (email: string): boolean => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
-  };
-
   const handleUpdateProfile = async () => {
-    if (!username && !email && !password) {
+    if (!username && !password) {
       setMessage("⚠️ Please enter at least one field to update.");
-      return;
-    }
-
-    // ✅ 检查 email 是否符合标准格式
-    if (email && !validateEmail(email)) {
-      setMessage("❌ Please enter a valid email address (e.g., name@example.com).");
       return;
     }
 
@@ -48,7 +35,7 @@ export default function ProfilePage({
       const body = {
         id: currentUser.id,
         username: username || currentUser.username,
-        email: email || currentUser.email,
+        email: currentUser.email,
         role: currentUser.role,
         password: password || "", // 留空后端会忽略
       };
@@ -72,7 +59,6 @@ export default function ProfilePage({
         setCurrentUser({
           ...currentUser,
           username,
-          email,
         });
 
         setPassword("");
@@ -96,40 +82,75 @@ export default function ProfilePage({
       />
 
       <div className="main-content-with-sidebar">
-        <div className="profile">
-          <h2>My Profile</h2>
+        <div className="profile-page">
+          {/* Header Section */}
+          <div className="page-header">
+            <h1>My Profile</h1>
+            <p>Manage your account information and password</p>
+          </div>
 
-          <div className="profile-form">
-            <label>Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
+          {/* Profile Card */}
+          <div className="profile-card">
+            <div className="card-header">
+              <h2>Account Information</h2>
+            </div>
+            
+            <div className="profile-form">
+              {/* Current Info Display */}
+              <div className="current-info">
+                <div className="info-item">
+                  <span className="info-label">User ID:</span>
+                  <span className="info-value">{currentUser.id}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Email:</span>
+                  <span className="info-value">{currentUser.email}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Role:</span>
+                  <span className="info-value role-badge">{currentUser.role}</span>
+                </div>
+              </div>
 
-            {/* ✅ Email 输入框（带标准格式验证） */}
-            <label>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              required
-            />
+              {/* Editable Fields */}
+              <div className="form-group">
+                <label>Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
+                />
+              </div>
 
-            <label>New Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Leave blank if unchanged"
-            />
+              <div className="form-group">
+                <label>New Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Leave blank to keep current password"
+                />
+                <span className="input-hint">Minimum 6 characters</span>
+              </div>
 
-            <button onClick={handleUpdateProfile} disabled={loading}>
-              {loading ? "Updating..." : "Update Profile"}
-            </button>
+              <button onClick={handleUpdateProfile} disabled={loading} className="update-btn">
+                {loading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Updating...
+                  </>
+                ) : (
+                  "Update Profile"
+                )}
+              </button>
 
-            {message && <p className="profile-message">{message}</p>}
+              {message && (
+                <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+                  {message}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

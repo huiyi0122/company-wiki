@@ -1,282 +1,384 @@
-.Enroll{
-  margin: 20px 50px;
-}
-
-.enroll-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 420px;
-  background: #ffffff;
-  padding: 24px 28px;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-  transition: all 0.25s ease;
-}
-
-.enroll-form:hover {
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-}
-
-.enroll-form label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: #2d3748;
-}
-
-.enroll-form input,
-.enroll-form select {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e0;
-  background: #f7fafc;
-  transition: all 0.2s ease;
-  font-size: 0.95rem;
-}
-
-.enroll-form input:focus,
-.enroll-form select:focus {
-  outline: none;
-  border-color: #3182ce;
-  background: #fff;
-  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
-}
-
-/* ===== Button ===== */
-.enroll-form button {
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #4299e1, #3182ce);
-  border: none;
-  color: white;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  box-shadow: 0 3px 10px rgba(66, 153, 225, 0.25);
-}
-
-.enroll-form button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2b6cb0, #2c5282);
-  transform: translateY(-1px);
-  box-shadow: 0 5px 15px rgba(66, 153, 225, 0.35);
-}
-
-.enroll-form button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.25);
-}
-
-.enroll-form button:disabled {
-  background: #a0aec0;
-  cursor: not-allowed;
-}
-
-/* ===== Message ===== */
-.enroll-message {
-  margin-top: 10px;
-  font-weight: 600;
-  color: #2d3748;
-  text-align: center;
-  background: #edf2f7;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 0.95rem;
-}
-
-.enroll-message:empty {
-  display: none;
-}
-
-.not-allowed {
-  padding: 60px;
-  font-size: 1.2rem;
-  color: #e53e3e;
-  text-align: center;
-  background: #fff5f5;
-  border: 1px solid #fed7d7;
-  border-radius: 10px;
-  max-width: 400px;
-  margin: 80px auto;
-}
-
-.enroll-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 420px;
-  background: #ffffff;
-  padding: 24px 28px;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-  transition: all 0.25s ease;
-  margin-bottom: 40px;
-}
-
-.enroll-form:hover {
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-}
-
-.enroll-form label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: #2d3748;
-}
-
-.enroll-form input,
-.enroll-form select {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e0;
-  background: #f7fafc;
-  transition: all 0.2s ease;
-  font-size: 0.95rem;
-}
-
-.enroll-form input:focus,
-.enroll-form select:focus {
-  outline: none;
-  border-color: #3182ce;
-  background: #fff;
-  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
-}
-
-.enroll-form button {
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #4299e1, #3182ce);
-  border: none;
-  color: white;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  box-shadow: 0 3px 10px rgba(66, 153, 225, 0.25);
-}
-
-.enroll-form button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2b6cb0, #2c5282);
-  transform: translateY(-1px);
-  box-shadow: 0 5px 15px rgba(66, 153, 225, 0.35);
-}
-
-.enroll-form button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.25);
-}
-
-.enroll-form button:disabled {
-  background: #a0aec0;
-  cursor: not-allowed;
-}
-
-.enroll-message {
-  margin-top: 10px;
-  font-weight: 600;
-  color: #2d3748;
-  text-align: center;
-  background: #edf2f7;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 0.95rem;
-}
-
-.enroll-message:empty {
-  display: none;
-}
-
-/* ===== Access Denied ===== */
-.not-allowed {
-  padding: 60px;
-  font-size: 1.2rem;
-  color: #e53e3e;
-  text-align: center;
-  background: #fff5f5;
-  border: 1px solid #fed7d7;
-  border-radius: 10px;
-  max-width: 400px;
-  margin: 80px auto;
-}
-
-/* ===== User Table ===== */
-.user-table {
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+.enroll-page {
+  padding: 30px;
   max-width: 1200px;
-  width: 100%;
-  overflow-x: auto;
+  margin: 0 auto;
 }
 
-.user-table h3 {
-  margin-bottom: 18px;
-  font-size: 1.2rem;
-  color: #2d3748;
+/* Page Header */
+.page-header {
+  margin-bottom: 30px;
+}
+
+.page-header h1 {
+  color: #1a202c;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.page-header p {
+  color: #718096;
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Cards */
+.enroll-card,
+.users-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  margin-bottom: 30px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.enroll-card h2,
+.users-card .card-header h2 {
+  background: #f7fafc;
+  padding: 20px 24px;
+  margin: 0;
+  font-size: 1.3rem;
   font-weight: 600;
-}
-
-.user-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.95rem;
-}
-
-.user-table th,
-.user-table td {
-  text-align: left;
-  padding: 16px 0;
+  color: #2d3748;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.user-table th {
-  background: #f7fafc;
-  color: #2d3748;
-  font-weight: 700;
+/* Enroll Form */
+.enroll-form {
+  padding: 24px;
 }
 
-.user-table tr:hover {
-  background-color: #f1f5f9;
+.form-group {
+  margin-bottom: 20px;
 }
 
-/* ===== Action Buttons ===== */
-.user-table .action-btn {
-  padding: 6px 12px;
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.enroll-form input,
+.enroll-form select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  background: #fff;
+}
+
+.enroll-form input:focus,
+.enroll-form select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.enroll-btn {
+  width: 100%;
+  padding: 12px;
+  background: #4299e1;
+  color: white;
   border: none;
   border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+}
+
+.enroll-btn:hover:not(:disabled) {
+  background: #3182ce;
+  transform: translateY(-1px);
+}
+
+.enroll-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Password Display */
+.password-display {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.password-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #2f855a;
+  margin-bottom: 4px;
+}
+
+.password-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #22543d;
+  font-size: 0.9rem;
+}
+
+/* Messages */
+.message {
+  margin-top: 15px;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.message.success {
+  background: #f0fff4;
+  color: #22543d;
+  border: 1px solid #9ae6b4;
+}
+
+.message.error {
+  background: #fed7d7;
+  color: #c53030;
+  border: 1px solid #fc8181;
+}
+
+/* Users Table */
+.table-container {
+  padding: 0;
+  overflow: scroll;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table th {
+  background: #f7fafc;
+  padding: 16px 20px;
+  text-align: left;
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.users-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #4a5568;
+}
+
+.users-table tr:last-child td {
+  border-bottom: none;
+}
+
+.users-table tr:hover {
+  background: #f7fafc;
+}
+
+/* Editable Inputs */
+.editable-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.editable-input:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.1);
+}
+
+.role-select {
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: #4299e1;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-save {
+  padding: 6px 12px;
+  background: #48bb78;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.user-table .edit-btn {
+.btn-save:hover {
+  background: #38a169;
+}
+
+.btn-delete {
+  padding: 6px 12px;
+  background: #f56565;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-delete:hover {
+  background: #e53e3e;
+}
+
+/* User ID */
+.user-id {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #718096;
+  font-size: 0.85rem;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: #a0aec0;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f7fafc;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  color: #4a5568;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
   background: #4299e1;
   color: white;
+  border-color: #4299e1;
 }
 
-.user-table .edit-btn:hover {
-  background: #2b6cb0;
+.pagination-btn:disabled {
+  background: #e2e8f0;
+  color: #a0aec0;
+  cursor: not-allowed;
 }
 
-.user-table .delete-btn {
-  background: #e53e3e;
-  color: white;
+.page-info {
+  font-size: 0.9rem;
+  color: #4a5568;
+  font-weight: 500;
 }
 
-.user-table .delete-btn:hover {
-  background: #c53030;
+/* Access Denied */
+.not-allowed {
+  padding: 60px;
+  font-size: 1.2rem;
+  color: #e53e3e;
+  text-align: center;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 10px;
+  max-width: 400px;
+  margin: 80px auto;
 }
 
-/* ===== Responsive ===== */
+/* Responsive Design */
 @media (max-width: 768px) {
-  .Enroll{
-    margin: 120px 20px;
+  .enroll-page {
+    padding: 15px;
   }
+  
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+  
   .enroll-form {
-    max-width: 100%;
+    padding: 20px;
   }
-  .user-table table {
-    font-size: 0.9rem;
+  
+  .users-table {
+    font-size: 0.8rem;
   }
-  .user-table th,
-  .user-table td {
-    padding: 10px;
+  
+  .users-table th,
+  .users-table td {
+    padding: 12px 8px;
+  }
+  
+  .actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .btn-save,
+  .btn-delete {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+  
+  .pagination {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* Main content adjustment for sidebar */
+.main-content-with-sidebar {
+  margin-left: 280px;
+  min-height: 100vh;
+  background: #f7fafc;
+}
+
+@media (max-width: 768px) {
+  .main-content-with-sidebar {
+    margin-left: 0;
+    padding-top: 60px;
   }
 }
