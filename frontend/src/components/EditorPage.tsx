@@ -31,16 +31,19 @@ export default function EditorPage({
   const { id } = useParams<{ id: string }>();
   const [title, setTitle] = useState<string>("");
   const [content, setContent] = useState<string>("## Start writing your article...");
-  const [categoryId, setCategoryId] = useState<number | null>(null); // 用 id
+  const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   // ---------------------- 获取分类 + 标签 + 加载文章 ----------------------
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
+
+    setLoading(true);
 
     // 获取分类
     fetch(`${API_BASE_URL}/categories`, {
@@ -77,16 +80,14 @@ export default function EditorPage({
             const article = result.data;
             setTitle(article.title);
             setContent(article.content);
-            setCategoryId(article.category_id || null); // ✅ 直接用 id
+            setCategoryId(article.category_id || null);
             setSelectedTags(article.tag_ids || []);
           }
         })
-        .catch((err) => console.error(err));
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
     } else {
-      setTitle("");
-      setContent("## Start writing your article...");
-      setCategoryId(null);
-      setSelectedTags([]);
+      setLoading(false);
     }
   }, [id]);
 
@@ -117,7 +118,7 @@ export default function EditorPage({
       toast.success(`Category "${name.trim()}" added successfully!`);
       const newCatObj = { id: result.data?.id || Date.now(), name: name.trim() };
       setCategories((prev) => [...prev, newCatObj]);
-      setCategoryId(newCatObj.id); // ✅ 直接选中新增分类
+      setCategoryId(newCatObj.id);
     } catch (err) {
       console.error(err);
       toast.error("Failed to add category.");
@@ -167,11 +168,12 @@ export default function EditorPage({
     const payload = {
       title,
       content,
-      category_id: categoryId, // ✅ 用 id
-      tags: selectedTags, // ✅ 改这里
+      category_id: categoryId, 
+      tags: selectedTags, 
     };
 
     try {
+      setLoading(true);
       const res = await fetch(
         id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
         {
@@ -193,6 +195,8 @@ export default function EditorPage({
     } catch (err) {
       console.error(err);
       toast.error("Save failed!");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -205,6 +209,22 @@ export default function EditorPage({
     );
   };
 
+  if (loading) {
+    return (
+      <div className="layout">
+        <Sidebar setCategory={() => {}} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+        <div className="main-content-with-sidebar">
+          <div className="editor-page">
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading editor...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="layout">
       <Sidebar
@@ -213,79 +233,114 @@ export default function EditorPage({
         setCurrentUser={setCurrentUser}
       />
       <div className="main-content-with-sidebar">
-        <div className="edit-top">
-          <h2>{id ? "Edit Article" : "New Article"}</h2>
-
-          {/* Title */}
-          <div className="title">
-            <label>Title:</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+        <div className="editor-page">
+          {/* Header Section */}
+          <div className="page-header">
+            <h1>{id ? "Edit Article" : "Create New Article"}</h1>
+            <p>{id ? "Update your existing article" : "Write and publish a new article"}</p>
           </div>
 
-          {/* Category */}
-          <div
-            className="Category"
-            style={{ display: "flex", alignItems: "center", gap: "10px" }}
-          >
-            <div>
-              <label>Category:</label>
-              <select
-                value={categoryId || ""}
-                onChange={(e) => setCategoryId(Number(e.target.value))}
-              >
-                <option value="">-- Select Category --</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+          {/* Main Editor Card */}
+          <div className="editor-card">
+            <div className="card-header">
+              <h2>Article Details</h2>
             </div>
-            <button className="add-category-btn" onClick={handleAddCategory}>
-              + Add Category
-            </button>
-          </div>
 
-          {/* Tags */}
-          <div className="tags-section">
-            <label>Tags:</label>
-            <div className="tags-list">
-              {tags.map((tag) => (
-                <label key={tag.id} className="tag-item">
-                  <input
-                    type="checkbox"
-                    checked={selectedTags.includes(tag.id)}
-                    onChange={() => toggleTagSelection(tag.id)}
+            <div className="editor-form">
+              {/* Title */}
+              <div className="form-group">
+                <label>Article Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter a compelling title..."
+                  className="form-input"
+                />
+              </div>
+
+              {/* Category & Tags Row */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Category</label>
+                  <div className="select-with-button">
+                    <select
+                      value={categoryId || ""}
+                      onChange={(e) => setCategoryId(Number(e.target.value))}
+                      className="form-select"
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="btn-add" onClick={handleAddCategory}>
+                      + New
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Tags</label>
+                  <div className="tags-section">
+                    <div className="tags-list">
+                      {tags.map((tag) => (
+                        <label key={tag.id} className="tag-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedTags.includes(tag.id)}
+                            onChange={() => toggleTagSelection(tag.id)}
+                          />
+                          <span className="tag-name">{tag.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <button className="btn-add" onClick={handleAddTag}>
+                      + New Tag
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content Editor */}
+              <div className="form-group">
+                <label>Content</label>
+                <div className="editor-container">
+                  <MDEditor
+                    value={content}
+                    onChange={(val) => setContent(val || "")}
+                    height={400}
+                    previewOptions={{ remarkPlugins: [remarkGfm, remarkGemoji] }}
                   />
-                  {tag.name}
-                </label>
-              ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="action-buttons">
+                <button 
+                  className="btn-primary" 
+                  onClick={handleSave}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className="loading-spinner-small"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Article"
+                  )}
+                </button>
+                <button 
+                  className="btn-secondary"
+                  onClick={() => navigate("/docs")}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            <button className="add-tag-btn" onClick={handleAddTag}>
-              + Add Tag
-            </button>
-          </div>
-
-          {/* Markdown Editor */}
-          <MDEditor
-            value={content}
-            onChange={(val) => setContent(val || "")}
-            height={500}
-            previewOptions={{ remarkPlugins: [remarkGfm, remarkGemoji] }}
-          />
-
-          {/* Buttons */}
-          <div className="edit-btn">
-            <button className="save" onClick={handleSave}>
-              Save
-            </button>
-            <button className="back" onClick={() => navigate("/docs")}>
-              Back to Docs
-            </button>
           </div>
         </div>
       </div>

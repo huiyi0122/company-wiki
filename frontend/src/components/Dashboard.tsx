@@ -1,4 +1,3 @@
-// src/components/Dashboard.tsx
 import React, { useEffect, useState } from "react";
 import type { User } from "./CommonTypes";
 import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
@@ -13,11 +12,22 @@ interface DashboardProps {
 interface Category {
   id: number;
   name: string;
+  slug?: string | null;
+  is_active?: number;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Tag {
   id: number;
   name: string;
+  slug?: string | null;
+  is_active?: number;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+  updated_at?: string | null;
 }
 
 const fetchStats = async () => {
@@ -65,6 +75,15 @@ export default function Dashboard({
   const [catLoading, setCatLoading] = useState(false);
   const [tagLoading, setTagLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [catPagination, setCatPagination] = useState<{ nextCursor: number | null; limit: number }>({
+  nextCursor: null,
+  limit: 20,
+});
+const [tagPagination, setTagPagination] = useState<{ nextCursor: number | null; limit: number }>({
+  nextCursor: null,
+  limit: 20,
+});
+
 
   const setCategory = () => {};
 
@@ -84,24 +103,144 @@ export default function Dashboard({
   }, [canManage]);
 
   // ===== 获取分类（仅管理员） =====
-  const fetchCategories = async () => {
+// ✅ 获取 Categories（使用 lastId 分页）
+const fetchCategories = async (lastId?: number) => {
+  try {
+    setCatLoading(true);
+    const token = localStorage.getItem("token");
+
+    // ✅ 改为 lastId 参数
+    const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
+      lastId ? `&lastId=${lastId}` : ""
+    }`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const result = await res.json();
+
+    if (!result.success) {
+      setMessage(`❌ ${result.message}`);
+      return;
+    }
+
+    const list = Array.isArray(result.data?.data)
+      ? result.data.data
+      : Array.isArray(result.data)
+      ? result.data
+      : [];
+
+    // ✅ 分页：第一页替换，之后追加
+    if (lastId) {
+      setCategories((prev) => [...prev, ...list]);
+    } else {
+      setCategories(list);
+    }
+
+    // ✅ 更新分页游标（nextCursor 即最后一个 id）
+    const nextCursor =
+      list.length > 0 ? list[list.length - 1].id : null;
+
+    setCatPagination({
+      nextCursor,
+      limit: result.data?.meta?.limit ?? 20,
+    });
+  } catch (err) {
+    console.error("Category fetch error:", err);
+    setMessage("❌ Failed to connect to server.");
+  } finally {
+    setCatLoading(false);
+  }
+};
+
+
+
+  // ===== 获取标签（仅管理员） =====
+// ✅ 获取 Tags（使用 lastId 分页）
+const fetchTags = async (lastId?: number) => {
+  try {
+    setTagLoading(true);
+    const token = localStorage.getItem("token");
+
+    // ✅ 改为 lastId 参数
+    const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
+      lastId ? `&lastId=${lastId}` : ""
+    }`;
+
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const result = await res.json();
+
+    if (!result.success) {
+      setMessage(`❌ ${result.message}`);
+      return;
+    }
+
+    const list = Array.isArray(result.data?.data)
+      ? result.data.data
+      : Array.isArray(result.data)
+      ? result.data
+      : [];
+
+    // ✅ 分页：第一页替换，之后追加
+    if (lastId) {
+      setTags((prev) => [...prev, ...list]);
+    } else {
+      setTags(list);
+    }
+
+    // ✅ 更新分页游标
+    const nextCursor =
+      list.length > 0 ? list[list.length - 1].id : null;
+
+    setTagPagination({
+      nextCursor,
+      limit: result.data?.meta?.limit ?? 20,
+    });
+  } catch (err) {
+    console.error("Tag fetch error:", err);
+    setMessage("❌ Failed to connect to server.");
+  } finally {
+    setTagLoading(false);
+  }
+};
+
+
+
+  // ===== 编辑分类 =====
+  const handleEditCategory = async (id: number, oldName: string) => {
+    const newName = window.prompt("Enter new category name:", oldName);
+    if (!newName || newName.trim() === oldName) return;
+
+
     try {
-      setCatLoading(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newName.trim(),
+        }),
       });
       const result = await res.json();
-      if (result.success && Array.isArray(result.data)) {
-        setCategories(result.data);
+
+      if (result.success) {
+        setMessage(`✅ Category "${newName.trim()}" updated successfully`);
+        setCategories((prev) =>
+          prev.map((c) =>
+            c.id === id ? { ...c, name: newName.trim()} : c
+          )
+        );
       } else {
-        setMessage("❌ Failed to load categories.");
+        setMessage(`❌ ${result.message || "Failed to update category."}`);
       }
     } catch (err) {
-      console.error("Category fetch error:", err);
-      setMessage("❌ Failed to connect to server.");
-    } finally {
-      setCatLoading(false);
+      console.error("Edit category error:", err);
+      setMessage("❌ Server connection failed.");
     }
   };
 
@@ -115,38 +254,45 @@ export default function Dashboard({
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const result = await res.json();
+      const msg = result.message || result.error || "";
+
+      if (!result.success && /used by/i.test(msg)) {
+        const forceConfirm = window.confirm(
+          "⚠️ This category is still used by some articles.\n\nIf you force delete it, all related articles will have no category.\n\nDo you want to force delete this category?"
+        );
+        if (forceConfirm) {
+          const forceRes = await fetch(
+            `${API_BASE_URL}/categories/${id}?force=true`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          const forceResult = await forceRes.json();
+          if (forceResult.success) {
+            setMessage(`✅ ${forceResult.message || "Category deleted"}`);
+            setCategories((prev) => prev.filter((c) => c.id !== id));
+          } else {
+            setMessage(`❌ ${forceResult.message || "Force delete failed"}`);
+          }
+          return;
+        } else {
+          setMessage("❎ Force delete cancelled.");
+          return;
+        }
+      }
+
       if (result.success) {
-        setMessage(`✅ ${result.data?.message || "Category deleted."}`);
+        setMessage(`✅ ${msg || "Category deleted"}`);
         setCategories((prev) => prev.filter((c) => c.id !== id));
       } else {
-        setMessage(`❌ ${result.data?.message || "Failed to delete category."}`);
+        setMessage(`❌ ${msg || "Failed to delete category."}`);
       }
     } catch (err) {
       console.error("Delete error:", err);
       setMessage("❌ Server connection failed.");
-    }
-  };
-
-  // ===== 获取标签（仅管理员） =====
-  const fetchTags = async () => {
-    try {
-      setTagLoading(true);
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/tags`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
-      if (result.success && Array.isArray(result.data)) {
-        setTags(result.data);
-      } else {
-        setMessage("❌ Failed to load tags.");
-      }
-    } catch (err) {
-      console.error("Tag fetch error:", err);
-      setMessage("❌ Failed to connect to server.");
-    } finally {
-      setTagLoading(false);
     }
   };
 
@@ -191,17 +337,20 @@ export default function Dashboard({
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
+
       if (result.success) {
-        setMessage(`✅ ${result.data?.message || "Tag deleted."}`);
+        setMessage(`✅ ${result.data || result.message || "Tag deleted."}`);
         setTags((prev) => prev.filter((t) => t.id !== id));
       } else {
-        setMessage(`❌ ${result.data?.message || "Failed to delete tag."}`);
+        setMessage(`❌ ${result.message || "Failed to delete tag."}`);
       }
     } catch (err) {
       console.error("Delete tag error:", err);
       setMessage("❌ Server connection failed.");
     }
   };
+
+
 
   useEffect(() => {
     if (currentUser?.role === "admin") {
@@ -218,10 +367,14 @@ export default function Dashboard({
     return (
       <div className="layout">
         <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
-        <div className="main-content-with-sidebar dashboard-container error">
-          <h2>Access Denied</h2>
-          <p>You do not have the required permissions to view the Dashboard.</p>
-          <p>Your role: {currentUser.role}</p>
+        <div className="main-content-with-sidebar">
+          <div className="dashboard-page">
+            <div className="access-denied-card">
+              <h2>🚫 Access Denied</h2>
+              <p>You do not have the required permissions to view the Dashboard.</p>
+              <p className="user-role">Your role: <span>{currentUser.role}</span></p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -231,7 +384,14 @@ export default function Dashboard({
     return (
       <div className="layout">
         <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
-        <div className="main-content-with-sidebar dashboard-container">Loading statistics...</div>
+        <div className="main-content-with-sidebar">
+          <div className="dashboard-page">
+            <div className="loading-card">
+              <div className="loading-spinner"></div>
+              <p>Loading statistics...</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -239,55 +399,115 @@ export default function Dashboard({
   return (
     <div className="layout">
       <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
-      <div className="main-content-with-sidebar dashboard-container">
-        <div className="dashboard-top">
-          <h1>👋 Welcome back, {currentUser.username}!</h1>
-          <p className="dashboard-role">
-            Role: <strong>{currentUser.role}</strong>
-          </p>
-
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h3>Total Articles</h3>
-              <p className="stat-value">{stats.totalArticles}</p>
-            </div>
-
-            <div className="stat-card pending">
-              <h3>Drafts Pending Review</h3>
-              <p className="stat-value">{stats.draftsPendingReview}</p>
-            </div>
-
-            <div className="stat-card">
-              <h3>New Users (Last 7 Days)</h3>
-              <p className="stat-value">{stats.newUsersLast7Days}</p>
-            </div>
+      <div className="main-content-with-sidebar">
+        <div className="dashboard-page">
+          {/* Header Section */}
+          <div className="page-header">
+            <h1>Dashboard</h1>
+            <p>Welcome back, {currentUser.username}! Here's your workspace overview.</p>
           </div>
 
-          {/* 分类管理 */}
+          {/* Stats Grid */}
+          <section className="stats-section">
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon">📚</div>
+                <div className="stat-content">
+                  <h3>Total Articles</h3>
+                  <p className="stat-value">{stats.totalArticles}</p>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon">📝</div>
+                <div className="stat-content">
+                  <h3>Drafts Pending</h3>
+                  <p className="stat-value">{stats.draftsPendingReview}</p>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon">👥</div>
+                <div className="stat-content">
+                  <h3>New Users (7 Days)</h3>
+                  <p className="stat-value">{stats.newUsersLast7Days}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Message Display */}
+          {message && (
+            <div className={`message ${message.includes("❌") ? "error" : "success"}`}>
+              {message}
+            </div>
+          )}
+
+          {/* Admin Management Sections */}
           {currentUser.role === "admin" && (
-            <>
-              <section className="category-section">
-                <h2>📂 Category Management</h2>
-                <button onClick={fetchCategories} disabled={catLoading}>
-                  {catLoading ? "Refreshing..." : "Refresh List"}
-                </button>
-                {message && <p className="message">{message}</p>}
-                <table className="category-table">
-                  <thead>
+            <div className="admin-sections">
+              {/* Category Management */}
+              <div className="management-card">
+                <div className="card-header">
+                  <h2>📂 Category Management</h2>
+                  <button 
+                    className="refresh-btn"
+                    onClick={() => fetchCategories()}
+                    disabled={catLoading}
+                  >
+                    {catLoading ? (
+                      <>
+                        <span className="loading-spinner-small"></span>
+                        Refreshing...
+                      </>
+                    ) : (
+                      "🔄 Refresh"
+                    )}
+                  </button>
+                </div>
+                
+                <div className="table-container">
+                  <table className="management-table">
+                   <thead>
                     <tr>
                       <th>ID</th>
                       <th>Name</th>
-                      <th>Action</th>
+                      <th>Slug</th>
+                      <th>Status</th>
+                      <th>Created By</th>
+                      <th>Updated By</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {categories.length > 0 ? (
                       categories.map((cat) => (
                         <tr key={cat.id}>
-                          <td>{cat.id}</td>
-                          <td>{cat.name}</td>
+                          <td className="id-cell">#{cat.id}</td>
+                          <td className="name-cell">{cat.name}</td>
+                          <td>{cat.slug || "-"}</td>
                           <td>
-                            <button className="btn-delete" onClick={() => handleDeleteCategory(cat.id)}>
+                            <span
+                              className={`status-badge ${
+                                cat.is_active ? "active" : "inactive"
+                              }`}
+                            >
+                              {cat.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td>{cat.created_by_name || "-"}</td>
+                          <td>{cat.updated_by_name || "-"}</td>
+                          <td className="actions-cell">
+                            <button
+                              className="btn-edit"
+                              onClick={() => handleEditCategory(cat.id, cat.name)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn-delete"
+                              onClick={() => handleDeleteCategory(cat.id)}
+                            >
                               Delete
                             </button>
                           </td>
@@ -295,60 +515,145 @@ export default function Dashboard({
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={3}>No categories found.</td>
+                        <td colSpan={7} className="no-data">
+                          No categories found.
+                        </td>
                       </tr>
                     )}
                   </tbody>
-                </table>
-              </section>
 
-              {/* 标签管理 */}
-              <section className="tag-section">
-                <h2>🏷️ Tag Management</h2>
-                <button onClick={fetchTags} disabled={tagLoading}>
-                  {tagLoading ? "Refreshing..." : "Refresh List"}
-                </button>
-                <table className="category-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tags.length > 0 ? (
-                      tags.map((tag) => (
-                        <tr key={tag.id}>
-                          <td>{tag.id}</td>
-                          <td>{tag.name}</td>
-                          <td>
-                            <button onClick={() => handleEditTag(tag.id, tag.name)}>Edit</button>
-                            <button className="btn-delete" onClick={() => handleDeleteTag(tag.id)}>
-                              Delete
-                            </button>
+                  </table>
+                  {catPagination.nextCursor && (
+                    <div className="loadmore-container">
+                      <button
+                        className="btn-loadmore"
+                        onClick={() => fetchCategories(catPagination.nextCursor!)}
+                        disabled={catLoading}
+                      >
+                        {catLoading ? "Loading..." : "↓ Load More"}
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+              {/* Tag Management */}
+              <div className="management-card">
+                <div className="card-header">
+                  <h2>🏷️ Tag Management</h2>
+                  <button 
+                    className="refresh-btn"
+                    onClick={() => fetchTags(tagPagination.nextCursor!)}
+                    disabled={tagLoading}
+                  >
+                    {tagLoading ? (
+                      <>
+                        <span className="loading-spinner-small"></span>
+                        Refreshing...
+                      </>
+                    ) : (
+                      "🔄 Refresh"
+                    )}
+                  </button>
+                </div>
+                
+                <div className="table-container">
+                  <table className="management-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Slug</th>
+                        <th>Status</th>
+                        <th>Created By</th>
+                        <th>Updated By</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tags.length > 0 ? (
+                        tags.map((tag) => (
+                          <tr key={tag.id}>
+                            <td className="id-cell">#{tag.id}</td>
+                            <td className="name-cell">{tag.name}</td>
+                            <td>{tag.slug || "-"}</td>
+                            <td>
+                              <span className={`status-badge ${tag.is_active ? 'active' : 'inactive'}`}>
+                                {tag.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td>{tag.created_by_name || "-"}</td>
+                            <td>{tag.updated_by_name || "-"}</td>
+                            <td className="actions-cell">
+                              <button
+                                className="btn-edit"
+                                onClick={() => handleEditTag(tag.id, tag.name)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="btn-delete"
+                                onClick={() => handleDeleteTag(tag.id)}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="no-data">
+                            No tags found.
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={3}>No tags found.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </section>
-            </>
+                      )}
+                    </tbody>
+                  </table>
+                  {tagPagination.nextCursor && (
+                    <div className="loadmore-container">
+                      <button
+                        className="btn-loadmore"
+                        onClick={() => fetchTags(tagPagination.nextCursor!)}
+                        disabled={tagLoading}
+                      >
+                        {tagLoading ? "Loading..." : "↓ Load More"}
+                      </button>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            </div>
           )}
 
-          <section className="recent-activity">
+          {/* Recent Activity */}
+          <div className="activity-card">
             <h2>Recent Activity</h2>
-            <ul>
-              <li>User **ABC** submitted a new draft: *Q3 Marketing Strategy*.</li>
-              <li>User **DEF** approved article *Onboarding Flow Update*.</li>
-              <li>Category **HR** created by **system**.</li>
-            </ul>
-          </section>
+            <div className="activity-list">
+              <div className="activity-item">
+                <div className="activity-icon">📄</div>
+                <div className="activity-content">
+                  <p><strong>ABC</strong> submitted a new draft</p>
+                  <span className="activity-time">2 hours ago</span>
+                </div>
+              </div>
+              <div className="activity-item">
+                <div className="activity-icon">✅</div>
+                <div className="activity-content">
+                  <p><strong>DEF</strong> approved an article</p>
+                  <span className="activity-time">5 hours ago</span>
+                </div>
+              </div>
+              <div className="activity-item">
+                <div className="activity-icon">📂</div>
+                <div className="activity-content">
+                  <p>New category <strong>HR</strong> created</p>
+                  <span className="activity-time">1 day ago</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

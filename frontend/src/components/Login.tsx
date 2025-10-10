@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
-// ----------------------------------------------------------------------
-// ✅ FIX 1: Separating value imports (API_BASE_URL) from type imports (User, JWTPayload)
 import { API_BASE_URL } from "./CommonTypes";
-import type { User, JWTPayload } from "./CommonTypes";
-// ----------------------------------------------------------------------
+import type { User } from "./CommonTypes";
 import "../styles/Login.css";
 
 interface LoginProps {
@@ -18,7 +14,10 @@ export default function Login({ setCurrentUser }: LoginProps) {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
-    if (!username || !password) return console.error("Please fill all fields!");
+    if (!username || !password) {
+      console.error("Please fill all fields!");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE_URL}/login`, {
@@ -29,24 +28,33 @@ export default function Login({ setCurrentUser }: LoginProps) {
 
       const data = await res.json();
 
-      if (!data.success) {
-        console.error(data.error || "Invalid username or password!");
+      if (!res.ok || !data.success) {
+        console.error("Invalid username or password!");
         return;
       }
 
-      localStorage.setItem("token", data.data.token);
+      // ✅ 保存 token
+      localStorage.setItem("token", data.token);
 
-      const decoded = jwtDecode<JWTPayload>(data.data.token);
-      setCurrentUser({
-        id: decoded.id,
-        username: decoded.username,
-        role: decoded.role,
-      });
+      // ✅ 使用后端返回的 user 对象，而不是 jwtDecode
+      if (data.user) {
+        setCurrentUser({
+          id: data.user.id,
+          username: data.user.username,
+          email: data.user.email,
+          role: data.user.role,
+        });
+      } else {
+        console.error("No user data in response!");
+        return;
+      }
 
+      console.log("Login successful:", data.user);
+
+      // ✅ 登录成功跳转
       navigate("/docs");
     } catch (err) {
-      console.error(err);
-      console.error("Login failed!");
+      console.error("Login failed:", err);
     }
   };
 

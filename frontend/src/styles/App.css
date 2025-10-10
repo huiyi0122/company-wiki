@@ -27,8 +27,8 @@ body {
 }
 
 .main-content-with-sidebar {
-  margin-left: 280px;
-  width: calc(100% - 280px);
+  margin-left: 250px;
+  width: calc(100% - 250px);
   min-height: 100vh;
   background: #f7fafc;
 }
