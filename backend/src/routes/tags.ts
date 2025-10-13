@@ -3,12 +3,15 @@ import { authenticate } from "../middleware/auth";
 import { authorize } from "../middleware/authorize";
 import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
-import { createTag } from "../services/tagService";
-import { getTags } from "../services/tagService";
-import { updateTag } from "../services/tagService";
-import { deleteTag } from "../services/tagService";
-import { hardDeleteTag } from "../services/tagService";
-import { restoreTag } from "../services/tagService";
+import {
+  createTag,
+  getTags,
+  getTagById,
+  updateTag,
+  deleteTag,
+  hardDeleteTag,
+  restoreTag,
+} from "../services/tagService";
 
 const router = Router();
 
@@ -60,6 +63,28 @@ router.get(
     } catch (err) {
       console.error("GET /tags error:", err);
       res.status(500).json(errorResponse("Failed to fetch tags"));
+    }
+  }
+);
+
+router.get(
+  "/:id",
+  authenticate,
+  authorize(PERMISSIONS.CATEGORY_READ),
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    try {
+      const category = await getTagById(Number(id));
+
+      if (!category) {
+        return res.status(404).json(errorResponse("Tag not found"));
+      }
+
+      res.json(successResponse(category));
+    } catch (err) {
+      console.error("GET /tags/:id error:", err);
+      res.status(500).json(errorResponse("Failed to fetch tag details"));
     }
   }
 );

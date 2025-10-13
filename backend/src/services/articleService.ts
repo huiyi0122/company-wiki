@@ -552,7 +552,7 @@ export async function deleteArticle(articleId: number, user: any) {
     // 3️⃣ 写日志
     await connection.query(
       `INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data)
-       VALUES (?, 'DELETE', ?, ?, ?)`,
+       VALUES (?, 'SOFT_DELETE', ?, ?, ?)`,
       [
         articleId,
         user.id,
@@ -665,13 +665,12 @@ export async function hardDeleteArticle(id: string, user: any) {
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查询文章
+    // 1️⃣ 查出旧数据
     const [articles]: any = await connection.query(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
     if (!articles.length) throw new Error("Article not found");
-
     const article = articles[0];
 
     // 2️⃣ 权限检查
@@ -679,16 +678,27 @@ export async function hardDeleteArticle(id: string, user: any) {
       throw new Error("You cannot delete this article");
     }
 
-    // 3️⃣ 写日志
+    // 3️⃣ 先写 log（确保记录留下来）
     await connection.query(
-      "INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data) VALUES (?, 'DELETE', ?, ?, ?)",
-      [id, user.id, JSON.stringify(article), JSON.stringify({ deleted: true })]
+      `INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data)
+       VALUES (?, 'DELETE', ?, ?, ?)`,
+      [
+        article.id,
+        user.id,
+        JSON.stringify(article),
+        JSON.stringify({ deleted: true }),
+      ]
     );
 
-    // 4️⃣ 删除数据库
+    // 4️⃣ 删除关联表，避免外键冲突
+    await connection.query("DELETE FROM article_tags WHERE article_id = ?", [
+      id,
+    ]);
+
+    // 5️⃣ 删除主表
     await connection.query("DELETE FROM articles WHERE id = ?", [id]);
 
-    // 5️⃣ ES同步
+    // 6️⃣ 删除 ES
     try {
       await esClient.delete({
         index: "articles",

@@ -1,32 +1,29 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 
-export async function createTag(name: string, user: any) {
+export async function createCategory(name: string, user: any) {
   const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 插入 tag
     const [result]: any = await connection.query(
-      `INSERT INTO tags (name, slug, created_by)
+      `INSERT INTO categories (name, slug, created_by)
        VALUES (?, ?, ?)`,
       [name.trim(), slug, user.id]
     );
-    const tagId = result.insertId;
+    const categoryId = result.insertId;
 
-    // 2️⃣ 写日志
     await connection.query(
-      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+      `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'CREATE', ?, NULL, ?)`,
-      [tagId, user.id, JSON.stringify({ name, slug })]
+      [categoryId, user.id, JSON.stringify({ name, slug })]
     );
 
-    // 3️⃣ 同步到 Elasticsearch
     try {
       await esClient.index({
-        index: "tags",
-        id: tagId.toString(),
+        index: "categories",
+        id: categoryId.toString(),
         refresh: true,
         document: {
           name,
@@ -39,13 +36,13 @@ export async function createTag(name: string, user: any) {
         },
       });
     } catch (esErr) {
-      console.error("❌ Elasticsearch create tag failed:", esErr);
+      console.error("❌ Elasticsearch create category failed:", esErr);
     }
 
     await connection.commit();
     connection.release();
 
-    return { id: tagId, name, slug };
+    return { id: categoryId, name, slug };
   } catch (err: any) {
     await connection.rollback();
     connection.release();
@@ -53,15 +50,11 @@ export async function createTag(name: string, user: any) {
   }
 }
 
-export async function getTags(options: {
-  limit?: number;
-  lastId?: number;
+export async function getCategory(options: {
   search?: string;
   includeInactive?: boolean;
   withCount?: boolean;
 }) {
-  const limit = Math.min(options.limit || 10, 100);
-  const lastId = options.lastId || 0;
   const search = options.search?.trim() || "";
   const includeInactive = !!options.includeInactive;
   const withCount = !!options.withCount;
@@ -69,108 +62,94 @@ export async function getTags(options: {
   let whereClause = "WHERE 1=1";
   const params: any[] = [];
 
-  if (!includeInactive) whereClause += " AND t.is_active = 1";
+  if (!includeInactive) whereClause += " AND c.is_active = 1";
   if (search) {
     whereClause +=
-      " AND MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
+      " AND MATCH(c.name, c.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
     params.push(search);
   }
-  if (lastId > 0) {
-    whereClause += " AND t.id < ?";
-    params.push(lastId);
-  }
 
-  // 查询 tags
+  // 查询 categories
   let [rows]: any = await database.query(
     `
     SELECT 
-      t.id, 
-      t.name, 
-      t.slug, 
-      t.is_active, 
+      c.id, 
+      c.name, 
+      c.slug, 
+      c.is_active, 
       u1.username AS created_by_name,
       u2.username AS updated_by_name
-    FROM tags t
-    LEFT JOIN users u1 ON t.created_by = u1.id
-    LEFT JOIN users u2 ON t.updated_by = u2.id
+    FROM categories c
+    LEFT JOIN users u1 ON c.created_by = u1.id
+    LEFT JOIN users u2 ON c.updated_by = u2.id
     ${whereClause}
-    ORDER BY t.id DESC
-    LIMIT ?
+    ORDER BY c.id DESC
     `,
-    [...params, limit]
+    params
   );
 
   // fallback for short keywords
   if (!rows.length && search && search.length < 4) {
     const likeWhere = whereClause.replace(
-      "MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)",
-      "(t.name LIKE CONCAT('%', ?, '%') OR t.slug LIKE CONCAT('%', ?, '%'))"
+      "MATCH(c.name, c.slug) AGAINST(? IN NATURAL LANGUAGE MODE)",
+      "(c.name LIKE CONCAT('%', ?, '%') OR c.slug LIKE CONCAT('%', ?, '%'))"
     );
     const [fallbackRows]: any = await database.query(
       `
       SELECT 
-        t.id, 
-        t.name, 
-        t.slug, 
-        t.is_active, 
+        c.id, 
+        c.name, 
+        c.slug, 
+        c.is_active, 
         u1.username AS created_by_name,
         u2.username AS updated_by_name
-      FROM tags t
-      LEFT JOIN users u1 ON t.created_by = u1.id
-      LEFT JOIN users u2 ON t.updated_by = u2.id
+      FROM categories c
+      LEFT JOIN users u1 ON c.created_by = u1.id
+      LEFT JOIN users u2 ON c.updated_by = u2.id
       ${likeWhere}
-      ORDER BY t.id DESC
-      LIMIT ?
+      ORDER BY c.id DESC
       `,
-      [...params, search, search, limit]
+      [...params, search, search]
     );
     rows = fallbackRows;
   }
 
-  // 带 count
   let total = null;
   if (withCount) {
     const [[countResult]]: any = await database.query(
-      `SELECT COUNT(*) as total FROM tags ${whereClause}`,
+      `SELECT COUNT(*) as total FROM categories c ${whereClause}`,
       params
     );
     total = countResult.total;
   }
 
-  // 格式化返回数据
-  const data = rows.map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    slug: t.slug,
-    is_active: Boolean(t.is_active),
-    created_by: t.created_by_name,
-    updated_by: t.updated_by_name,
-  }));
-
   return {
-    meta: {
-      total,
-      limit,
-      nextCursor: data.length ? data[data.length - 1].id : null,
-    },
-    data,
+    meta: { total },
+    data: rows.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      is_active: Boolean(c.is_active),
+      created_by: c.created_by_name,
+      updated_by: c.updated_by_name,
+    })),
   };
 }
 
-export async function getTagById(id: number) {
+export async function getCategoryById(id: number) {
   const [rows]: any = await database.query(
     `
       SELECT 
-        t.id,
-        t.name,
-        t.slug,
-        t.is_active,
+        c.id,
+        c.name,
+        c.slug,
+        c.is_active,
         u1.username AS created_by_name,
         u2.username AS updated_by_name
-      FROM tags t
-      LEFT JOIN users u1 ON t.created_by = u1.id
-      LEFT JOIN users u2 ON t.updated_by = u2.id
-      WHERE t.id = ?
+      FROM categories c
+      LEFT JOIN users u1 ON c.created_by = u1.id
+      LEFT JOIN users u2 ON c.updated_by = u2.id
+      WHERE c.id = ?
     `,
     [id]
   );
@@ -180,7 +159,7 @@ export async function getTagById(id: number) {
   return rows[0];
 }
 
-export async function updateTag(
+export async function updateCategory(
   id: number,
   body: { name: string; is_active?: boolean },
   user: any
@@ -193,21 +172,18 @@ export async function updateTag(
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取原 tag
     const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+      "SELECT * FROM categories WHERE id = ?",
       [id]
     );
-    if (!rows.length) throw new Error("Tag not found");
+    if (!rows.length) throw new Error("Category not found");
     const original = rows[0];
 
-    // 2️⃣ 生成 slug
     const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
 
-    // 3️⃣ 更新 tag
     await connection.query(
       `
-      UPDATE tags
+      UPDATE categories
       SET name = ?, slug = ?, is_active = COALESCE(?, is_active),
           updated_at = NOW(), updated_by = ?
       WHERE id = ?
@@ -215,10 +191,9 @@ export async function updateTag(
       [name, slug, is_active, user.id, id]
     );
 
-    // 4️⃣ 写 tag_logs
     await connection.query(
       `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+      INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
       VALUES (?, 'UPDATE', ?, ?, ?)
       `,
       [
@@ -241,7 +216,7 @@ export async function updateTag(
     // 5️⃣ 同步 ES
     try {
       await esClient.index({
-        index: "tags",
+        index: "categories",
         id: id.toString(),
         refresh: true,
         document: {
@@ -280,45 +255,48 @@ export async function updateTag(
   }
 }
 
-export async function deleteTag(id: number, user: any, force = false) {
+export async function deleteCategory(id: number, user: any, force = false) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取 tag 原始数据
+    // 1️⃣ 获取 category 原始数据
     const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+      "SELECT * FROM categories WHERE id = ?",
       [id]
     );
-    if (!rows.length) throw new Error("Tag not found");
+    if (!rows.length) throw new Error("Category not found");
     const original = rows[0];
 
-    // 2️⃣ 检查关联文章
+    // 2️⃣ 检查是否被文章使用
     const [used]: any = await connection.query(
-      "SELECT COUNT(*) AS count FROM article_tags WHERE tag_id = ?",
+      "SELECT COUNT(*) AS count FROM articles WHERE category_id = ?",
       [id]
     );
     if (used[0].count > 0 && !force) {
       throw new Error(
-        "Cannot delete tag because it’s still used by articles. Use force option to override."
+        "Cannot delete category because it’s still used by articles. Use force option to override."
       );
     }
 
-    // 3️⃣ 如果 force，删除关联
+    // 3️⃣ 如果 force=true，把这些文章的 category_id 设为 NULL
     if (force) {
-      await connection.query("DELETE FROM article_tags WHERE tag_id = ?", [id]);
+      await connection.query(
+        "UPDATE articles SET category_id = NULL WHERE category_id = ?",
+        [id]
+      );
     }
 
-    // 4️⃣ soft delete（或者实际删除）
+    // 4️⃣ soft delete category
     await connection.query(
-      "UPDATE tags SET is_active = 0, updated_by = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE categories SET is_active = 0, updated_by = ?, updated_at = NOW() WHERE id = ?",
       [user.id, id]
     );
 
-    // 5️⃣ 写 tag_logs
+    // 5️⃣ 写 category_logs
     await connection.query(
       `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+      INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
       VALUES (?, 'SOFT_DELETE', ?, ?, ?)
       `,
       [
@@ -335,10 +313,10 @@ export async function deleteTag(id: number, user: any, force = false) {
       ]
     );
 
-    // 6️⃣ 更新 ES
+    // 6️⃣ 同步 Elasticsearch（可选，如果你 categories 也进 ES）
     try {
       await esClient.delete({
-        index: "tags",
+        index: "categories",
         id: id.toString(),
         refresh: true,
       });
@@ -350,8 +328,8 @@ export async function deleteTag(id: number, user: any, force = false) {
     connection.release();
 
     return force
-      ? "Tag forcibly deactivated and unlinked from articles"
-      : "Tag deactivated successfully";
+      ? "Category forcibly deactivated and unlinked from articles"
+      : "Category deactivated successfully";
   } catch (err) {
     await connection.rollback();
     connection.release();
@@ -359,35 +337,42 @@ export async function deleteTag(id: number, user: any, force = false) {
   }
 }
 
-export async function hardDeleteTag(id: number, user: any) {
+export async function hardDeleteCategory(id: number, user: any) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取原始 tag 数据
-    const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+    // 1️⃣ 查询 category
+    const [categories]: any = await connection.query(
+      "SELECT * FROM categories WHERE id = ?",
       [id]
     );
-    if (!rows.length) throw new Error("Tag not found");
-    const tag = rows[0];
+    if (!categories.length) throw new Error("Category not found");
+    const category = categories[0];
 
-    // 2️⃣ 写入日志（先写，确保 tag_id 被记录）
+    // 2️⃣ 写 log
     await connection.query(
       `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
-      VALUES (?, 'DELETE', ?, ?, ?)
+      INSERT INTO category_logs (
+        category_id,
+        action,
+        changed_by,
+        changed_at,
+        old_data,
+        new_data
+      )
+      VALUES (?, 'DELETE', ?, NOW(), ?, ?)
       `,
-      [id, user.id, JSON.stringify(tag), JSON.stringify({ deleted: true })]
+      [id, user.id, JSON.stringify(category), JSON.stringify({ deleted: true })]
     );
 
-    // 3️⃣ 删除 tag（永久删除）
-    await connection.query("DELETE FROM tags WHERE id = ?", [id]);
+    // 3️⃣ 真正删除 category
+    await connection.query("DELETE FROM categories WHERE id = ?", [id]);
 
-    // 4️⃣ 删除 Elasticsearch 记录
+    // 4️⃣ Elasticsearch 删除（可选）
     try {
       await esClient.delete({
-        index: "tags",
+        index: "categories",
         id: id.toString(),
         refresh: true,
       });
@@ -398,7 +383,7 @@ export async function hardDeleteTag(id: number, user: any) {
     await connection.commit();
     connection.release();
 
-    return "Tag permanently deleted";
+    return "Category permanently deleted and logged successfully";
   } catch (err) {
     await connection.rollback();
     connection.release();
@@ -406,38 +391,43 @@ export async function hardDeleteTag(id: number, user: any) {
   }
 }
 
-export async function restoreTag(id: number, user: any) {
+export async function restoreCategory(id: number, user: any) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
     // 1️⃣ 查询标签
-    const [tags]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+    const [categories]: any = await connection.query(
+      "SELECT * FROM categories WHERE id = ?",
       [id]
     );
-    if (!tags.length) throw new Error("Tag not found");
+    if (!categories.length) throw new Error("Category not found");
 
-    const tag = tags[0];
-    if (tag.is_active === 1) throw new Error("Tag is already active");
+    const category = categories[0];
+    if (category.is_active === 1) throw new Error("Category is already active");
 
     // 2️⃣ 更新状态为启用
     await connection.query(
-      "UPDATE tags SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE categories SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?",
       [user.id, id]
     );
 
     // 3️⃣ 写日志
     await connection.query(
-      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+      `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'RESTORE', ?, ?, ?)`,
-      [id, user.id, JSON.stringify(tag), JSON.stringify({ restored: true })]
+      [
+        id,
+        user.id,
+        JSON.stringify(category),
+        JSON.stringify({ restored: true }),
+      ]
     );
 
     // 4️⃣ Elasticsearch 同步
     try {
       await esClient.update({
-        index: "tags",
+        index: "categories",
         id: id.toString(),
         doc: {
           is_active: 1,
@@ -453,7 +443,7 @@ export async function restoreTag(id: number, user: any) {
     await connection.commit();
     connection.release();
 
-    return "Tag restored successfully";
+    return "Category restored successfully";
   } catch (err) {
     await connection.rollback();
     connection.release();
