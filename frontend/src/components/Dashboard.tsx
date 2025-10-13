@@ -35,18 +35,37 @@ const fetchStats = async () => {
     const token = localStorage.getItem("token");
     if (!token) throw new Error("Missing token");
 
-    const res = await fetch(`${API_BASE_URL}/articles`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const result = await res.json();
+    let totalArticles = 0;
+    let nextCursor: number | null = null;
+    const limit = 50; // 每次取 50，减少请求次数
 
-    if (!result.success)
-      throw new Error(result.message || "Failed to fetch articles");
+    do {
+      const url = `${API_BASE_URL}/articles?limit=${limit}${
+        nextCursor ? `&lastId=${nextCursor}` : ""
+      }`;
 
-    const articles = result.data || [];
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.message || "Failed to fetch articles");
+
+      // 兼容后端格式：data 可能在 result.data 或 result.data.data 里
+      const list = Array.isArray(result.data?.data)
+        ? result.data.data
+        : Array.isArray(result.data)
+        ? result.data
+        : [];
+
+      totalArticles += list.length;
+
+      // 更新分页游标
+      nextCursor = result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
+    } while (nextCursor); // 只要还有下一页就继续
 
     return {
-      totalArticles: articles.length,
+      totalArticles,
       draftsPendingReview: 0,
       newUsersLast7Days: 0,
     };
@@ -59,6 +78,7 @@ const fetchStats = async () => {
     };
   }
 };
+
 
 export default function Dashboard({
   currentUser,
@@ -108,8 +128,6 @@ const fetchCategories = async (lastId?: number) => {
   try {
     setCatLoading(true);
     const token = localStorage.getItem("token");
-
-    // ✅ 改为 lastId 参数
     const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
       lastId ? `&lastId=${lastId}` : ""
     }`;
@@ -124,26 +142,18 @@ const fetchCategories = async (lastId?: number) => {
       return;
     }
 
-    const list = Array.isArray(result.data?.data)
-      ? result.data.data
-      : Array.isArray(result.data)
-      ? result.data
-      : [];
+    const list = Array.isArray(result.data) ? result.data : result.data?.data || [];
+    const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
 
-    // ✅ 分页：第一页替换，之后追加
     if (lastId) {
       setCategories((prev) => [...prev, ...list]);
     } else {
       setCategories(list);
     }
 
-    // ✅ 更新分页游标（nextCursor 即最后一个 id）
-    const nextCursor =
-      list.length > 0 ? list[list.length - 1].id : null;
-
     setCatPagination({
       nextCursor,
-      limit: result.data?.meta?.limit ?? 20,
+      limit: result.meta?.limit ?? 20,
     });
   } catch (err) {
     console.error("Category fetch error:", err);
@@ -155,14 +165,13 @@ const fetchCategories = async (lastId?: number) => {
 
 
 
+
   // ===== 获取标签（仅管理员） =====
 // ✅ 获取 Tags（使用 lastId 分页）
 const fetchTags = async (lastId?: number) => {
   try {
     setTagLoading(true);
     const token = localStorage.getItem("token");
-
-    // ✅ 改为 lastId 参数
     const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
       lastId ? `&lastId=${lastId}` : ""
     }`;
@@ -177,26 +186,18 @@ const fetchTags = async (lastId?: number) => {
       return;
     }
 
-    const list = Array.isArray(result.data?.data)
-      ? result.data.data
-      : Array.isArray(result.data)
-      ? result.data
-      : [];
+    const list = Array.isArray(result.data) ? result.data : result.data?.data || [];
+    const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
 
-    // ✅ 分页：第一页替换，之后追加
     if (lastId) {
       setTags((prev) => [...prev, ...list]);
     } else {
       setTags(list);
     }
 
-    // ✅ 更新分页游标
-    const nextCursor =
-      list.length > 0 ? list[list.length - 1].id : null;
-
     setTagPagination({
       nextCursor,
-      limit: result.data?.meta?.limit ?? 20,
+      limit: result.meta?.limit ?? 20,
     });
   } catch (err) {
     console.error("Tag fetch error:", err);
@@ -450,20 +451,13 @@ const fetchTags = async (lastId?: number) => {
               <div className="management-card">
                 <div className="card-header">
                   <h2>📂 Category Management</h2>
-                  <button 
-                    className="refresh-btn"
-                    onClick={() => fetchCategories()}
-                    disabled={catLoading}
-                  >
-                    {catLoading ? (
-                      <>
-                        <span className="loading-spinner-small"></span>
-                        Refreshing...
-                      </>
-                    ) : (
-                      "🔄 Refresh"
-                    )}
-                  </button>
+                    <button 
+                      className="refresh-btn"
+                      onClick={() => fetchCategories()} // ✅ 不传 nextCursor，重新加载第一页
+                    >
+                      🔄 Refresh
+                    </button>
+
                 </div>
                 
                 <div className="table-container">
@@ -544,7 +538,7 @@ const fetchTags = async (lastId?: number) => {
                   <h2>🏷️ Tag Management</h2>
                   <button 
                     className="refresh-btn"
-                    onClick={() => fetchTags(tagPagination.nextCursor!)}
+                    onClick={() => fetchTags()}  // ✅ 正确：重载第一页
                     disabled={tagLoading}
                   >
                     {tagLoading ? (

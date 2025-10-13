@@ -261,6 +261,10 @@
   transition: all 0.2s ease !important;
 }
 
+.wmde-markdown {
+  background-color: transparent;
+}
+
 .w-md-editor-toolbar li > button:hover {
   background: #edf2f7 !important;
   color: #4299e1 !important;

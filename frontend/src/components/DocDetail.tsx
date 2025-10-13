@@ -163,17 +163,22 @@ export default function DocDetail({
             <strong>Author:</strong> {doc.author || "Unknown"}
           </p>
 
-          {/* ✅ 标签显示：支持 tag_ids / tags */}
-          {doc.tags && doc.tags.length > 0 && Array.isArray(doc.tags) && (
-            <p>
-              <strong>Tags:</strong>{" "}
-              {doc.tags.map((t) => (
-                <span key={t.id} className="tag-pill">
-                  {t.name}
-                </span>
-              ))}
-            </p>
+          {doc.tags && Array.isArray(doc.tags) && doc.tags.length > 0 && (
+            <div className="article-tags">
+              <strong>Tags: </strong>
+              {doc.tags.map((t: any, index: number) => {
+                const tagName = typeof t === "string" ? t : t.name || "Untitled";
+                return (
+                  <span key={t.id || tagName} className="tag-pill-sm">
+                    #{tagName}
+                    {index < doc.tags.length - 1 && " "} {/* 用空格分隔 */}
+                  </span>
+                );
+              })}
+            </div>
           )}
+
+
 
           <p>
             <strong>Created:</strong>{" "}
