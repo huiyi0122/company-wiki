@@ -208,7 +208,6 @@ export async function searchArticles({
   }
 
   if (tags && tags.length > 0) {
-    // 每个 tag 都要匹配其中一个（OR）
     filter.push({
       terms: { tags: tags },
     });

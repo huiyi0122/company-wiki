@@ -5,12 +5,13 @@ import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
 import {
   createCategory,
-  getCategory,
+  GetCategoriesOptions,
   getCategoryById,
   updateCategory,
   deleteCategory,
   hardDeleteCategory,
   restoreCategory,
+  searchCategoriesES,
 } from "../services/categoryService";
 
 const router = Router();
@@ -51,13 +52,19 @@ router.get(
   authorize(PERMISSIONS.CATEGORY_READ),
   async (req: Request, res: Response) => {
     try {
-      const categories = await getCategory({
-        search: req.query.search as string,
-        includeInactive: req.query.include_inactive === "true",
-        withCount: req.query.with_count === "true",
+      const search = (req.query.search as string)?.trim();
+      const includeInactive = req.query.include_inactive === "true";
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const result = await searchCategoriesES({
+        search,
+        includeInactive,
+        page,
+        limit,
       });
 
-      res.json(successResponse(categories));
+      res.json(successResponse(result));
     } catch (err) {
       console.error("GET /categories error:", err);
       res.status(500).json(errorResponse("Failed to fetch categories"));
@@ -90,18 +97,19 @@ router.get(
 router.put(
   "/:id",
   authenticate,
-  authorize(PERMISSIONS.CATEGORY_CREATE),
+  authorize(PERMISSIONS.CATEGORY_UPDATE),
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const currentUser = (req as any).user;
     const { name, is_active } = req.body;
+    const currentUser = (req as any).user;
 
     try {
       const updated = await updateCategory(
         parseInt(id),
-        { name, is_active },
+        { name, is_active }, // 现在可以直接传对象
         currentUser
       );
+
       res.json(successResponse(updated));
     } catch (err: any) {
       console.error("PUT /categories/:id error:", err);

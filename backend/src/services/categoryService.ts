@@ -1,6 +1,13 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 
+export interface GetCategoriesOptions {
+  search?: string;
+  includeInactive?: boolean;
+  page?: number;
+  limit?: number;
+}
+
 export async function createCategory(name: string, user: any) {
   const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
   const connection = await database.getConnection();
@@ -14,126 +21,167 @@ export async function createCategory(name: string, user: any) {
     );
     const categoryId = result.insertId;
 
+    // 写日志
     await connection.query(
       `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'CREATE', ?, NULL, ?)`,
       [categoryId, user.id, JSON.stringify({ name, slug })]
     );
 
-    try {
-      await esClient.index({
-        index: "categories",
-        id: categoryId.toString(),
-        refresh: true,
-        document: {
-          name,
-          slug,
-          is_active: true,
-          created_by: user.username,
-          updated_by: user.username,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch create category failed:", esErr);
-    }
+    // 同步到 ES
+    await esClient.index({
+      index: "categories",
+      id: categoryId.toString(),
+      refresh: true,
+      document: {
+        id: categoryId,
+        name,
+        slug,
+        is_active: true,
+        created_by_name: user.username,
+        updated_by_name: user.username,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    });
 
     await connection.commit();
     connection.release();
 
     return { id: categoryId, name, slug };
-  } catch (err: any) {
+  } catch (err) {
     await connection.rollback();
     connection.release();
     throw err;
   }
 }
 
-export async function getCategory(options: {
-  search?: string;
-  includeInactive?: boolean;
-  withCount?: boolean;
-}) {
-  const search = options.search?.trim() || "";
-  const includeInactive = !!options.includeInactive;
-  const withCount = !!options.withCount;
+export async function searchCategoriesES(options: GetCategoriesOptions) {
+  const {
+    search = "",
+    includeInactive = false,
+    page = 1,
+    limit = 20,
+  } = options;
+  const from = (page - 1) * limit;
 
-  let whereClause = "WHERE 1=1";
-  const params: any[] = [];
+  const must: any[] = [];
+  const filter: any[] = [];
 
-  if (!includeInactive) whereClause += " AND c.is_active = 1";
   if (search) {
-    whereClause +=
-      " AND MATCH(c.name, c.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
-    params.push(search);
+    must.push({
+      multi_match: {
+        query: search,
+        fields: ["name", "slug"],
+        fuzziness: "AUTO",
+      },
+    });
   }
 
-  // 查询 categories
-  let [rows]: any = await database.query(
-    `
-    SELECT 
-      c.id, 
-      c.name, 
-      c.slug, 
-      c.is_active, 
-      u1.username AS created_by_name,
-      u2.username AS updated_by_name
-    FROM categories c
-    LEFT JOIN users u1 ON c.created_by = u1.id
-    LEFT JOIN users u2 ON c.updated_by = u2.id
-    ${whereClause}
-    ORDER BY c.id DESC
-    `,
-    params
-  );
-
-  // fallback for short keywords
-  if (!rows.length && search && search.length < 4) {
-    const likeWhere = whereClause.replace(
-      "MATCH(c.name, c.slug) AGAINST(? IN NATURAL LANGUAGE MODE)",
-      "(c.name LIKE CONCAT('%', ?, '%') OR c.slug LIKE CONCAT('%', ?, '%'))"
-    );
-    const [fallbackRows]: any = await database.query(
-      `
-      SELECT 
-        c.id, 
-        c.name, 
-        c.slug, 
-        c.is_active, 
-        u1.username AS created_by_name,
-        u2.username AS updated_by_name
-      FROM categories c
-      LEFT JOIN users u1 ON c.created_by = u1.id
-      LEFT JOIN users u2 ON c.updated_by = u2.id
-      ${likeWhere}
-      ORDER BY c.id DESC
-      `,
-      [...params, search, search]
-    );
-    rows = fallbackRows;
+  if (!includeInactive) {
+    filter.push({ term: { is_active: true } });
   }
 
-  let total = null;
-  if (withCount) {
-    const [[countResult]]: any = await database.query(
-      `SELECT COUNT(*) as total FROM categories c ${whereClause}`,
-      params
-    );
-    total = countResult.total;
-  }
+  const res = await esClient.search({
+    index: "categories",
+    from,
+    size: limit,
+    query: {
+      bool: { must, filter },
+    },
+  });
+
+  const hits = res.hits.hits;
+  const total =
+    typeof res.hits.total === "number"
+      ? res.hits.total
+      : res.hits.total?.value || 0;
+
+  const data = hits.map((hit: any) => hit._source);
 
   return {
-    meta: { total },
-    data: rows.map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      is_active: Boolean(c.is_active),
-      created_by: c.created_by_name,
-      updated_by: c.updated_by_name,
-    })),
+    data,
+    meta: { total, page, limit },
   };
+}
+
+// 更新 category
+export interface UpdateCategoryData {
+  name?: string;
+  is_active?: boolean;
+}
+
+export async function updateCategory(
+  id: number,
+  data: UpdateCategoryData,
+  user: any
+) {
+  const { name, is_active } = data;
+  const slug = name?.trim().toLowerCase().replace(/\s+/g, "-");
+
+  const connection = await database.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    const [rows]: any = await connection.query(
+      "SELECT * FROM categories WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) throw new Error("Category not found");
+    const original = rows[0];
+
+    await connection.query(
+      "UPDATE categories SET name=?, slug=?, is_active=?, updated_by=?, updated_at=NOW() WHERE id=?",
+      [
+        name || original.name,
+        slug || original.slug,
+        is_active ?? original.is_active,
+        user.id,
+        id,
+      ]
+    );
+
+    // 写日志
+    await connection.query(
+      `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
+       VALUES (?, 'UPDATE', ?, ?, ?)`,
+      [
+        id,
+        user.id,
+        JSON.stringify(original),
+        JSON.stringify({ name, slug, is_active }),
+      ]
+    );
+
+    // 同步到 ES
+    await esClient.index({
+      index: "categories",
+      id: id.toString(),
+      refresh: true,
+      document: {
+        id,
+        name: name || original.name,
+        slug: slug || original.slug,
+        is_active: is_active ?? original.is_active,
+        updated_by_name: user.username,
+        updated_at: new Date().toISOString(),
+      },
+    });
+
+    await connection.commit();
+    connection.release();
+
+    return {
+      id,
+      name: name || original.name,
+      slug: slug || original.slug,
+      is_active: is_active ?? original.is_active,
+    };
+  } catch (err) {
+    await connection.rollback();
+    connection.release();
+    throw err;
+  }
 }
 
 export async function getCategoryById(id: number) {
@@ -157,102 +205,6 @@ export async function getCategoryById(id: number) {
   if (!rows.length) return null;
 
   return rows[0];
-}
-
-export async function updateCategory(
-  id: number,
-  body: { name: string; is_active?: boolean },
-  user: any
-) {
-  const { name, is_active } = body;
-
-  if (!name?.trim()) throw new Error("Name is required");
-
-  const connection = await database.getConnection();
-  await connection.beginTransaction();
-
-  try {
-    const [rows]: any = await connection.query(
-      "SELECT * FROM categories WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) throw new Error("Category not found");
-    const original = rows[0];
-
-    const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
-
-    await connection.query(
-      `
-      UPDATE categories
-      SET name = ?, slug = ?, is_active = COALESCE(?, is_active),
-          updated_at = NOW(), updated_by = ?
-      WHERE id = ?
-      `,
-      [name, slug, is_active, user.id, id]
-    );
-
-    await connection.query(
-      `
-      INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
-      VALUES (?, 'UPDATE', ?, ?, ?)
-      `,
-      [
-        id,
-        user.id,
-        JSON.stringify({
-          name: original.name,
-          slug: original.slug,
-          is_active: !!original.is_active,
-        }),
-        JSON.stringify({
-          name,
-          slug,
-          is_active:
-            typeof is_active !== "undefined" ? is_active : original.is_active,
-        }),
-      ]
-    );
-
-    // 5️⃣ 同步 ES
-    try {
-      await esClient.index({
-        index: "categories",
-        id: id.toString(),
-        refresh: true,
-        document: {
-          name,
-          slug,
-          is_active:
-            typeof is_active !== "undefined" ? is_active : original.is_active,
-          created_by: original.created_by,
-          updated_by: user.id,
-          created_at: original.created_at,
-          updated_at: new Date().toISOString(),
-        },
-      });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch update failed:", esErr);
-    }
-
-    await connection.commit();
-    connection.release();
-
-    return {
-      id: original.id,
-      name,
-      slug,
-      is_active:
-        typeof is_active !== "undefined" ? is_active : original.is_active,
-      created_by: original.created_by,
-      updated_by: user.id,
-      created_at: original.created_at,
-      updated_at: new Date().toISOString(),
-    };
-  } catch (err) {
-    await connection.rollback();
-    connection.release();
-    throw err;
-  }
 }
 
 export async function deleteCategory(id: number, user: any, force = false) {

@@ -21,33 +21,33 @@ interface Article {
   category_id: number;
 }
 
-interface CategoryState {
-  articles: Article[];
-  total: number;
-  hasMore: boolean;
-  isLoading: boolean;
-  page: number;
-}
-
-export default function Sidebar({
-  currentUser,
-  setCurrentUser,
-  setCategory,
-}: SidebarProps) {
+export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
-  
-  // 🔥 使用单一状态对象管理所有分类数据
-  const [categoryStates, setCategoryStates] = useState<Record<number, CategoryState>>({});
+  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+  const [categoryArticles, setCategoryArticles] = useState<
+    Record<number, Article[]>
+  >({});
+  const [loadingCategories, setLoadingCategories] = useState<number[]>([]);
+
+  // 🔥 追踪每个分类的状态
+  const [categoryTotals, setCategoryTotals] = useState<Record<number, number>>(
+    {}
+  );
+  const [categoryHasMore, setCategoryHasMore] = useState<
+    Record<number, boolean>
+  >({});
+  const [categoryPages, setCategoryPages] = useState<Record<number, number>>(
+    {}
+  ); // 当前页码
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const PAGE_SIZE = 8; // 每次加载8篇文章
+  const INITIAL_SIZE = 5; // 初始显示5篇
+  const LOAD_MORE_SIZE = 20; // 点击 Show More 后每次加载20篇
 
-  // 📦 加载分类列表
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -69,104 +69,6 @@ export default function Sidebar({
       .catch((err) => console.error("Error fetching categories:", err));
   }, []);
 
-  // 🔥 加载分类下的文章（支持追加加载）
-  const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    // 设置加载状态
-    setCategoryStates((prev) => ({
-      ...prev,
-      [categoryId]: {
-        ...(prev[categoryId] || { articles: [], total: 0, hasMore: false, page: 1 }),
-        isLoading: true,
-      },
-    }));
-
-    try {
-      const currentState = categoryStates[categoryId];
-      const page = isLoadMore && currentState ? currentState.page : 1;
-
-      const url = `${API_BASE_URL}/articles?category_id=${categoryId}&page=${page}&limit=${PAGE_SIZE}`;
-      
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        const newArticles = (result.data || []).map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          category_id: a.category_id,
-        }));
-
-        const total = result.meta?.total || 0;
-        const currentPage = result.meta?.page || page;
-        const totalPages = result.meta?.totalPages || Math.ceil(total / PAGE_SIZE);
-
-        setCategoryStates((prev) => {
-          const existing = isLoadMore && prev[categoryId] ? prev[categoryId].articles : [];
-          
-          return {
-            ...prev,
-            [categoryId]: {
-              articles: [...existing, ...newArticles],
-              total,
-              hasMore: currentPage < totalPages,
-              isLoading: false,
-              page: currentPage + 1, // 为下次加载准备
-            },
-          };
-        });
-      }
-    } catch (err) {
-      console.error(`Error fetching articles for category ${categoryId}:`, err);
-      
-      // 出错时重置加载状态
-      setCategoryStates((prev) => ({
-        ...prev,
-        [categoryId]: {
-          ...(prev[categoryId] || { articles: [], total: 0, hasMore: false, page: 1 }),
-          isLoading: false,
-        },
-      }));
-    }
-  };
-
-  // 🔥 切换分类展开/收起
-  const handleCategoryClick = (categoryId: number) => {
-    const isExpanded = expandedCategories.has(categoryId);
-
-    if (isExpanded) {
-      // 收起
-      setExpandedCategories((prev) => {
-        const next = new Set(prev);
-        next.delete(categoryId);
-        return next;
-      });
-    } else {
-      // 展开
-      setExpandedCategories((prev) => new Set(prev).add(categoryId));
-
-      // 如果还没加载过，初始加载
-      if (!categoryStates[categoryId]) {
-        fetchCategoryArticles(categoryId, false);
-      }
-    }
-  };
-
-  // 🔥 加载更多文章
-  const handleLoadMore = (categoryId: number) => {
-    fetchCategoryArticles(categoryId, true);
-  };
-
-  const handleArticleClick = (articleId: number) => {
-    navigate(`/docs/${articleId}`);
-    setMobileOpen(false);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     setCurrentUser(null);
@@ -182,7 +84,103 @@ export default function Sidebar({
     }
   };
 
-  // 🎯 路由高亮判断
+  // 🔥 使用 Elasticsearch 搜索接口加载文章（支持分页）
+  const fetchCategoryArticles = async (
+    categoryId: number,
+    isLoadMore = false
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setLoadingCategories((prev) => [...prev, categoryId]);
+
+    try {
+      const currentPage = isLoadMore ? (categoryPages[categoryId] || 1) + 1 : 1;
+      const limit = isLoadMore ? LOAD_MORE_SIZE : INITIAL_SIZE;
+
+      // 🔥 使用 Elasticsearch 搜索接口，支持 page 参数
+      const url = `${API_BASE_URL}/articles/search?category_id=${categoryId}&page=${currentPage}&limit=${limit}`;
+
+      console.log(
+        `🔍 Fetching articles for category ${categoryId}, page ${currentPage}, limit ${limit}`
+      );
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const result = await res.json();
+
+      console.log(`🔍 API Response for category ${categoryId}:`, result);
+
+      if (result.success && Array.isArray(result.data)) {
+        const newArticles = result.data.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          category_id: a.category_id,
+        }));
+
+        // 🔥 修复：先声明 updatedArticles 变量
+        let updatedArticles: Article[] = [];
+        setCategoryArticles((prev) => {
+          const existing = isLoadMore ? prev[categoryId] || [] : [];
+          updatedArticles = [...existing, ...newArticles];
+          return { ...prev, [categoryId]: updatedArticles };
+        });
+
+        const total = result.meta?.total || 0;
+        const nextCursor = result.meta?.nextCursor;
+
+        console.log(
+          `📊 Meta info - total: ${total}, nextCursor: ${nextCursor}, currentPage: ${currentPage}, limit: ${limit}`
+        );
+
+        setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
+        setCategoryPages((prev) => ({ ...prev, [categoryId]: currentPage }));
+
+        // 🔥 判断是否还有更多（根据 nextCursor）
+        const hasMore = nextCursor !== null;
+        setCategoryHasMore((prev) => ({ ...prev, [categoryId]: hasMore }));
+
+        console.log(
+          `📊 Category ${categoryId}: loaded ${updatedArticles.length}/${total}, hasMore: ${hasMore}, nextCursor: ${nextCursor}`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `❌ Error fetching articles for category ${categoryId}:`,
+        err
+      );
+    } finally {
+      setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
+    }
+  };
+
+  // 🔥 处理加载更多
+  const handleLoadMore = (categoryId: number) => {
+    fetchCategoryArticles(categoryId, true);
+  };
+
+  const handleCategoryClick = (categoryId: number) => {
+    const isExpanded = expandedCategories.includes(categoryId);
+
+    if (isExpanded) {
+      setExpandedCategories((prev) => prev.filter((id) => id !== categoryId));
+    } else {
+      setExpandedCategories((prev) => [...prev, categoryId]);
+
+      // 如果还没加载过，初始化加载
+      if (!categoryArticles[categoryId]) {
+        fetchCategoryArticles(categoryId, false);
+      }
+    }
+  };
+
+  const handleArticleClick = (articleId: number) => {
+    navigate(`/docs/${articleId}`);
+    setMobileOpen(false);
+  };
+
   const isProfileActive = location.pathname === "/profile";
   const isDashboardActive = location.pathname === "/dashboard";
   const isNewArticleActive = location.pathname === "/editor";
@@ -192,17 +190,40 @@ export default function Sidebar({
     (location.pathname.startsWith("/editor/") && !isNewArticleActive);
   const isEnrollActive = location.pathname === "/enroll";
 
-  // 🎨 渲染主菜单
   const renderMenuItems = () => (
     <>
       <form onSubmit={handleSearch} className="sidebar-search-form">
-        <input
-          type="text"
-          placeholder="Search articles..."
-          className="sidebar-search"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="search-wrapper">
+          <svg
+            className="search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 14L11.1 11.1"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search..."
+            className="sidebar-search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </form>
 
       {currentUser && PERMISSIONS[currentUser.role].includes("edit") && (
@@ -213,6 +234,7 @@ export default function Sidebar({
           }}
           className={isDashboardActive ? "active" : ""}
         >
+          <span className="menu-icon">📊</span>
           Dashboard
         </li>
       )}
@@ -224,6 +246,7 @@ export default function Sidebar({
         }}
         className={isArticlesActive ? "active" : ""}
       >
+        <span className="menu-icon">📚</span>
         Articles
       </li>
 
@@ -235,7 +258,8 @@ export default function Sidebar({
           }}
           className={isNewArticleActive ? "active" : ""}
         >
-          Add New Article
+          <span className="menu-icon">✏️</span>
+          New Article
         </li>
       )}
 
@@ -246,7 +270,8 @@ export default function Sidebar({
         }}
         className={isProfileActive ? "active" : ""}
       >
-        My Profile
+        <span className="menu-icon">👤</span>
+        Profile
       </li>
 
       {currentUser && currentUser.role === "admin" && (
@@ -257,28 +282,27 @@ export default function Sidebar({
           }}
           className={isEnrollActive ? "active" : ""}
         >
+          <span className="menu-icon">➕</span>
           Enroll Users
         </li>
       )}
     </>
   );
 
-  // 🎨 渲染分类和文章
   const renderCategories = () => (
     <div className="categories-section">
       <div className="categories-header">
-        <span>Categories</span>
+        <span>CATEGORIES</span>
       </div>
 
       <ul className="categories-with-articles">
         {categories.length > 0 ? (
           categories.map((category) => {
-            const isExpanded = expandedCategories.has(category.id);
-            const state = categoryStates[category.id];
-            const articles = state?.articles || [];
-            const total = state?.total || 0;
-            const hasMore = state?.hasMore || false;
-            const isLoading = state?.isLoading || false;
+            const isExpanded = expandedCategories.includes(category.id);
+            const isLoading = loadingCategories.includes(category.id);
+            const articles = categoryArticles[category.id] || [];
+            const hasMore = categoryHasMore[category.id] || false;
+            const total = categoryTotals[category.id] || 0;
 
             return (
               <li key={category.id} className="category-item">
@@ -286,13 +310,30 @@ export default function Sidebar({
                   className="category-header"
                   onClick={() => handleCategoryClick(category.id)}
                 >
-                  <span className="category-name">
-                    {category.name}
-                    {total > 0 && <span className="article-count"> ({total})</span>}
-                  </span>
-                  <span className={`collapse-icon ${isExpanded ? "open" : ""}`}>
-                    {isExpanded ? "▼" : "►"}
-                  </span>
+                  <div className="category-name">
+                    <span
+                      className={`collapse-icon ${isExpanded ? "open" : ""}`}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path
+                          d="M4.5 3L7.5 6L4.5 9"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <span className="category-text">{category.name}</span>
+                    {total > 0 && (
+                      <span className="article-count">{total}</span>
+                    )}
+                  </div>
                 </div>
 
                 {isExpanded && (
@@ -309,12 +350,13 @@ export default function Sidebar({
                                 handleArticleClick(article.id);
                               }}
                             >
+                              <span className="article-bullet">•</span>
                               {article.title || "Untitled"}
                             </li>
                           ))}
                         </ul>
 
-                        {/* 🔥 Show More 按钮 */}
+                        {/* 🔥 Show More 按钮 - 显示已加载数量 / 总数 */}
                         {hasMore && (
                           <div className="show-more-container">
                             <button
@@ -327,15 +369,22 @@ export default function Sidebar({
                             >
                               {isLoading
                                 ? "Loading..."
-                                : `Show More (${articles.length}/${total})`}
+                                : `Show more • ${articles.length} of ${total}`}
                             </button>
+                          </div>
+                        )}
+
+                        {/* 🎉 已加载全部提示 */}
+                        {!hasMore && articles.length > INITIAL_SIZE && (
+                          <div className="all-loaded-hint">
+                            All {total} articles loaded
                           </div>
                         )}
                       </>
                     ) : isLoading ? (
-                      <div className="articles-loading">Loading articles...</div>
+                      <div className="articles-loading">Loading...</div>
                     ) : (
-                      <div className="articles-empty">No articles in this category</div>
+                      <div className="articles-empty">No articles yet</div>
                     )}
                   </div>
                 )}
@@ -354,23 +403,42 @@ export default function Sidebar({
       {/* 📱 移动端导航栏 */}
       <div className="mobile-navbar">
         <h2 onClick={() => navigate("/")}>Company Wiki</h2>
-        <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)}>
-          ☰
+        <button
+          className="hamburger"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M3 12H21M3 6H21M3 18H21"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 
       {/* 🖥️ 桌面端侧边栏 */}
       <aside className="sidebar desktop-only">
-        <h2 onClick={() => navigate("/")}>Company Wiki</h2>
+        <h2 onClick={() => navigate("/")}>
+          <span className="logo-icon">📖</span>
+          Company Wiki
+        </h2>
         <ul className="main-menu">{renderMenuItems()}</ul>
         {renderCategories()}
 
         <div className="sidebar-user">
           {currentUser ? (
             <>
-              <p>
-                {currentUser.username} ({currentUser.role})
-              </p>
+              <div className="user-info">
+                <span className="user-avatar">
+                  {currentUser.username.charAt(0).toUpperCase()}
+                </span>
+                <div className="user-details">
+                  <p className="user-name">{currentUser.username}</p>
+                  <p className="user-role">{currentUser.role}</p>
+                </div>
+              </div>
               <button onClick={handleLogout}>Logout</button>
             </>
           ) : (
@@ -388,9 +456,15 @@ export default function Sidebar({
           <div className="sidebar-user">
             {currentUser ? (
               <>
-                <p>
-                  {currentUser.username} ({currentUser.role})
-                </p>
+                <div className="user-info">
+                  <span className="user-avatar">
+                    {currentUser.username.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="user-details">
+                    <p className="user-name">{currentUser.username}</p>
+                    <p className="user-role">{currentUser.role}</p>
+                  </div>
+                </div>
                 <button onClick={handleLogout}>Logout</button>
               </>
             ) : (
