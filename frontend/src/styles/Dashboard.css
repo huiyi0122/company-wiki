@@ -3,7 +3,7 @@
   padding: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  background: #f7fafc;
+  background: #fff;
   min-height: 100vh;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .id-cell {
-  font-family: 'Monaco', 'Consolas', monospace;
+  font-family: "Monaco", "Consolas", monospace;
   font-weight: 600;
   color: #718096;
 }
@@ -336,8 +336,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Access Denied */
@@ -366,7 +370,7 @@
   background: #f7fafc;
   padding: 4px 12px;
   border-radius: 6px;
-  font-family: 'Monaco', 'Consolas', monospace;
+  font-family: "Monaco", "Consolas", monospace;
   color: #2d3748;
 }
 
@@ -374,7 +378,7 @@
 .main-content-with-sidebar {
   margin-left: 280px;
   min-height: 100vh;
-  background: #f7fafc;
+  background: #fff;
 }
 
 .loadmore-container {

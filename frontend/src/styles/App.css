@@ -7,7 +7,6 @@
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.6;
-  color: #333;
   background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
   min-height: 100vh;
 }
@@ -30,7 +29,7 @@ body {
   margin-left: 250px;
   width: calc(100% - 250px);
   min-height: 100vh;
-  background: #f7fafc;
+  background: #fff;
 }
 
 button {
@@ -113,7 +112,6 @@ button.view {
 .tag-section table button {
   margin-right: 8px;
 }
-
 
 @media (max-width: 1024px) {
   .main-content-with-sidebar {

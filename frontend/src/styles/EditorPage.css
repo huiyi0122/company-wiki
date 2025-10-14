@@ -3,7 +3,7 @@
   padding: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  background: #f7fafc;
+  background: #fff;
   min-height: 100vh;
 }
 
@@ -312,8 +312,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Main content adjustment for sidebar */

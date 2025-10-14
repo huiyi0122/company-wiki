@@ -3,7 +3,7 @@
   padding: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  background: #f7fafc;
+  background: #fff;
   min-height: 100vh;
 }
 
@@ -262,7 +262,7 @@
 .main-content-with-sidebar {
   margin-left: 280px;
   min-height: 100vh;
-  background: #f7fafc;
+  background: #fff;
 }
 
 .pagination {
