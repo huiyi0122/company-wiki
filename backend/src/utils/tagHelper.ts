@@ -28,10 +28,23 @@ export async function ensureTags(
       "INSERT INTO tags (name, slug, is_active, created_by, updated_by) VALUES ?",
       [values]
     );
+
     newTagObjects = newTags.map((name, idx) => ({
       id: inserted.insertId + idx,
       name,
     }));
+
+    // ✅ 写 log
+    const logValues = newTagObjects.map((t) => [
+      t.id,
+      "CREATE",
+      userId,
+      JSON.stringify({ name: t.name }),
+    ]);
+    await connection.query(
+      "INSERT INTO tag_logs (tag_id, action, changed_by, new_data) VALUES ?",
+      [logValues]
+    );
   }
 
   return [...existingTags, ...newTagObjects];

@@ -38,10 +38,10 @@ router.get(
   authorize(PERMISSIONS.ARTICLE_READ),
   async (req: Request, res: Response) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 5, 100);
-      const lastId = parseInt(req.query.lastId as string) || 0;
+      const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
 
-      const result = await getArticles(limit, lastId); // 👈 调用 service
+      const result = await getArticles(page, limit); // 👈 改参数
 
       res.json(successResponse(result));
     } catch (err: any) {
@@ -50,6 +50,7 @@ router.get(
     }
   }
 );
+
 // routes/articles.ts
 router.get(
   "/search",
@@ -58,7 +59,6 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const { page = "1", limit = "20", q, category_id, tags } = req.query;
-
       const pageNumber = Math.max(parseInt(page as string, 10), 1);
       const pageSize = Math.min(parseInt(limit as string, 10), 100);
 
@@ -75,7 +75,12 @@ router.get(
         pageSize,
       });
 
-      res.json(successResponse(result));
+      res.json(
+        successResponse({
+          meta: result.meta,
+          data: result.data,
+        })
+      );
     } catch (err: any) {
       console.error("Elasticsearch search error:", err);
       res.status(500).json(errorResponse(err.message || "Search failed"));

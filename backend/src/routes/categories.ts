@@ -54,17 +54,13 @@ router.get(
     try {
       const search = (req.query.search as string)?.trim();
       const includeInactive = req.query.include_inactive === "true";
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
 
       const result = await searchCategoriesES({
         search,
         includeInactive,
-        page,
-        limit,
       });
 
-      res.json(successResponse(result));
+      res.json(successResponse({ data: result }));
     } catch (err) {
       console.error("GET /categories error:", err);
       res.status(500).json(errorResponse("Failed to fetch categories"));

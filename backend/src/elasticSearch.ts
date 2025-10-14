@@ -133,6 +133,10 @@ export async function createTagsIndex() {
             name: { type: "text" },
             slug: { type: "text" },
             is_active: { type: "boolean" },
+            created_by: { type: "integer" },
+            updated_by: { type: "integer" },
+            created_at: { type: "date" },
+            updated_at: { type: "date" },
           },
         },
       });

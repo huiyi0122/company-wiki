@@ -56,14 +56,11 @@ export async function createCategory(name: string, user: any) {
   }
 }
 
-export async function searchCategoriesES(options: GetCategoriesOptions) {
-  const {
-    search = "",
-    includeInactive = false,
-    page = 1,
-    limit = 20,
-  } = options;
-  const from = (page - 1) * limit;
+export async function searchCategoriesES(options: {
+  search?: string;
+  includeInactive?: boolean;
+}) {
+  const { search = "", includeInactive = false } = options;
 
   const must: any[] = [];
   const filter: any[] = [];
@@ -82,27 +79,22 @@ export async function searchCategoriesES(options: GetCategoriesOptions) {
     filter.push({ term: { is_active: true } });
   }
 
+  const query: any = search
+    ? { bool: { must, filter } }
+    : { bool: { must: [{ match_all: {} }], filter } };
+
   const res = await esClient.search({
     index: "categories",
-    from,
-    size: limit,
-    query: {
-      bool: { must, filter },
-    },
+    size: 1000, // ✅ 默认最多取 1000 条，可视需要调整
+    query,
   });
 
   const hits = res.hits.hits;
-  const total =
-    typeof res.hits.total === "number"
-      ? res.hits.total
-      : res.hits.total?.value || 0;
 
-  const data = hits.map((hit: any) => hit._source);
-
-  return {
-    data,
-    meta: { total, page, limit },
-  };
+  return hits.map((hit: any) => ({
+    id: parseInt(hit._id, 10),
+    ...hit._source,
+  }));
 }
 
 // 更新 category
@@ -153,7 +145,6 @@ export async function updateCategory(
       ]
     );
 
-    // 同步到 ES
     await esClient.index({
       index: "categories",
       id: id.toString(),
@@ -162,7 +153,7 @@ export async function updateCategory(
         id,
         name: name || original.name,
         slug: slug || original.slug,
-        is_active: is_active ?? original.is_active,
+        is_active: Boolean(is_active ?? original.is_active),
         updated_by_name: user.username,
         updated_at: new Date().toISOString(),
       },

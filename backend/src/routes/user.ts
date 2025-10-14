@@ -1,19 +1,35 @@
 import { Router, Request, Response } from "express";
-import { PERMISSIONS } from "../constants/permission";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import database from "../db";
 import { authenticate } from "../middleware/auth";
-import { successResponse, errorResponse } from "../utils/response";
 import { authorize } from "../middleware/authorize";
+import { successResponse, errorResponse } from "../utils/response";
+import { PERMISSIONS } from "../constants/permission";
 
 const router = Router();
+
+const ACCESS_SECRET = process.env.JWT_SECRET as string;
+const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
+
+// --- 生成 Token ---
+function generateAccessToken(user: any) {
+  return jwt.sign(
+    { id: user.id, username: user.username, role: user.role },
+    ACCESS_SECRET,
+    { expiresIn: "1h" }
+  );
+}
+
+function generateRefreshToken(user: any) {
+  return jwt.sign({ id: user.id }, REFRESH_SECRET, { expiresIn: "7d" });
+}
 
 router.post(
   "/enroll",
   authenticate,
   authorize(PERMISSIONS.USER_ENROLL),
   async (req: Request, res: Response) => {
-    const currentUser = (req as any).user;
     const { username, password, role, email } = req.body;
 
     if (!username || !password || !role || !email) {
@@ -37,25 +53,42 @@ router.post(
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      await database.query(
+
+      // 👇 先创建用户（临时没有 token）
+      const [insertResult]: any = await database.query(
         "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
         [username, email, hashedPassword, role]
       );
 
-      const [newUserRows]: any = await database.query(
-        "SELECT id, username, email, role FROM users WHERE username = ?",
-        [username]
-      );
-      const newUser = newUserRows[0];
+      const userId = insertResult.insertId;
+      const user = { id: userId, username, role };
+
+      // 👇 再生成 token
+      const accessToken = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
+
+      // 👇 存入 refresh token
+      await database.query("UPDATE users SET refresh_token = ? WHERE id = ?", [
+        refreshToken,
+        userId,
+      ]);
+
+      // 👇 返回结果（可选：也可设置 cookie）
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
 
       return res.status(201).json(
         successResponse({
           message: `User '${username}' enrolled successfully`,
-          user: newUser,
+          user: { id: userId, username, email, role },
+          token: accessToken, // Access Token
         })
       );
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Enroll error:", err);
       return res.status(500).json(errorResponse("Server error"));
     }
   }
