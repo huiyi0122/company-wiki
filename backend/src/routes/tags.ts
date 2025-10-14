@@ -5,16 +5,18 @@ import { PERMISSIONS } from "../constants/permission";
 import { successResponse, errorResponse } from "../utils/response";
 import {
   createTag,
-  getTags,
+  GetTagsOptions,
   getTagById,
   updateTag,
   deleteTag,
   hardDeleteTag,
   restoreTag,
+  searchTagsES,
 } from "../services/tagService";
 
 const router = Router();
 
+// Create Tag
 router.post(
   "/",
   authenticate,
@@ -45,21 +47,26 @@ router.post(
   }
 );
 
+// Search / List Tags with Elasticsearch
 router.get(
   "/",
   authenticate,
   authorize(PERMISSIONS.TAG_READ),
   async (req: Request, res: Response) => {
     try {
-      const tags = await getTags({
-        limit: parseInt(req.query.limit as string) || 10,
-        lastId: parseInt(req.query.lastId as string) || 0,
-        search: req.query.search as string,
-        includeInactive: req.query.include_inactive === "true",
-        withCount: req.query.with_count === "true",
+      const search = (req.query.search as string)?.trim();
+      const includeInactive = req.query.include_inactive === "true";
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const result = await searchTagsES({
+        search,
+        includeInactive,
+        page,
+        limit,
       });
 
-      res.json(successResponse(tags));
+      res.json(successResponse(result));
     } catch (err) {
       console.error("GET /tags error:", err);
       res.status(500).json(errorResponse("Failed to fetch tags"));
@@ -67,21 +74,22 @@ router.get(
   }
 );
 
+// Get Tag by ID
 router.get(
   "/:id",
   authenticate,
-  authorize(PERMISSIONS.CATEGORY_READ),
+  authorize(PERMISSIONS.TAG_READ),
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
     try {
-      const category = await getTagById(Number(id));
+      const tag = await getTagById(Number(id));
 
-      if (!category) {
+      if (!tag) {
         return res.status(404).json(errorResponse("Tag not found"));
       }
 
-      res.json(successResponse(category));
+      res.json(successResponse(tag));
     } catch (err) {
       console.error("GET /tags/:id error:", err);
       res.status(500).json(errorResponse("Failed to fetch tag details"));
@@ -89,14 +97,15 @@ router.get(
   }
 );
 
+// Update Tag
 router.put(
   "/:id",
   authenticate,
   authorize(PERMISSIONS.TAG_UPDATE),
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const currentUser = (req as any).user;
     const { name, is_active } = req.body;
+    const currentUser = (req as any).user;
 
     try {
       const updated = await updateTag(
@@ -118,6 +127,7 @@ router.put(
   }
 );
 
+// Soft Delete Tag
 router.delete(
   "/:id",
   authenticate,
@@ -143,6 +153,7 @@ router.delete(
   }
 );
 
+// Hard Delete Tag
 router.delete(
   "/hard/:id",
   authenticate,
@@ -164,6 +175,7 @@ router.delete(
   }
 );
 
+// Restore Tag
 router.patch(
   "/restore/:id",
   authenticate,

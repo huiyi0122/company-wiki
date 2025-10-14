@@ -1,13 +1,20 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 
+export interface GetTagsOptions {
+  search?: string;
+  includeInactive?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+// 创建 tag
 export async function createTag(name: string, user: any) {
   const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 插入 tag
     const [result]: any = await connection.query(
       `INSERT INTO tags (name, slug, created_by)
        VALUES (?, ?, ?)`,
@@ -15,148 +22,167 @@ export async function createTag(name: string, user: any) {
     );
     const tagId = result.insertId;
 
-    // 2️⃣ 写日志
+    // 写日志
     await connection.query(
       `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
        VALUES (?, 'CREATE', ?, NULL, ?)`,
       [tagId, user.id, JSON.stringify({ name, slug })]
     );
 
-    // 3️⃣ 同步到 Elasticsearch
-    try {
-      await esClient.index({
-        index: "tags",
-        id: tagId.toString(),
-        refresh: true,
-        document: {
-          name,
-          slug,
-          is_active: true,
-          created_by: user.username,
-          updated_by: user.username,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch create tag failed:", esErr);
-    }
+    // 同步 ES
+    await esClient.index({
+      index: "tags",
+      id: tagId.toString(),
+      refresh: true,
+      document: {
+        id: tagId,
+        name,
+        slug,
+        is_active: true,
+        created_by_name: user.username,
+        updated_by_name: user.username,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    });
 
     await connection.commit();
     connection.release();
 
     return { id: tagId, name, slug };
-  } catch (err: any) {
+  } catch (err) {
     await connection.rollback();
     connection.release();
     throw err;
   }
 }
 
-export async function getTags(options: {
-  limit?: number;
-  lastId?: number;
-  search?: string;
-  includeInactive?: boolean;
-  withCount?: boolean;
-}) {
-  const limit = Math.min(options.limit || 10, 100);
-  const lastId = options.lastId || 0;
-  const search = options.search?.trim() || "";
-  const includeInactive = !!options.includeInactive;
-  const withCount = !!options.withCount;
+// ES 搜索 tag
+export async function searchTagsES(options: GetTagsOptions) {
+  const {
+    search = "",
+    includeInactive = false,
+    page = 1,
+    limit = 20,
+  } = options;
+  const from = (page - 1) * limit;
 
-  let whereClause = "WHERE 1=1";
-  const params: any[] = [];
+  const must: any[] = [];
+  const filter: any[] = [];
 
-  if (!includeInactive) whereClause += " AND t.is_active = 1";
   if (search) {
-    whereClause +=
-      " AND MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)";
-    params.push(search);
-  }
-  if (lastId > 0) {
-    whereClause += " AND t.id < ?";
-    params.push(lastId);
-  }
-
-  // 查询 tags
-  let [rows]: any = await database.query(
-    `
-    SELECT 
-      t.id, 
-      t.name, 
-      t.slug, 
-      t.is_active, 
-      u1.username AS created_by_name,
-      u2.username AS updated_by_name
-    FROM tags t
-    LEFT JOIN users u1 ON t.created_by = u1.id
-    LEFT JOIN users u2 ON t.updated_by = u2.id
-    ${whereClause}
-    ORDER BY t.id DESC
-    LIMIT ?
-    `,
-    [...params, limit]
-  );
-
-  // fallback for short keywords
-  if (!rows.length && search && search.length < 4) {
-    const likeWhere = whereClause.replace(
-      "MATCH(t.name, t.slug) AGAINST(? IN NATURAL LANGUAGE MODE)",
-      "(t.name LIKE CONCAT('%', ?, '%') OR t.slug LIKE CONCAT('%', ?, '%'))"
-    );
-    const [fallbackRows]: any = await database.query(
-      `
-      SELECT 
-        t.id, 
-        t.name, 
-        t.slug, 
-        t.is_active, 
-        u1.username AS created_by_name,
-        u2.username AS updated_by_name
-      FROM tags t
-      LEFT JOIN users u1 ON t.created_by = u1.id
-      LEFT JOIN users u2 ON t.updated_by = u2.id
-      ${likeWhere}
-      ORDER BY t.id DESC
-      LIMIT ?
-      `,
-      [...params, search, search, limit]
-    );
-    rows = fallbackRows;
+    must.push({
+      multi_match: {
+        query: search,
+        fields: ["name", "slug"],
+        fuzziness: "AUTO",
+      },
+    });
   }
 
-  // 带 count
-  let total = null;
-  if (withCount) {
-    const [[countResult]]: any = await database.query(
-      `SELECT COUNT(*) as total FROM tags ${whereClause}`,
-      params
-    );
-    total = countResult.total;
+  if (!includeInactive) {
+    filter.push({ term: { is_active: true } });
   }
 
-  // 格式化返回数据
-  const data = rows.map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    slug: t.slug,
-    is_active: Boolean(t.is_active),
-    created_by: t.created_by_name,
-    updated_by: t.updated_by_name,
-  }));
+  const res = await esClient.search({
+    index: "tags",
+    from,
+    size: limit,
+    query: {
+      bool: { must, filter },
+    },
+  });
+
+  const hits = res.hits.hits;
+  const total =
+    typeof res.hits.total === "number"
+      ? res.hits.total
+      : res.hits.total?.value || 0;
+
+  const data = hits.map((hit: any) => hit._source);
 
   return {
-    meta: {
-      total,
-      limit,
-      nextCursor: data.length ? data[data.length - 1].id : null,
-    },
+    meta: { total, page, limit },
     data,
   };
 }
 
+// 更新 tag
+export interface UpdateTagData {
+  name?: string;
+  is_active?: boolean;
+}
+
+export async function updateTag(id: number, data: UpdateTagData, user: any) {
+  const { name, is_active } = data;
+  const slug = name?.trim().toLowerCase().replace(/\s+/g, "-");
+
+  const connection = await database.getConnection();
+  await connection.beginTransaction();
+
+  try {
+    const [rows]: any = await connection.query(
+      "SELECT * FROM tags WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) throw new Error("Tag not found");
+    const original = rows[0];
+
+    await connection.query(
+      "UPDATE tags SET name=?, slug=?, is_active=?, updated_by=?, updated_at=NOW() WHERE id=?",
+      [
+        name || original.name,
+        slug || original.slug,
+        is_active ?? original.is_active,
+        user.id,
+        id,
+      ]
+    );
+
+    // 写日志
+    await connection.query(
+      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+       VALUES (?, 'UPDATE', ?, ?, ?)`,
+      [
+        id,
+        user.id,
+        JSON.stringify(original),
+        JSON.stringify({ name, slug, is_active }),
+      ]
+    );
+
+    // 同步 ES
+    await esClient.index({
+      index: "tags",
+      id: id.toString(),
+      refresh: true,
+      document: {
+        id,
+        name: name || original.name,
+        slug: slug || original.slug,
+        is_active: !!(is_active ?? original.is_active), // ✅ 转成 true / false
+        updated_by_name: user.username,
+        updated_at: new Date().toISOString(),
+      },
+    });
+
+    await connection.commit();
+    connection.release();
+
+    return {
+      id,
+      name: name || original.name,
+      slug: slug || original.slug,
+      is_active: is_active ?? original.is_active,
+    };
+  } catch (err) {
+    await connection.rollback();
+    connection.release();
+    throw err;
+  }
+}
+
+// 查询 tag by id
 export async function getTagById(id: number) {
   const [rows]: any = await database.query(
     `
@@ -165,8 +191,8 @@ export async function getTagById(id: number) {
         t.name,
         t.slug,
         t.is_active,
-        u1.username AS created_by_name,
-        u2.username AS updated_by_name
+        u1.username AS created_by,
+        u2.username AS updated_by
       FROM tags t
       LEFT JOIN users u1 ON t.created_by = u1.id
       LEFT JOIN users u2 ON t.updated_by = u2.id
@@ -176,126 +202,25 @@ export async function getTagById(id: number) {
   );
 
   if (!rows.length) return null;
-
   return rows[0];
 }
 
-export async function updateTag(
-  id: number,
-  body: { name: string; is_active?: boolean },
-  user: any
-) {
-  const { name, is_active } = body;
-
-  if (!name?.trim()) throw new Error("Name is required");
-
-  const connection = await database.getConnection();
-  await connection.beginTransaction();
-
-  try {
-    // 1️⃣ 获取原 tag
-    const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
-      [id]
-    );
-    if (!rows.length) throw new Error("Tag not found");
-    const original = rows[0];
-
-    // 2️⃣ 生成 slug
-    const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
-
-    // 3️⃣ 更新 tag
-    await connection.query(
-      `
-      UPDATE tags
-      SET name = ?, slug = ?, is_active = COALESCE(?, is_active),
-          updated_at = NOW(), updated_by = ?
-      WHERE id = ?
-      `,
-      [name, slug, is_active, user.id, id]
-    );
-
-    // 4️⃣ 写 tag_logs
-    await connection.query(
-      `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
-      VALUES (?, 'UPDATE', ?, ?, ?)
-      `,
-      [
-        id,
-        user.id,
-        JSON.stringify({
-          name: original.name,
-          slug: original.slug,
-          is_active: !!original.is_active,
-        }),
-        JSON.stringify({
-          name,
-          slug,
-          is_active:
-            typeof is_active !== "undefined" ? is_active : original.is_active,
-        }),
-      ]
-    );
-
-    // 5️⃣ 同步 ES
-    try {
-      await esClient.index({
-        index: "tags",
-        id: id.toString(),
-        refresh: true,
-        document: {
-          name,
-          slug,
-          is_active:
-            typeof is_active !== "undefined" ? is_active : original.is_active,
-          created_by: original.created_by,
-          updated_by: user.id,
-          created_at: original.created_at,
-          updated_at: new Date().toISOString(),
-        },
-      });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch update failed:", esErr);
-    }
-
-    await connection.commit();
-    connection.release();
-
-    return {
-      id: original.id,
-      name,
-      slug,
-      is_active:
-        typeof is_active !== "undefined" ? is_active : original.is_active,
-      created_by: original.created_by,
-      updated_by: user.id,
-      created_at: original.created_at,
-      updated_at: new Date().toISOString(),
-    };
-  } catch (err) {
-    await connection.rollback();
-    connection.release();
-    throw err;
-  }
-}
-
+// 删除 tag（软删）
 export async function deleteTag(id: number, user: any, force = false) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取 tag 原始数据
     const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+      "SELECT * FROM tags WHERE id=?",
       [id]
     );
     if (!rows.length) throw new Error("Tag not found");
     const original = rows[0];
 
-    // 2️⃣ 检查关联文章
+    // 检查文章使用
     const [used]: any = await connection.query(
-      "SELECT COUNT(*) AS count FROM article_tags WHERE tag_id = ?",
+      "SELECT COUNT(*) AS count FROM article_tags WHERE tag_id=?",
       [id]
     );
     if (used[0].count > 0 && !force) {
@@ -304,23 +229,18 @@ export async function deleteTag(id: number, user: any, force = false) {
       );
     }
 
-    // 3️⃣ 如果 force，删除关联
     if (force) {
-      await connection.query("DELETE FROM article_tags WHERE tag_id = ?", [id]);
+      await connection.query("DELETE FROM article_tags WHERE tag_id=?", [id]);
     }
 
-    // 4️⃣ soft delete（或者实际删除）
     await connection.query(
-      "UPDATE tags SET is_active = 0, updated_by = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE tags SET is_active=0, updated_by=?, updated_at=NOW() WHERE id=?",
       [user.id, id]
     );
 
-    // 5️⃣ 写 tag_logs
     await connection.query(
-      `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
-      VALUES (?, 'SOFT_DELETE', ?, ?, ?)
-      `,
+      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+       VALUES (?, 'SOFT_DELETE', ?, ?, ?)`,
       [
         id,
         user.id,
@@ -329,13 +249,10 @@ export async function deleteTag(id: number, user: any, force = false) {
           slug: original.slug,
           is_active: !!original.is_active,
         }),
-        JSON.stringify({
-          is_active: false,
-        }),
+        JSON.stringify({ is_active: false }),
       ]
     );
 
-    // 6️⃣ 更新 ES
     try {
       await esClient.delete({
         index: "tags",
@@ -359,32 +276,27 @@ export async function deleteTag(id: number, user: any, force = false) {
   }
 }
 
+// 硬删 tag
 export async function hardDeleteTag(id: number, user: any) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取原始 tag 数据
-    const [rows]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+    const [tags]: any = await connection.query(
+      "SELECT * FROM tags WHERE id=?",
       [id]
     );
-    if (!rows.length) throw new Error("Tag not found");
-    const tag = rows[0];
+    if (!tags.length) throw new Error("Tag not found");
+    const tag = tags[0];
 
-    // 2️⃣ 写入日志（先写，确保 tag_id 被记录）
     await connection.query(
-      `
-      INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
-      VALUES (?, 'DELETE', ?, ?, ?)
-      `,
+      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
+       VALUES (?, 'DELETE', ?, ?, ?)`,
       [id, user.id, JSON.stringify(tag), JSON.stringify({ deleted: true })]
     );
 
-    // 3️⃣ 删除 tag（永久删除）
-    await connection.query("DELETE FROM tags WHERE id = ?", [id]);
+    await connection.query("DELETE FROM tags WHERE id=?", [id]);
 
-    // 4️⃣ 删除 Elasticsearch 记录
     try {
       await esClient.delete({
         index: "tags",
@@ -406,35 +318,31 @@ export async function hardDeleteTag(id: number, user: any) {
   }
 }
 
+// 恢复 tag
 export async function restoreTag(id: number, user: any) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查询标签
     const [tags]: any = await connection.query(
-      "SELECT * FROM tags WHERE id = ?",
+      "SELECT * FROM tags WHERE id=?",
       [id]
     );
     if (!tags.length) throw new Error("Tag not found");
-
     const tag = tags[0];
     if (tag.is_active === 1) throw new Error("Tag is already active");
 
-    // 2️⃣ 更新状态为启用
     await connection.query(
-      "UPDATE tags SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?",
+      "UPDATE tags SET is_active=1, updated_by=?, updated_at=NOW() WHERE id=?",
       [user.id, id]
     );
 
-    // 3️⃣ 写日志
     await connection.query(
       `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
        VALUES (?, 'RESTORE', ?, ?, ?)`,
       [id, user.id, JSON.stringify(tag), JSON.stringify({ restored: true })]
     );
 
-    // 4️⃣ Elasticsearch 同步
     try {
       await esClient.update({
         index: "tags",

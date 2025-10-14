@@ -89,19 +89,20 @@ export async function createArticle(body: any, user: any) {
   }
 }
 
-export async function getArticles(limit: number, lastId: number) {
+export async function getArticles(page: number, limit: number) {
   const connection = await database.getConnection();
 
   try {
-    let whereClause = "WHERE 1=1";
-    const params: any[] = [];
+    const offset = (page - 1) * limit;
 
-    if (lastId > 0) {
-      whereClause += " AND a.id < ?";
-      params.push(lastId);
-    }
+    // 1️⃣ 查总数
+    const [countRows]: any = await connection.query(
+      "SELECT COUNT(*) AS total FROM articles"
+    );
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
 
-    // 1️⃣ 查询文章基本信息 + 作者
+    // 2️⃣ 查数据
     const [rows]: any = await connection.query(
       `
       SELECT 
@@ -117,18 +118,20 @@ export async function getArticles(limit: number, lastId: number) {
       LEFT JOIN users u_author ON a.author_id = u_author.id
       LEFT JOIN users u_created ON a.created_by = u_created.id
       LEFT JOIN users u_updated ON a.updated_by = u_updated.id
-      ${whereClause}
       ORDER BY a.id DESC
-      LIMIT ?
+      LIMIT ? OFFSET ?
       `,
-      [...params, limit]
+      [limit, offset]
     );
 
     if (!rows.length) {
-      return { meta: { limit, nextCursor: null }, data: [] };
+      return {
+        meta: { page, limit, total, totalPages },
+        data: [],
+      };
     }
 
-    // 2️⃣ 查询 tags
+    // 3️⃣ 查 tags
     const articleIds = rows.map((r: any) => r.id);
     const [tagRows]: any = await connection.query(
       `
@@ -146,7 +149,7 @@ export async function getArticles(limit: number, lastId: number) {
       return acc;
     }, {});
 
-    // 3️⃣ 拼装结果
+    // 4️⃣ 拼装数据
     const data = rows.map((r: any) => ({
       id: r.id,
       title: r.title,
@@ -159,12 +162,9 @@ export async function getArticles(limit: number, lastId: number) {
       is_active: Boolean(r.is_active),
     }));
 
-    // 4️⃣ 返回分页信息
+    // 5️⃣ 返回带分页信息
     return {
-      meta: {
-        limit,
-        nextCursor: data.length ? data[data.length - 1].id : null,
-      },
+      meta: { page, limit, total, totalPages },
       data,
     };
   } finally {
@@ -209,7 +209,7 @@ export async function searchArticles({
 
   if (tags && tags.length > 0) {
     filter.push({
-      terms: { tags: tags },
+      terms: { tags },
     });
   }
 
@@ -217,9 +217,7 @@ export async function searchArticles({
     index: "articles",
     from,
     size: pageSize,
-    query: {
-      bool: { must, filter },
-    },
+    query: { bool: { must, filter } },
   });
 
   const hits = searchResponse.hits.hits;
@@ -240,11 +238,14 @@ export async function searchArticles({
     updated_at: hit._source.updated_at,
   }));
 
+  const totalPages = Math.ceil(totalHits / pageSize);
+
   return {
     meta: {
       total: totalHits,
+      page: pageNumber,
+      totalPages,
       limit: pageSize,
-      nextCursor: hits.length === pageSize ? pageNumber + 1 : null,
     },
     data,
   };
