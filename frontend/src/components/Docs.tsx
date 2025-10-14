@@ -5,8 +5,23 @@ import { API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
 import "../styles/Docs.css";
 
-// Assuming Sidebar and CommonTypes are imported correctly.
-// Also assuming the API_BASE_URL is defined.
+// --- 🚀 useDebounce Hook 实现 (保持不变) ---
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+// ---------------------------------
 
 interface DocsProps {
   currentUser: User | null;
@@ -24,16 +39,18 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   // Tab state
   const [activeTab, setActiveTab] = useState<"all" | "my">("all");
 
-  // 📦 游标分页状态 (Load More 模式), used for either cursor or page number
+  // 📦 游标分页状态 (Load More 模式)
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [pageSize] = useState<number>(5);
 
-  // 仅用于判断是否是初次加载或筛选重置
-  const [isNewSearch, setIsNewSearch] = useState(true);
+  // ❌ 移除 isNewSearch，它导致了依赖循环和不必要的重置。
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 🚀 防抖后的搜索值
+  const debouncedSearch = useDebounce(search, 500);
 
   // 📦 Load category map ( unchanged )
   const fetchCategories = async () => {
@@ -56,7 +73,7 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
 
   /**
    * 📡 Fetch articles using Load More (Cursor-based or Page-based)
-   * @param cursorToUse 要用于请求的游标值/页码 (null for the first page)
+   * @param cursorToUse 要用于请求的游标值/页码 (null for the first page / new search)
    */
   const fetchDocs = useCallback(async (cursorToUse: number | null) => {
     const token = localStorage.getItem("token");
@@ -65,7 +82,7 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
       return;
     }
 
-    // Only show full loading state if it's a new search and no results are shown yet
+    // 只有在加载第一页/新筛选时才显示完全的 loading spinner
     if (cursorToUse === null) {
       setLoading(true);
     }
@@ -75,8 +92,8 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
       const params = new URLSearchParams();
       params.append("limit", pageSize.toString());
 
-      // Determine if search or category filters are active
-      const hasFilters = search.trim() || category;
+      // 使用 debouncedSearch 来判断是否进入搜索模式
+      const hasFilters = debouncedSearch.trim() || category;
 
       let endpoint: string;
       let nextCursorVal: number | null = null;
@@ -88,15 +105,14 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
         // --- 搜索模式用 cursor 分页 ---
         endpoint = "/articles/search";
         if (cursorToUse !== null) {
-          // In cursor mode, cursorToUse is the actual cursor value
           params.append("cursor", cursorToUse.toString());
         }
 
-        if (search.trim()) {
-          if (search.startsWith("#")) {
-            params.append("tags", search.substring(1).trim());
+        if (debouncedSearch.trim()) {
+          if (debouncedSearch.startsWith("#")) {
+            params.append("tags", debouncedSearch.substring(1).trim());
           } else {
-            params.append("q", search.trim());
+            params.append("q", debouncedSearch.trim());
           }
         }
         if (category) {
@@ -105,11 +121,9 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
       } else {
         // --- 普通模式用 page 分页 ---
         endpoint = "/articles";
-        // In page mode, cursorToUse (or nextCursor state) is the next *page number* to fetch. Null means page 1.
         const pageToFetch = cursorToUse !== null ? cursorToUse : 1;
         params.append("page", pageToFetch.toString());
         
-        // Optional: If 'my' tab logic is needed, add it here:
         if (activeTab === "my" && currentUser?.id) {
             params.append("author_id", currentUser.id.toString());
         }
@@ -127,41 +141,37 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
 
       // 🚀 Process result based on mode
       if (hasFilters) {
-        // 搜索结果格式 { data: [...], meta: { nextCursor, total } }
         articles = result.data || [];
         nextCursorVal = result.meta?.nextCursor || null;
         totalVal = result.meta?.total || articles.length;
       } else {
-        // 普通分页格式 { data: [...], meta: { page, totalPages, total } }
         articles = result.data || [];
         const currentPage = result.meta?.page || 1;
         const totalPages = result.meta?.totalPages || 1;
         totalVal = result.meta?.total || articles.length;
-
-        // ✅ CRITICAL FIX for page-based: next cursor is the next page number
-        nextCursorVal = currentPage < totalPages ? currentPage + 1 : null;
+        nextCursorVal = currentPage < totalPages ? currentPage + 1 : null; 
       }
 
       // 🚀 Update UI data
       if (cursorToUse === null) {
-        // Reset docs array for initial load or new search/filter
+        // 新搜索/筛选/第一页：替换数据
         setDocs(articles);
       } else {
-        // Append docs for "Load More"
+        // 加载更多：追加数据
         setDocs(prev => [...prev, ...articles]);
       }
 
       setNextCursor(nextCursorVal);
       setTotalResults(totalVal);
-      setIsNewSearch(false);
-
+      // ❌ 移除 setIsNewSearch(false);
+      
     } catch (err: any) {
       console.error("❌ Fetch error:", err);
       setError(err.message || "Failed to load documents.");
     } finally {
       setLoading(false);
     }
-  }, [search, category, activeTab, currentUser, pageSize, isNewSearch]); // Added isNewSearch for completeness
+  }, [debouncedSearch, category, activeTab, currentUser, pageSize]); // ⚠️ 依赖数组中不再包含 isNewSearch
 
   // 🏁 Init category map
   useEffect(() => {
@@ -182,18 +192,18 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
 
   // 🔁 当筛选条件变化时，重置游标并重新搜索
   useEffect(() => {
-    // Only proceed after category map is loaded, or if filters change
-    if (Object.keys(categoryMap).length > 0 || search || category || activeTab) {
-      // 🚨 核心：标记为新搜索，并重置游标/页码
-      setIsNewSearch(true);
+    // ⚠️ 核心：这里只依赖 debouncedSearch, category, activeTab。
+    // fetchDocs 已经稳定，不会因为 fetchDocs 自身重新创建而触发。
+    if (Object.keys(categoryMap).length > 0 || debouncedSearch || category || activeTab) {
+      // ❌ 移除 setIsNewSearch(true);
       setNextCursor(null);
 
       // 立即请求第一页 (null 游标/页码)
       fetchDocs(null);
     }
-  }, [search, category, activeTab, categoryMap, fetchDocs]);
+  }, [debouncedSearch, category, activeTab, categoryMap, fetchDocs]);
 
-  // 🔄 处理“加载更多”
+  // 🔄 处理“加载更多” (保持不变)
   const handleLoadMore = () => {
     if (nextCursor !== null && !loading) {
       fetchDocs(nextCursor);
@@ -323,7 +333,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
 
                     <div className="article-content">
                       <p className="article-author">
-                        {/* Assuming doc.author is the display name */}
                         By {doc.author || doc.created_by_name || `User ${doc.author_id}` || "Unknown"}
                       </p>
 
