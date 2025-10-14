@@ -528,7 +528,6 @@ const fetchTags = async (lastId?: number) => {
                       </button>
                     </div>
                   )}
-
                 </div>
               </div>
 
