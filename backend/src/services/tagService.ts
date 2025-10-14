@@ -63,7 +63,7 @@ export async function searchTagsES(options: GetTagsOptions) {
     search = "",
     includeInactive = false,
     page = 1,
-    limit = 20,
+    limit = 10,
   } = options;
   const from = (page - 1) * limit;
 

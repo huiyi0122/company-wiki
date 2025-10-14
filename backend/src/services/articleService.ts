@@ -105,21 +105,23 @@ export async function getArticles(page: number, limit: number) {
     // 2️⃣ 查数据
     const [rows]: any = await connection.query(
       `
-      SELECT 
-        a.id,
-        a.title,
-        a.content,
-        a.category_id,
-        a.is_active,
-        u_author.username AS author,
-        u_created.username AS created_by_name,
-        u_updated.username AS updated_by_name
-      FROM articles a
-      LEFT JOIN users u_author ON a.author_id = u_author.id
-      LEFT JOIN users u_created ON a.created_by = u_created.id
-      LEFT JOIN users u_updated ON a.updated_by = u_updated.id
-      ORDER BY a.id DESC
-      LIMIT ? OFFSET ?
+    SELECT 
+  a.id,
+  a.title,
+  a.content,
+  a.category_id,
+  a.is_active,
+  a.created_at,
+  u_author.username AS author,
+  u_created.username AS created_by_name,
+  u_updated.username AS updated_by_name
+FROM articles a
+LEFT JOIN users u_author ON a.author_id = u_author.id
+LEFT JOIN users u_created ON a.created_by = u_created.id
+LEFT JOIN users u_updated ON a.updated_by = u_updated.id
+ORDER BY a.id DESC
+LIMIT ? OFFSET ?
+
       `,
       [limit, offset]
     );
@@ -160,6 +162,7 @@ export async function getArticles(page: number, limit: number) {
       created_by_name: r.created_by_name,
       updated_by_name: r.updated_by_name,
       is_active: Boolean(r.is_active),
+      created_at: r.created_at, // ✅ 新增字段
     }));
 
     // 5️⃣ 返回带分页信息
@@ -189,16 +192,44 @@ export async function searchArticles({
 }: SearchParams) {
   const from = (pageNumber - 1) * pageSize;
 
-  // 🔍 构建 must / filter 条件
   const must: any[] = [];
   const filter: any[] = [{ term: { is_active: true } }];
 
+  // 🔍 改进的搜索逻辑
   if (queryString) {
+    const trimmedQuery = queryString.trim();
+
+    // 使用 bool + should 组合多种匹配策略
     must.push({
-      multi_match: {
-        query: queryString,
-        fields: ["title", "content", "tags"],
-        fuzziness: "AUTO",
+      bool: {
+        should: [
+          // 原有的 multi_match（保持兼容）
+          {
+            multi_match: {
+              query: trimmedQuery,
+              fields: ["title^3", "content", "tags^2"],
+              fuzziness: "AUTO",
+            },
+          },
+          // 新增：通配符查询（支持部分匹配）
+          {
+            wildcard: {
+              title: {
+                value: `*${trimmedQuery}*`,
+                boost: 2.0,
+              },
+            },
+          },
+          {
+            wildcard: {
+              content: {
+                value: `*${trimmedQuery}*`,
+                boost: 1.0,
+              },
+            },
+          },
+        ],
+        minimum_should_match: 1, // 至少匹配一个条件
       },
     });
   }
@@ -208,11 +239,10 @@ export async function searchArticles({
   }
 
   if (tags && tags.length > 0) {
-    filter.push({
-      terms: { tags },
-    });
+    filter.push({ terms: { tags } });
   }
 
+  // 保持原有的查询结构
   const searchResponse = await esClient.search({
     index: "articles",
     from,

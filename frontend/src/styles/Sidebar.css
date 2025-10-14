@@ -105,7 +105,7 @@
   padding: 6px 10px 6px 32px;
   border-radius: 4px;
   border: 1px solid rgba(55, 53, 47, 0.16);
-  background: rgba(242, 241, 238, 0.6);
+  background: #fffbdd;
   color: #37352f;
   font-size: 14px;
   font-family: inherit;
@@ -115,7 +115,7 @@
 .sidebar-search:focus {
   outline: none;
   border-color: #2383e2;
-  background: #ffffff;
+  background: #fffbdd;
   box-shadow: 0 0 0 1px #2383e2;
 }
 

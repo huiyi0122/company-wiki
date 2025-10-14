@@ -5,24 +5,6 @@ import { API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
 import "../styles/Docs.css";
 
-// --- 🚀 useDebounce Hook 实现 (保持不变) ---
-function useDebounce(value: string, delay: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-// ---------------------------------
-
 interface DocsProps {
   currentUser: User | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -39,20 +21,16 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   // Tab state
   const [activeTab, setActiveTab] = useState<"all" | "my">("all");
 
-  // 📦 游标分页状态 (Load More 模式)
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  // 📦 分页状态
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [pageSize] = useState<number>(5);
-
-  // ❌ 移除 isNewSearch，它导致了依赖循环和不必要的重置。
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 🚀 防抖后的搜索值
-  const debouncedSearch = useDebounce(search, 500);
-
-  // 📦 Load category map ( unchanged )
+  // 📦 加载分类映射
   const fetchCategories = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -72,144 +50,198 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   };
 
   /**
-   * 📡 Fetch articles using Load More (Cursor-based or Page-based)
-   * @param cursorToUse 要用于请求的游标值/页码 (null for the first page / new search)
+   * 📡 统一的文章获取函数
+   * @param page 页码
+   * @param searchQuery 搜索词
+   * @param categoryId 分类ID
    */
-  const fetchDocs = useCallback(async (cursorToUse: number | null) => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("User not logged in.");
-      return;
-    }
+  const fetchDocs = useCallback(
+    async (page: number, searchQuery: string, categoryId: string) => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("User not logged in.");
+        return;
+      }
 
-    // 只有在加载第一页/新筛选时才显示完全的 loading spinner
-    if (cursorToUse === null) {
       setLoading(true);
-    }
-    setError(null);
+      setError(null);
 
-    try {
-      const params = new URLSearchParams();
-      params.append("limit", pageSize.toString());
+      try {
+        const params = new URLSearchParams();
+        params.append("limit", pageSize.toString());
 
-      // 使用 debouncedSearch 来判断是否进入搜索模式
-      const hasFilters = debouncedSearch.trim() || category;
+        // 判断是否为搜索模式
+        const hasFilters = searchQuery.trim() || categoryId;
 
-      let endpoint: string;
-      let nextCursorVal: number | null = null;
-      let articles: any[] = [];
-      let totalVal: number = 0;
+        let endpoint: string;
+        let articles: any[] = [];
+        let totalVal: number = 0;
+        let pagesVal: number = 1;
 
-      // ✅ Decide the API endpoint and pagination parameter
-      if (hasFilters) {
-        // --- 搜索模式用 cursor 分页 ---
-        endpoint = "/articles/search";
-        if (cursorToUse !== null) {
-          params.append("cursor", cursorToUse.toString());
-        }
+        if (hasFilters) {
+          // --- 搜索模式：使用 /articles/search ---
+          endpoint = "/articles/search";
+          params.append("page", page.toString());
 
-        if (debouncedSearch.trim()) {
-          if (debouncedSearch.startsWith("#")) {
-            params.append("tags", debouncedSearch.substring(1).trim());
-          } else {
-            params.append("q", debouncedSearch.trim());
+          if (searchQuery.trim()) {
+            if (searchQuery.startsWith("#")) {
+              params.append("tags", searchQuery.substring(1).trim());
+            } else {
+              params.append("q", searchQuery.trim());
+            }
+          }
+          if (categoryId) {
+            params.append("category_id", categoryId);
+          }
+        } else {
+          // --- 普通模式：使用 /articles ---
+          endpoint = "/articles";
+          params.append("page", page.toString());
+
+          if (activeTab === "my" && currentUser?.id) {
+            params.append("author_id", currentUser.id.toString());
           }
         }
-        if (category) {
-          params.append("category_id", category);
-        }
-      } else {
-        // --- 普通模式用 page 分页 ---
-        endpoint = "/articles";
-        const pageToFetch = cursorToUse !== null ? cursorToUse : 1;
-        params.append("page", pageToFetch.toString());
-        
-        if (activeTab === "my" && currentUser?.id) {
-            params.append("author_id", currentUser.id.toString());
-        }
-      }
 
-      const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
-      console.log(`📡 Fetching (${hasFilters ? "search" : "normal"}):`, url);
+        const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
+        console.log(`📡 Fetching (page ${page}):`, url);
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      if (!res.ok) throw new Error(`Failed to fetch articles (${res.status})`);
-      const result = await res.json();
+        if (!res.ok)
+          throw new Error(`Failed to fetch articles (${res.status})`);
+        const result = await res.json();
 
-      // 🚀 Process result based on mode
-      if (hasFilters) {
+        // 解析响应
         articles = result.data || [];
-        nextCursorVal = result.meta?.nextCursor || null;
         totalVal = result.meta?.total || articles.length;
-      } else {
-        articles = result.data || [];
-        const currentPage = result.meta?.page || 1;
-        const totalPages = result.meta?.totalPages || 1;
-        totalVal = result.meta?.total || articles.length;
-        nextCursorVal = currentPage < totalPages ? currentPage + 1 : null; 
-      }
+        pagesVal = result.meta?.totalPages || 1;
 
-      // 🚀 Update UI data
-      if (cursorToUse === null) {
-        // 新搜索/筛选/第一页：替换数据
         setDocs(articles);
-      } else {
-        // 加载更多：追加数据
-        setDocs(prev => [...prev, ...articles]);
+        setTotalResults(totalVal);
+        setTotalPages(pagesVal);
+        setCurrentPage(page);
+      } catch (err: any) {
+        console.error("❌ Fetch error:", err);
+        setError(err.message || "Failed to load documents.");
+      } finally {
+        setLoading(false);
       }
+    },
+    [activeTab, currentUser, pageSize]
+  );
 
-      setNextCursor(nextCursorVal);
-      setTotalResults(totalVal);
-      // ❌ 移除 setIsNewSearch(false);
-      
-    } catch (err: any) {
-      console.error("❌ Fetch error:", err);
-      setError(err.message || "Failed to load documents.");
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, category, activeTab, currentUser, pageSize]); // ⚠️ 依赖数组中不再包含 isNewSearch
-
-  // 🏁 Init category map
+  // 🏁 初始化分类映射
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  // 🔁 从 URL 读取分类参数 (unchanged)
+  // 🔁 从 URL 读取参数并更新状态
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const cat = params.get("category_id") || "";
     const searchQuery = params.get("q") || "";
 
     setCategory(cat);
-    if (searchQuery) {
-      setSearch(searchQuery);
-    }
+    setSearch(searchQuery);
   }, [location.search]);
 
-  // 🔁 当筛选条件变化时，重置游标并重新搜索
+  // 🔁 当 URL 参数变化时，重置到第一页并重新加载
   useEffect(() => {
-    // ⚠️ 核心：这里只依赖 debouncedSearch, category, activeTab。
-    // fetchDocs 已经稳定，不会因为 fetchDocs 自身重新创建而触发。
-    if (Object.keys(categoryMap).length > 0 || debouncedSearch || category || activeTab) {
-      // ❌ 移除 setIsNewSearch(true);
-      setNextCursor(null);
-
-      // 立即请求第一页 (null 游标/页码)
-      fetchDocs(null);
+    if (Object.keys(categoryMap).length > 0) {
+      setCurrentPage(1);
+      fetchDocs(1, search, category);
     }
-  }, [debouncedSearch, category, activeTab, categoryMap, fetchDocs]);
+  }, [search, category, activeTab, categoryMap, fetchDocs]);
 
-  // 🔄 处理“加载更多” (保持不变)
-  const handleLoadMore = () => {
-    if (nextCursor !== null && !loading) {
-      fetchDocs(nextCursor);
+  // 📄 页码变化处理
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && !loading) {
+      fetchDocs(newPage, search, category);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
+  // 🎨 渲染页码按钮
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const pageNumbers: (number | string)[] = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        pageNumbers.push(1, 2, 3, 4, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pageNumbers.push(
+          1,
+          "...",
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+          totalPages
+        );
+      } else {
+        pageNumbers.push(
+          1,
+          "...",
+          currentPage - 1,
+          currentPage,
+          currentPage + 1,
+          "...",
+          totalPages
+        );
+      }
+    }
+
+    return (
+      <div className="pagination">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1 || loading}
+          className="pagination-btn"
+        >
+          ← Previous
+        </button>
+
+        <div className="page-numbers">
+          {pageNumbers.map((num, idx) => {
+            if (num === "...") {
+              return (
+                <span key={`ellipsis-${idx}`} className="pagination-ellipsis">
+                  ...
+                </span>
+              );
+            }
+            return (
+              <button
+                key={num}
+                onClick={() => handlePageChange(num as number)}
+                disabled={loading}
+                className={`page-number ${currentPage === num ? "active" : ""}`}
+              >
+                {num}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || loading}
+          className="pagination-btn"
+        >
+          Next →
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="layout">
@@ -227,30 +259,12 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <p>Browse and search through all articles</p>
           </div>
 
-          {/* Search Bar */}
-          <div className="search-section">
-            <input
-              type="text"
-              placeholder="Search articles... (Use # for tags, e.g., #test)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="search-input"
-            />
-            {search && (
-              <button
-                className="clear-search"
-                onClick={() => setSearch("")}
-                style={{ marginLeft: "10px" }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
           {/* Category Filter Display */}
           {category && (
             <div className="active-filters">
-              <span>Category: {categoryMap[parseInt(category)] || category}</span>
+              <span>
+                Category: {categoryMap[parseInt(category)] || category}
+              </span>
               <button onClick={() => setCategory("")}>✕</button>
             </div>
           )}
@@ -260,7 +274,9 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <div className="tabs-section">
               <div className="tabs-container">
                 <button
-                  className={`tab-button ${activeTab === "all" ? "active" : ""}`}
+                  className={`tab-button ${
+                    activeTab === "all" ? "active" : ""
+                  }`}
                   onClick={() => setActiveTab("all")}
                 >
                   All Articles
@@ -278,17 +294,16 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
           {/* Results Count */}
           <div className="results-info">
             <p>
-              {loading && docs.length === 0
-                ? 'Loading...'
-                : `Showing ${docs.length} of ${totalResults} articles${nextCursor !== null && docs.length < totalResults ? ' (scroll to load more)' : ''}`
-              }
+              {loading
+                ? "Loading..."
+                : `Showing ${docs.length} of ${totalResults} articles (Page ${currentPage} of ${totalPages})`}
             </p>
           </div>
 
           {/* Content Section */}
           <div className="content-section">
             {/* Loading State */}
-            {loading && docs.length === 0 && (
+            {loading && (
               <div className="loading-state">
                 <p>Loading articles...</p>
               </div>
@@ -306,7 +321,13 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
               <div className="empty-state">
                 <p>📭 No articles found.</p>
                 {(search || category) && (
-                  <button onClick={() => { setSearch(""); setCategory(""); }}>
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setCategory("");
+                      navigate("/docs");
+                    }}
+                  >
                     Clear filters
                   </button>
                 )}
@@ -315,67 +336,62 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
 
             {/* Articles List */}
             {!error && docs.length > 0 && (
-              <div className="articles-grid">
-                {docs.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="article-card"
-                    onClick={() => navigate(`/docs/${doc.id}`)}
-                  >
-                    <div className="article-header">
-                      <h3 className="article-title">{doc.title || "Untitled"}</h3>
-                      <div className="article-meta">
-                        <span className="category-badge">
-                          {categoryMap[doc.category_id] || "Uncategorized"}
-                        </span>
+              <>
+                <div className="articles-grid">
+                  {docs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="article-card"
+                      onClick={() => navigate(`/docs/${doc.id}`)}
+                    >
+                      <div className="article-header">
+                        <h3 className="article-title">
+                          {doc.title || "Untitled"}
+                        </h3>
+                        <div className="article-meta">
+                          <span className="category-badge">
+                            {categoryMap[doc.category_id] || "Uncategorized"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="article-content">
+                        <p className="article-author">
+                          By{" "}
+                          {doc.author ||
+                            doc.created_by_name ||
+                            `User ${doc.author_id}` ||
+                            "Unknown"}
+                        </p>
+
+                        {/* Tags */}
+                        {doc.tags &&
+                          Array.isArray(doc.tags) &&
+                          doc.tags.length > 0 && (
+                            <div className="article-tags">
+                              {doc.tags.map((tag: any, idx: number) => (
+                                <span key={idx} className="tag-pill-sm">
+                                  {typeof tag === "string"
+                                    ? tag
+                                    : tag.name || tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                        <p className="article-date">
+                          {doc.created_at
+                            ? new Date(doc.created_at).toLocaleDateString()
+                            : "N/A"}
+                        </p>
                       </div>
                     </div>
-
-                    <div className="article-content">
-                      <p className="article-author">
-                        By {doc.author || doc.created_by_name || `User ${doc.author_id}` || "Unknown"}
-                      </p>
-
-                      {/* Tags */}
-                      {doc.tags && Array.isArray(doc.tags) && doc.tags.length > 0 && (
-                        <div className="article-tags">
-                          {doc.tags.map((tag: any, idx: number) => (
-                            <span key={idx} className="tag-pill-sm">
-                              {typeof tag === "string" ? tag : tag.name || tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <p className="article-date">
-                        {doc.created_at
-                          ? new Date(doc.created_at).toLocaleDateString()
-                          : "N/A"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Loading More Indicator */}
-            {loading && docs.length > 0 && (
-                <div style={{textAlign: "center", padding: "10px", color: "#666"}}>
-                    Loading more...
+                  ))}
                 </div>
-            )}
-            
-            {/* Load More Button (Cursor/Page-based) */}
-            {nextCursor !== null && !loading && (
-              <div className="pagination">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loading}
-                  className="load-more-button"
-                >
-                  Load More
-                </button>
-              </div>
+
+                {/* Page-based Pagination */}
+                {renderPagination()}
+              </>
             )}
           </div>
         </div>

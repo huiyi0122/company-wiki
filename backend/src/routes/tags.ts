@@ -57,7 +57,7 @@ router.get(
       const search = (req.query.search as string)?.trim();
       const includeInactive = req.query.include_inactive === "true";
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const limit = parseInt(req.query.limit as string) || 10;
 
       const result = await searchTagsES({
         search,

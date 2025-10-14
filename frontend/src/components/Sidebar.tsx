@@ -30,28 +30,62 @@ export default function Sidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
-  const [categoryArticles, setCategoryArticles] = useState<Record<number, Article[]>>({});
+  const [categoryArticles, setCategoryArticles] = useState<
+    Record<number, Article[]>
+  >({});
   const [loadingCategories, setLoadingCategories] = useState<number[]>([]);
-  
-  // 🔥 新增：追踪每个分类的分页状态
-  const [categoryPages, setCategoryPages] = useState<Record<number, number>>({});
-  const [categoryTotals, setCategoryTotals] = useState<Record<number, number>>({});
-  const [categoryHasMore, setCategoryHasMore] = useState<Record<number, boolean>>({});
+
+  // 🔥 追踪每个分类的分页状态
+  const [categoryPages, setCategoryPages] = useState<Record<number, number>>(
+    {}
+  );
+  const [categoryTotals, setCategoryTotals] = useState<Record<number, number>>(
+    {}
+  );
+  const [categoryHasMore, setCategoryHasMore] = useState<
+    Record<number, boolean>
+  >({});
 
   const navigate = useNavigate();
   const location = useLocation();
 
   const PAGE_SIZE = 8; // 每次加载8个文章
 
-    useEffect(() => {
-    if (!searchTerm.trim()) return;
+  // 🔥 防抖搜索：输入停止3秒后自动搜索（只在 /docs 页面启用）
+  useEffect(() => {
+    // 只在 docs 页面才启用自动搜索
+    const isDocsPage =
+      location.pathname === "/docs" || location.pathname === "/";
+    if (!isDocsPage) return;
 
     const timer = setTimeout(() => {
-      navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
-    }, 3000); // ⏱️ 3秒防抖
+      if (searchTerm.trim()) {
+        navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
+      } else {
+        // 清空搜索时返回全部文章
+        navigate("/docs");
+      }
+    }, 3000);
 
-    return () => clearTimeout(timer); // 用户继续输入时重置计时器
-  }, [searchTerm, navigate]);
+    return () => clearTimeout(timer);
+  }, [searchTerm, navigate, location.pathname]);
+
+  // 🔥 从 URL 同步搜索词到输入框（只在 docs 页面）
+  useEffect(() => {
+    const isDocsPage =
+      location.pathname === "/docs" || location.pathname === "/";
+    if (!isDocsPage) {
+      // 不在 docs 页面时，清空搜索框
+      if (searchTerm) setSearchTerm("");
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const queryFromUrl = params.get("q") || "";
+    if (queryFromUrl !== searchTerm) {
+      setSearchTerm(queryFromUrl);
+    }
+  }, [location.search, location.pathname]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -81,59 +115,66 @@ export default function Sidebar({
     setMobileOpen(false);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
+  // 🔥 按Enter键立即搜索
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      if (searchTerm.trim()) {
+        navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
+      } else {
+        // 清空搜索时返回全部文章
+        navigate("/docs");
+      }
       setMobileOpen(false);
     }
   };
 
   // 🔥 修改：支持追加加载文章
-const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
+  const fetchCategoryArticles = async (
+    categoryId: number,
+    isLoadMore = false
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-  setLoadingCategories((prev) => [...prev, categoryId]);
+    setLoadingCategories((prev) => [...prev, categoryId]);
 
-  try {
-    const cursor = isLoadMore ? categoryPages[categoryId] : null;
-    let url = `${API_BASE_URL}/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
-    if (cursor) url += `&cursor=${cursor}`;
+    try {
+      const cursor = isLoadMore ? categoryPages[categoryId] : null;
+      let url = `${API_BASE_URL}/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
+      if (cursor) url += `&cursor=${cursor}`;
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const result = await res.json();
-
-    if (result.success && Array.isArray(result.data)) {
-      const newArticles = result.data.map((a: any) => ({
-        id: a.id,
-        title: a.title,
-        category_id: a.category_id,
-      }));
-
-      setCategoryArticles((prev) => {
-        const existing = isLoadMore ? (prev[categoryId] || []) : [];
-        const updated = [...existing, ...newArticles];
-        return { ...prev, [categoryId]: updated };
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      const total = result.meta?.total || 0;
-      const nextCursor = result.meta?.nextCursor || null;
+      const result = await res.json();
 
-      setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
-      setCategoryPages((prev) => ({ ...prev, [categoryId]: nextCursor }));
-      setCategoryHasMore((prev) => ({ ...prev, [categoryId]: !!nextCursor }));
+      if (result.success && Array.isArray(result.data)) {
+        const newArticles = result.data.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          category_id: a.category_id,
+        }));
+
+        setCategoryArticles((prev) => {
+          const existing = isLoadMore ? prev[categoryId] || [] : [];
+          const updated = [...existing, ...newArticles];
+          return { ...prev, [categoryId]: updated };
+        });
+
+        const total = result.meta?.total || 0;
+        const nextCursor = result.meta?.nextCursor || null;
+
+        setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
+        setCategoryPages((prev) => ({ ...prev, [categoryId]: nextCursor }));
+        setCategoryHasMore((prev) => ({ ...prev, [categoryId]: !!nextCursor }));
+      }
+    } catch (err) {
+      console.error(`Error fetching articles for category ${categoryId}:`, err);
+    } finally {
+      setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
     }
-  } catch (err) {
-    console.error(`Error fetching articles for category ${categoryId}:`, err);
-  } finally {
-    setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
-  }
-};
-
+  };
 
   // 🔥 处理加载更多
   const handleLoadMore = (categoryId: number) => {
@@ -147,7 +188,7 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
       setExpandedCategories((prev) => prev.filter((id) => id !== categoryId));
     } else {
       setExpandedCategories((prev) => [...prev, categoryId]);
-      
+
       // 如果还没加载过，初始化加载
       if (!categoryArticles[categoryId]) {
         fetchCategoryArticles(categoryId, false);
@@ -178,6 +219,7 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
           className="sidebar-search"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
         />
       </div>
 
@@ -262,7 +304,9 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
                 >
                   <span className="category-name">
                     {category.name}
-                    {total > 0 && <span className="article-count"> ({total})</span>}
+                    {total > 0 && (
+                      <span className="article-count"> ({total})</span>
+                    )}
                   </span>
                   <span className={`collapse-icon ${isExpanded ? "open" : ""}`}>
                     {isExpanded ? "▼" : "►"}
@@ -284,7 +328,7 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
                             </li>
                           ))}
                         </ul>
-                        
+
                         {/* 🔥 Show More 按钮 */}
                         {hasMore && (
                           <div className="show-more-container">
@@ -296,15 +340,21 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
                               }}
                               disabled={isLoading}
                             >
-                              {isLoading ? "Loading..." : `Show More (${articles.length}/${total})`}
+                              {isLoading
+                                ? "Loading..."
+                                : `Show More (${articles.length}/${total})`}
                             </button>
                           </div>
                         )}
                       </>
                     ) : isLoading ? (
-                      <div className="articles-loading">Loading articles...</div>
+                      <div className="articles-loading">
+                        Loading articles...
+                      </div>
                     ) : (
-                      <div className="articles-empty">No articles in this category</div>
+                      <div className="articles-empty">
+                        No articles in this category
+                      </div>
                     )}
                   </>
                 )}
@@ -322,7 +372,10 @@ const fetchCategoryArticles = async (categoryId: number, isLoadMore = false) => 
     <>
       <div className="mobile-navbar">
         <h2 onClick={() => navigate("/")}>Company Wiki</h2>
-        <button className="hamburger" onClick={() => setMobileOpen(!mobileOpen)}>
+        <button
+          className="hamburger"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
           ☰
         </button>
       </div>

@@ -12,7 +12,6 @@ interface DashboardProps {
 interface Category {
   id: number;
   name: string;
-  slug?: string | null;
   is_active?: number;
   created_by_name?: string | null;
   updated_by_name?: string | null;
@@ -23,7 +22,6 @@ interface Category {
 interface Tag {
   id: number;
   name: string;
-  slug?: string | null;
   is_active?: number;
   created_by_name?: string | null;
   updated_by_name?: string | null;
@@ -49,7 +47,8 @@ const fetchStats = async () => {
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.message || "Failed to fetch articles");
+      if (!result.success)
+        throw new Error(result.message || "Failed to fetch articles");
 
       // 兼容后端格式：data 可能在 result.data 或 result.data.data 里
       const list = Array.isArray(result.data?.data)
@@ -61,7 +60,8 @@ const fetchStats = async () => {
       totalArticles += list.length;
 
       // 更新分页游标
-      nextCursor = result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
+      nextCursor =
+        result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
     } while (nextCursor); // 只要还有下一页就继续
 
     return {
@@ -79,7 +79,6 @@ const fetchStats = async () => {
   }
 };
 
-
 export default function Dashboard({
   currentUser,
   setCurrentUser,
@@ -95,15 +94,20 @@ export default function Dashboard({
   const [catLoading, setCatLoading] = useState(false);
   const [tagLoading, setTagLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [catPagination, setCatPagination] = useState<{ nextCursor: number | null; limit: number }>({
-  nextCursor: null,
-  limit: 20,
-});
-const [tagPagination, setTagPagination] = useState<{ nextCursor: number | null; limit: number }>({
-  nextCursor: null,
-  limit: 20,
-});
-
+  const [catPagination, setCatPagination] = useState<{
+    nextCursor: number | null;
+    limit: number;
+  }>({
+    nextCursor: null,
+    limit: 20,
+  });
+  const [tagPagination, setTagPagination] = useState<{
+    nextCursor: number | null;
+    limit: number;
+  }>({
+    nextCursor: null,
+    limit: 20,
+  });
 
   const setCategory = () => {};
 
@@ -123,97 +127,95 @@ const [tagPagination, setTagPagination] = useState<{ nextCursor: number | null; 
   }, [canManage]);
 
   // ===== 获取分类（仅管理员） =====
-// ✅ 获取 Categories（使用 lastId 分页）
-const fetchCategories = async (lastId?: number) => {
-  try {
-    setCatLoading(true);
-    const token = localStorage.getItem("token");
-    const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
-      lastId ? `&lastId=${lastId}` : ""
-    }`;
+  // ✅ 获取 Categories（使用 lastId 分页）
+  const fetchCategories = async (lastId?: number) => {
+    try {
+      setCatLoading(true);
+      const token = localStorage.getItem("token");
+      const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
+        lastId ? `&lastId=${lastId}` : ""
+      }`;
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const result = await res.json();
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
 
-    if (!result.success) {
-      setMessage(`❌ ${result.message}`);
-      return;
+      if (!result.success) {
+        setMessage(`❌ ${result.message}`);
+        return;
+      }
+
+      const list = Array.isArray(result.data)
+        ? result.data
+        : result.data?.data || [];
+      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+
+      if (lastId) {
+        setCategories((prev) => [...prev, ...list]);
+      } else {
+        setCategories(list);
+      }
+
+      setCatPagination({
+        nextCursor,
+        limit: result.meta?.limit ?? 20,
+      });
+    } catch (err) {
+      console.error("Category fetch error:", err);
+      setMessage("❌ Failed to connect to server.");
+    } finally {
+      setCatLoading(false);
     }
-
-    const list = Array.isArray(result.data) ? result.data : result.data?.data || [];
-    const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
-
-    if (lastId) {
-      setCategories((prev) => [...prev, ...list]);
-    } else {
-      setCategories(list);
-    }
-
-    setCatPagination({
-      nextCursor,
-      limit: result.meta?.limit ?? 20,
-    });
-  } catch (err) {
-    console.error("Category fetch error:", err);
-    setMessage("❌ Failed to connect to server.");
-  } finally {
-    setCatLoading(false);
-  }
-};
-
-
-
+  };
 
   // ===== 获取标签（仅管理员） =====
-// ✅ 获取 Tags（使用 lastId 分页）
-const fetchTags = async (lastId?: number) => {
-  try {
-    setTagLoading(true);
-    const token = localStorage.getItem("token");
-    const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
-      lastId ? `&lastId=${lastId}` : ""
-    }`;
+  // ✅ 获取 Tags（使用 lastId 分页）
+  const fetchTags = async (lastId?: number) => {
+    try {
+      setTagLoading(true);
+      const token = localStorage.getItem("token");
+      const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
+        lastId ? `&lastId=${lastId}` : ""
+      }`;
 
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const result = await res.json();
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
 
-    if (!result.success) {
-      setMessage(`❌ ${result.message}`);
-      return;
+      if (!result.success) {
+        setMessage(`❌ ${result.message}`);
+        return;
+      }
+
+      const list = Array.isArray(result.data)
+        ? result.data
+        : result.data?.data || [];
+      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+
+      if (lastId) {
+        setTags((prev) => [...prev, ...list]);
+      } else {
+        setTags(list);
+      }
+
+      setTagPagination({
+        nextCursor,
+        limit: result.meta?.limit ?? 20,
+      });
+    } catch (err) {
+      console.error("Tag fetch error:", err);
+      setMessage("❌ Failed to connect to server.");
+    } finally {
+      setTagLoading(false);
     }
-
-    const list = Array.isArray(result.data) ? result.data : result.data?.data || [];
-    const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
-
-    if (lastId) {
-      setTags((prev) => [...prev, ...list]);
-    } else {
-      setTags(list);
-    }
-
-    setTagPagination({
-      nextCursor,
-      limit: result.meta?.limit ?? 20,
-    });
-  } catch (err) {
-    console.error("Tag fetch error:", err);
-    setMessage("❌ Failed to connect to server.");
-  } finally {
-    setTagLoading(false);
-  }
-};
-
-
+  };
 
   // ===== 编辑分类 =====
   const handleEditCategory = async (id: number, oldName: string) => {
     const newName = window.prompt("Enter new category name:", oldName);
     if (!newName || newName.trim() === oldName) return;
-
 
     try {
       const token = localStorage.getItem("token");
@@ -232,9 +234,7 @@ const fetchTags = async (lastId?: number) => {
       if (result.success) {
         setMessage(`✅ Category "${newName.trim()}" updated successfully`);
         setCategories((prev) =>
-          prev.map((c) =>
-            c.id === id ? { ...c, name: newName.trim()} : c
-          )
+          prev.map((c) => (c.id === id ? { ...c, name: newName.trim() } : c))
         );
       } else {
         setMessage(`❌ ${result.message || "Failed to update category."}`);
@@ -247,7 +247,8 @@ const fetchTags = async (lastId?: number) => {
 
   // ===== 删除分类 =====
   const handleDeleteCategory = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this category?")) return;
+    if (!window.confirm("Are you sure you want to delete this category?"))
+      return;
 
     try {
       const token = localStorage.getItem("token");
@@ -351,8 +352,6 @@ const fetchTags = async (lastId?: number) => {
     }
   };
 
-
-
   useEffect(() => {
     if (currentUser?.role === "admin") {
       fetchCategories();
@@ -361,19 +360,31 @@ const fetchTags = async (lastId?: number) => {
   }, [currentUser]);
 
   if (!currentUser) {
-    return <div className="dashboard-container">Please login to view the dashboard.</div>;
+    return (
+      <div className="dashboard-container">
+        Please login to view the dashboard.
+      </div>
+    );
   }
 
   if (!canManage) {
     return (
       <div className="layout">
-        <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+        <Sidebar
+          setCategory={setCategory}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+        />
         <div className="main-content-with-sidebar">
           <div className="dashboard-page">
             <div className="access-denied-card">
               <h2>🚫 Access Denied</h2>
-              <p>You do not have the required permissions to view the Dashboard.</p>
-              <p className="user-role">Your role: <span>{currentUser.role}</span></p>
+              <p>
+                You do not have the required permissions to view the Dashboard.
+              </p>
+              <p className="user-role">
+                Your role: <span>{currentUser.role}</span>
+              </p>
             </div>
           </div>
         </div>
@@ -384,7 +395,11 @@ const fetchTags = async (lastId?: number) => {
   if (loading) {
     return (
       <div className="layout">
-        <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+        <Sidebar
+          setCategory={setCategory}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+        />
         <div className="main-content-with-sidebar">
           <div className="dashboard-page">
             <div className="loading-card">
@@ -399,13 +414,20 @@ const fetchTags = async (lastId?: number) => {
 
   return (
     <div className="layout">
-      <Sidebar setCategory={setCategory} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+      <Sidebar
+        setCategory={setCategory}
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+      />
       <div className="main-content-with-sidebar">
         <div className="dashboard-page">
           {/* Header Section */}
           <div className="page-header">
             <h1>Dashboard</h1>
-            <p>Welcome back, {currentUser.username}! Here's your workspace overview.</p>
+            <p>
+              Welcome back, {currentUser.username}! Here's your workspace
+              overview.
+            </p>
           </div>
 
           {/* Stats Grid */}
@@ -439,7 +461,11 @@ const fetchTags = async (lastId?: number) => {
 
           {/* Message Display */}
           {message && (
-            <div className={`message ${message.includes("❌") ? "error" : "success"}`}>
+            <div
+              className={`message ${
+                message.includes("❌") ? "error" : "success"
+              }`}
+            >
               {message}
             </div>
           )}
@@ -451,77 +477,77 @@ const fetchTags = async (lastId?: number) => {
               <div className="management-card">
                 <div className="card-header">
                   <h2>📂 Category Management</h2>
-                    <button 
-                      className="refresh-btn"
-                      onClick={() => fetchCategories()} // ✅ 不传 nextCursor，重新加载第一页
-                    >
-                      🔄 Refresh
-                    </button>
-
+                  <button
+                    className="refresh-btn"
+                    onClick={() => fetchCategories()} // ✅ 不传 nextCursor，重新加载第一页
+                  >
+                    🔄 Refresh
+                  </button>
                 </div>
-                
+
                 <div className="table-container">
                   <table className="management-table">
-                   <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Slug</th>
-                      <th>Status</th>
-                      <th>Created By</th>
-                      <th>Updated By</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.length > 0 ? (
-                      categories.map((cat) => (
-                        <tr key={cat.id}>
-                          <td className="id-cell">#{cat.id}</td>
-                          <td className="name-cell">{cat.name}</td>
-                          <td>{cat.slug || "-"}</td>
-                          <td>
-                            <span
-                              className={`status-badge ${
-                                cat.is_active ? "active" : "inactive"
-                              }`}
-                            >
-                              {cat.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </td>
-                          <td>{cat.created_by_name || "-"}</td>
-                          <td>{cat.updated_by_name || "-"}</td>
-                          <td className="actions-cell">
-                            <button
-                              className="btn-edit"
-                              onClick={() => handleEditCategory(cat.id, cat.name)}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="btn-delete"
-                              onClick={() => handleDeleteCategory(cat.id)}
-                            >
-                              Delete
-                            </button>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Created By</th>
+                        <th>Updated By</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categories.length > 0 ? (
+                        categories.map((cat) => (
+                          <tr key={cat.id}>
+                            <td className="id-cell">#{cat.id}</td>
+                            <td className="name-cell">{cat.name}</td>
+                            <td>
+                              <span
+                                className={`status-badge ${
+                                  cat.is_active ? "active" : "inactive"
+                                }`}
+                              >
+                                {cat.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td>{cat.created_by_name || "-"}</td>
+                            <td>{cat.updated_by_name || "-"}</td>
+                            <td className="actions-cell">
+                              <button
+                                className="btn-edit"
+                                onClick={() =>
+                                  handleEditCategory(cat.id, cat.name)
+                                }
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="btn-delete"
+                                onClick={() => handleDeleteCategory(cat.id)}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="no-data">
+                            No categories found.
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="no-data">
-                          No categories found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-
+                      )}
+                    </tbody>
                   </table>
                   {catPagination.nextCursor && (
                     <div className="loadmore-container">
                       <button
                         className="btn-loadmore"
-                        onClick={() => fetchCategories(catPagination.nextCursor!)}
+                        onClick={() =>
+                          fetchCategories(catPagination.nextCursor!)
+                        }
                         disabled={catLoading}
                       >
                         {catLoading ? "Loading..." : "↓ Load More"}
@@ -535,9 +561,9 @@ const fetchTags = async (lastId?: number) => {
               <div className="management-card">
                 <div className="card-header">
                   <h2>🏷️ Tag Management</h2>
-                  <button 
+                  <button
                     className="refresh-btn"
-                    onClick={() => fetchTags()}  // ✅ 正确：重载第一页
+                    onClick={() => fetchTags()} // ✅ 正确：重载第一页
                     disabled={tagLoading}
                   >
                     {tagLoading ? (
@@ -550,14 +576,13 @@ const fetchTags = async (lastId?: number) => {
                     )}
                   </button>
                 </div>
-                
+
                 <div className="table-container">
                   <table className="management-table">
                     <thead>
                       <tr>
                         <th>ID</th>
                         <th>Name</th>
-                        <th>Slug</th>
                         <th>Status</th>
                         <th>Created By</th>
                         <th>Updated By</th>
@@ -570,10 +595,13 @@ const fetchTags = async (lastId?: number) => {
                           <tr key={tag.id}>
                             <td className="id-cell">#{tag.id}</td>
                             <td className="name-cell">{tag.name}</td>
-                            <td>{tag.slug || "-"}</td>
                             <td>
-                              <span className={`status-badge ${tag.is_active ? 'active' : 'inactive'}`}>
-                                {tag.is_active ? 'Active' : 'Inactive'}
+                              <span
+                                className={`status-badge ${
+                                  tag.is_active ? "active" : "inactive"
+                                }`}
+                              >
+                                {tag.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
                             <td>{tag.created_by_name || "-"}</td>
@@ -614,7 +642,6 @@ const fetchTags = async (lastId?: number) => {
                       </button>
                     </div>
                   )}
-
                 </div>
               </div>
             </div>
@@ -627,21 +654,27 @@ const fetchTags = async (lastId?: number) => {
               <div className="activity-item">
                 <div className="activity-icon">📄</div>
                 <div className="activity-content">
-                  <p><strong>ABC</strong> submitted a new draft</p>
+                  <p>
+                    <strong>ABC</strong> submitted a new draft
+                  </p>
                   <span className="activity-time">2 hours ago</span>
                 </div>
               </div>
               <div className="activity-item">
                 <div className="activity-icon">✅</div>
                 <div className="activity-content">
-                  <p><strong>DEF</strong> approved an article</p>
+                  <p>
+                    <strong>DEF</strong> approved an article
+                  </p>
                   <span className="activity-time">5 hours ago</span>
                 </div>
               </div>
               <div className="activity-item">
                 <div className="activity-icon">📂</div>
                 <div className="activity-content">
-                  <p>New category <strong>HR</strong> created</p>
+                  <p>
+                    New category <strong>HR</strong> created
+                  </p>
                   <span className="activity-time">1 day ago</span>
                 </div>
               </div>
