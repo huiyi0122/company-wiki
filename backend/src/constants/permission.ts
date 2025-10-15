@@ -5,17 +5,18 @@ export const PERMISSIONS = {
   ARTICLE_READ: "article:read",
   ARTICLE_UPDATE: "article:update",
   ARTICLE_DELETE: "article:delete",
-  ARTICLE_DELETE_HARD: "article:delete_hard", // 硬删除
+  ARTICLE_DELETE_HARD: "article:delete_hard",
   CATEGORY_CREATE: "category:create",
   CATEGORY_READ: "category:read",
   CATEGORY_UPDATE: "category:update",
-  CATEGORY_DELETE: "category:delete", // 软删除
-  CATEGORY_DELETE_HARD: "category:delete_hard", // 硬删除
+  CATEGORY_DELETE: "category:delete",
+  CATEGORY_DELETE_HARD: "category:delete_hard",
   TAG_CREATE: "tag:create",
   TAG_READ: "tag:read",
   TAG_UPDATE: "tag:update",
-  TAG_DELETE: "tag:delete", // 软删除
-  TAG_DELETE_HARD: "tag:delete_hard", // 硬删除
+  TAG_DELETE: "tag:delete",
+  TAG_DELETE_HARD: "tag:delete_hard",
+  LOG_READ: "logs:log_read",
 };
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -37,6 +38,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.TAG_DELETE,
     PERMISSIONS.TAG_DELETE_HARD,
     PERMISSIONS.TAG_READ,
+    PERMISSIONS.LOG_READ,
   ],
   editor: [
     PERMISSIONS.USER_EDIT_SELF,

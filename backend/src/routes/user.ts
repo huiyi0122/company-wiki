@@ -12,7 +12,6 @@ const router = Router();
 const ACCESS_SECRET = process.env.JWT_SECRET as string;
 const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
-// --- 生成 Token ---
 function generateAccessToken(user: any) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role },
@@ -32,6 +31,7 @@ router.post(
   async (req: Request, res: Response) => {
     const { username, password, role, email } = req.body;
 
+    // 1️⃣ 基本验证
     if (!username || !password || !role || !email) {
       return res.status(400).json(errorResponse("All fields are required"));
     }
@@ -42,6 +42,7 @@ router.post(
     }
 
     try {
+      // 2️⃣ 检查 username / email 是否已存在
       const [existingRows]: any = await database.query(
         "SELECT * FROM users WHERE username = ? OR email = ?",
         [username, email]
@@ -52,39 +53,37 @@ router.post(
           .json(errorResponse("Username or email already exists"));
       }
 
+      // 3️⃣ 加密密码
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 👇 先创建用户（临时没有 token）
+      // 4️⃣ 创建用户
       const [insertResult]: any = await database.query(
         "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
         [username, email, hashedPassword, role]
       );
 
       const userId = insertResult.insertId;
-      const user = { id: userId, username, role };
 
-      // 👇 再生成 token
+      // ✅ 这里不生成 refresh token 也不存进数据库
+      const user = { id: userId, username, role };
       const accessToken = generateAccessToken(user);
       const refreshToken = generateRefreshToken(user);
 
-      // 👇 存入 refresh token
-      await database.query("UPDATE users SET refresh_token = ? WHERE id = ?", [
-        refreshToken,
-        userId,
-      ]);
-
-      // 👇 返回结果（可选：也可设置 cookie）
+      // ✅ 直接发 cookie（不入 DB）
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
+      // 5️⃣ 返回结果
       return res.status(201).json(
         successResponse({
           message: `User '${username}' enrolled successfully`,
           user: { id: userId, username, email, role },
-          token: accessToken, // Access Token
+          access_token: accessToken,
+          refreshToken: refreshToken,
         })
       );
     } catch (err: any) {
@@ -113,40 +112,31 @@ router.get(
   }
 );
 
-router.put("/:id", authenticate, async (req: Request, res: Response) => {
+router.put("/", authenticate, async (req: Request, res: Response) => {
   const currentUser = (req as any).user;
-  const { id } = req.params;
   const { username, email, password, role } = req.body;
 
-  const isSelf = currentUser.id === Number(id);
-
-  if (currentUser.role !== "admin" && !isSelf) {
-    return res
-      .status(403)
-      .json(errorResponse("Forbidden: You can only edit your own profile"));
-  }
-
-  if (!isSelf && currentUser.role !== "admin") {
-    return res.status(403).json(errorResponse("Forbidden"));
-  }
-
-  if (isSelf && currentUser.role !== "admin") {
-    const { ROLE_PERMISSIONS } = await import("../constants/permission");
-    const rolePermissions = ROLE_PERMISSIONS[currentUser.role] || [];
-    if (!rolePermissions.includes(PERMISSIONS.USER_EDIT_SELF)) {
-      return res.status(403).json(errorResponse("Forbidden"));
-    }
-  }
-
   try {
+    // 只有自己能改自己的资料（非 admin）
+    if (currentUser.role !== "admin") {
+      const { ROLE_PERMISSIONS } = await import("../constants/permission");
+      const rolePermissions = ROLE_PERMISSIONS[currentUser.role] || [];
+
+      if (!rolePermissions.includes(PERMISSIONS.USER_EDIT_SELF)) {
+        return res.status(403).json(errorResponse("Forbidden"));
+      }
+    }
+
+    // 查当前用户是否存在
     const [rows]: any = await database.query(
       "SELECT * FROM users WHERE id = ?",
-      [id]
+      [currentUser.id]
     );
     if (rows.length === 0) {
       return res.status(404).json(errorResponse("User not found"));
     }
 
+    // 动态组装更新字段
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -164,18 +154,17 @@ router.put("/:id", authenticate, async (req: Request, res: Response) => {
       values.push(hashedPassword);
     }
 
+    // 只有 admin 才能改 role
     if (role && currentUser.role === "admin") {
       updates.push("role = ?");
       values.push(role);
     }
 
     if (updates.length === 0) {
-      return res
-        .status(400)
-        .json(errorResponse("You're not allow to edit role!"));
+      return res.status(400).json(errorResponse("No valid fields to update"));
     }
 
-    values.push(id);
+    values.push(currentUser.id);
     await database.query(
       `UPDATE users SET ${updates.join(", ")} WHERE id = ?`,
       values

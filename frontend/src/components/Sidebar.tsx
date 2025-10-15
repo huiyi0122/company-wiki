@@ -21,11 +21,7 @@ interface Article {
   category_id: number;
 }
 
-export default function Sidebar({
-  currentUser,
-  setCurrentUser,
-  setCategory,
-}: SidebarProps) {
+export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,7 +31,6 @@ export default function Sidebar({
   >({});
   const [loadingCategories, setLoadingCategories] = useState<number[]>([]);
 
-  // 🔥 追踪每个分类的分页状态
   const [categoryPages, setCategoryPages] = useState<Record<number, number>>(
     {}
   );
@@ -49,11 +44,10 @@ export default function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const PAGE_SIZE = 8; // 每次加载8个文章
+  const PAGE_SIZE = 8;
 
-  // 🔥 防抖搜索：输入停止3秒后自动搜索（只在 /docs 页面启用）
+  // 🔍 防抖搜索
   useEffect(() => {
-    // 只在 docs 页面才启用自动搜索
     const isDocsPage =
       location.pathname === "/docs" || location.pathname === "/";
     if (!isDocsPage) return;
@@ -62,7 +56,6 @@ export default function Sidebar({
       if (searchTerm.trim()) {
         navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
       } else {
-        // 清空搜索时返回全部文章
         navigate("/docs");
       }
     }, 3000);
@@ -70,12 +63,11 @@ export default function Sidebar({
     return () => clearTimeout(timer);
   }, [searchTerm, navigate, location.pathname]);
 
-  // 🔥 从 URL 同步搜索词到输入框（只在 docs 页面）
+  // 从URL同步搜索词
   useEffect(() => {
     const isDocsPage =
       location.pathname === "/docs" || location.pathname === "/";
     if (!isDocsPage) {
-      // 不在 docs 页面时，清空搜索框
       if (searchTerm) setSearchTerm("");
       return;
     }
@@ -87,54 +79,85 @@ export default function Sidebar({
     }
   }, [location.search, location.pathname]);
 
+  // 🔥 获取分类列表（带 refresh-token 自动续签）
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    const fetchCategories = async () => {
+      const accessToken = localStorage.getItem("accessToken");
+      if (!accessToken) return;
 
-    fetch(`${API_BASE_URL}/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success) {
-          const list = Array.isArray(result.data)
-            ? result.data
-            : Array.isArray(result.data?.data)
-            ? result.data.data
-            : [];
-          setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
+      let response = await fetch(`${API_BASE_URL}/categories`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        credentials: "include",
+      });
+
+      // ❌ Token 过期时尝试刷新
+      if (response.status === 401 || response.status === 403) {
+        console.warn("Access token expired, trying to refresh...");
+
+        const refreshResponse = await fetch(`${API_BASE_URL}/refresh-token`, {
+          method: "POST",
+          credentials: "include", // ✅ 关键，自动附带 cookie
+        });
+
+        const refreshData = await refreshResponse.json();
+
+        if (refreshData.success && refreshData.token) {
+          // ✅ 存新的 access token
+          localStorage.setItem("accessToken", refreshData.token);
+
+          // ✅ 重新发请求
+          response = await fetch(`${API_BASE_URL}/categories`, {
+            headers: { Authorization: `Bearer ${refreshData.token}` },
+            credentials: "include",
+          });
+        } else {
+          console.error("Refresh token failed, please login again.");
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          navigate("/login");
+          return;
         }
-      })
-      .catch((err) => console.error("Error fetching categories:", err));
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        const list = Array.isArray(result.data)
+          ? result.data
+          : Array.isArray(result.data?.data)
+          ? result.data.data
+          : [];
+        setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
+      }
+    };
+
+    fetchCategories();
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     setCurrentUser(null);
     navigate("/login");
     setMobileOpen(false);
   };
 
-  // 🔥 按Enter键立即搜索
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       if (searchTerm.trim()) {
         navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
       } else {
-        // 清空搜索时返回全部文章
         navigate("/docs");
       }
       setMobileOpen(false);
     }
   };
 
-  // 🔥 修改：支持追加加载文章
   const fetchCategoryArticles = async (
     categoryId: number,
     isLoadMore = false
   ) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) return;
 
     setLoadingCategories((prev) => [...prev, categoryId]);
 
@@ -144,7 +167,8 @@ export default function Sidebar({
       if (cursor) url += `&cursor=${cursor}`;
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
+        credentials: "include",
       });
 
       const result = await res.json();
@@ -176,20 +200,16 @@ export default function Sidebar({
     }
   };
 
-  // 🔥 处理加载更多
   const handleLoadMore = (categoryId: number) => {
     fetchCategoryArticles(categoryId, true);
   };
 
   const handleCategoryClick = (categoryId: number) => {
     const isExpanded = expandedCategories.includes(categoryId);
-
     if (isExpanded) {
       setExpandedCategories((prev) => prev.filter((id) => id !== categoryId));
     } else {
       setExpandedCategories((prev) => [...prev, categoryId]);
-
-      // 如果还没加载过，初始化加载
       if (!categoryArticles[categoryId]) {
         fetchCategoryArticles(categoryId, false);
       }
@@ -309,7 +329,7 @@ export default function Sidebar({
                     )}
                   </span>
                   <span className={`collapse-icon ${isExpanded ? "open" : ""}`}>
-                    {isExpanded ? "▼" : "►"}
+                    {isExpanded ? "▼" : "▶"}
                   </span>
                 </div>
 

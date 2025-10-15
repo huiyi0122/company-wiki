@@ -1,9 +1,6 @@
-/* src/styles/Sidebar.css - React Docs Style (Seamless) */
-
-/* ========== 基础侧边栏样式 ========== */
 .sidebar {
-  width: 260px;
-  background: #fff; /* 🔥 透明背景，与页面融为一体 */
+  width: 273px;
+  background: #fff;
   color: #37352f;
   padding: 0;
   height: 100vh;
@@ -13,7 +10,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  border-right: none; /* 🔥 移除边框 */
+  border-right: none;
   z-index: 1000;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica",
     "Apple Color Emoji", sans-serif;
@@ -48,7 +45,7 @@
   padding: 4px 0;
   list-style: none;
   margin: 0;
-  border-bottom: none; /* 🔥 移除分割线 */
+  border-bottom: none;
 }
 
 .main-menu li {
@@ -56,8 +53,8 @@
   margin: 2px 8px;
   cursor: pointer;
   transition: all 0.15s ease;
-  color: rgba(55, 53, 47, 0.7); /* 🔥 稍微降低未激活项的透明度 */
-  font-size: 14px;
+  color: #000;
+  font-size: 15px;
   font-weight: 400;
   list-style: none;
   border-radius: 6px;
@@ -72,7 +69,7 @@
 }
 
 .main-menu li.active {
-  background: rgba(35, 131, 226, 0.08); /* 🔥 更柔和的激活色 */
+  background: rgba(35, 131, 226, 0.08);
   color: #2383e2;
   font-weight: 500;
 }
@@ -106,9 +103,9 @@
 .sidebar-search {
   width: 100%;
   padding: 8px 12px;
-  border-radius: 6px; /* 🔥 稍大的圆角 */
+  border-radius: 6px;
   border: 1px solid rgba(55, 53, 47, 0.12);
-  background: #fffbdd; /* 🔥 更淡的背景 */
+  background: #fffbdd;
   color: #37352f;
   font-size: 14px;
   font-family: inherit;
@@ -119,7 +116,7 @@
   outline: none;
   border-color: #2383e2;
   background: rgba(255, 251, 221, 0.5);
-  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1); /* 🔥 更柔和的阴影 */
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1);
 }
 
 .sidebar-search::placeholder {
@@ -130,7 +127,7 @@
 .categories-section {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 12px 0; /* 🔥 增加上下间距 */
+  padding: 12px 0;
 }
 
 .categories-header {
@@ -158,11 +155,11 @@
 .category-header {
   display: flex;
   align-items: center;
-  padding: 6px 10px; /* 🔥 调整内边距 */
+  padding: 6px 10px;
   margin: 1px 8px;
   cursor: pointer;
   transition: all 0.15s ease;
-  color: rgba(55, 53, 47, 0.7); /* 🔥 统一颜色透明度 */
+  color: rgba(55, 53, 47, 0.7);
   font-size: 14px;
   font-weight: 500;
   border-radius: 6px;
@@ -233,7 +230,7 @@
   padding: 5px 14px 5px 40px;
   margin: 1px 8px;
   font-size: 13px;
-  color: rgba(55, 53, 47, 0.7); /* 🔥 统一透明度 */
+  color: rgba(55, 53, 47, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
@@ -344,7 +341,7 @@
 .sidebar-user {
   margin-top: auto;
   padding: 12px;
-  border-top: 1px solid rgba(55, 53, 47, 0.06); /* 🔥 更淡的分割线 */
+  border-top: 1px solid rgba(55, 53, 47, 0.06);
   background: transparent;
 }
 
@@ -436,7 +433,7 @@
 
 .sidebar::-webkit-scrollbar-thumb,
 .categories-section::-webkit-scrollbar-thumb {
-  background: rgba(55, 53, 47, 0.12); /* 🔥 更淡的滚动条 */
+  background: rgba(55, 53, 47, 0.12);
   border-radius: 3px;
   border: none;
 }

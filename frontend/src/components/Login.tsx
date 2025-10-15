@@ -34,9 +34,9 @@ export default function Login({ setCurrentUser }: LoginProps) {
       }
 
       // ✅ 保存 token
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("accessToken", data.accessToken);
+      localStorage.setItem("refreshToken", data.refreshToken);
 
-      // ✅ 使用后端返回的 user 对象，而不是 jwtDecode
       if (data.user) {
         setCurrentUser({
           id: data.user.id,

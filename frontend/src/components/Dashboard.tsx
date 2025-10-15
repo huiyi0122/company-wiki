@@ -27,30 +27,73 @@ interface Tag {
   updated_by_name?: string | null;
   updated_at?: string | null;
 }
+// 🔥 通用 fetch（自动 refresh token）
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  let accessToken = localStorage.getItem("accessToken");
+
+  let response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: accessToken ? `Bearer ${accessToken}` : "",
+      "Content-Type": "application/json",
+    },
+    credentials: "include", // ✅ 让浏览器自动带 refreshToken cookie
+  });
+
+  // 如果 access token 过期
+  if (response.status === 401 || response.status === 403) {
+    console.warn("⚠️ Access token expired, trying to refresh...");
+
+    const refreshResponse = await fetch(`${API_BASE_URL}/refresh-token`, {
+      method: "POST",
+      credentials: "include", // ✅ 自动带 cookie
+    });
+
+    const refreshData = await refreshResponse.json();
+
+    if (refreshData.success && refreshData.token) {
+      // ✅ 更新新的 access token
+      localStorage.setItem("accessToken", refreshData.token);
+
+      // 🔁 再发一次原本请求
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${refreshData.token}`,
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+    } else {
+      console.error("❌ Refresh token expired, please login again.");
+      localStorage.removeItem("accessToken");
+      window.location.href = "/login";
+      throw new Error("Token expired");
+    }
+  }
+
+  return response;
+}
 
 const fetchStats = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("Missing token");
-
     let totalArticles = 0;
     let nextCursor: number | null = null;
-    const limit = 50; // 每次取 50，减少请求次数
+    const limit = 50;
 
     do {
       const url = `${API_BASE_URL}/articles?limit=${limit}${
         nextCursor ? `&lastId=${nextCursor}` : ""
       }`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const res = await fetchWithAuth(url); // ✅ 用封装的 fetchWithAuth
       const result = await res.json();
+
       if (!result.success)
         throw new Error(result.message || "Failed to fetch articles");
 
-      // 兼容后端格式：data 可能在 result.data 或 result.data.data 里
       const list = Array.isArray(result.data?.data)
         ? result.data.data
         : Array.isArray(result.data)
@@ -58,11 +101,9 @@ const fetchStats = async () => {
         : [];
 
       totalArticles += list.length;
-
-      // 更新分页游标
       nextCursor =
         result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
-    } while (nextCursor); // 只要还有下一页就继续
+    } while (nextCursor);
 
     return {
       totalArticles,
@@ -131,14 +172,11 @@ export default function Dashboard({
   const fetchCategories = async (lastId?: number) => {
     try {
       setCatLoading(true);
-      const token = localStorage.getItem("token");
       const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
         lastId ? `&lastId=${lastId}` : ""
       }`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchWithAuth(url); // ✅
       const result = await res.json();
 
       if (!result.success) {
@@ -149,7 +187,7 @@ export default function Dashboard({
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
-      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+      const nextCursor = result.meta?.nextCursor ?? null;
 
       if (lastId) {
         setCategories((prev) => [...prev, ...list]);
@@ -168,20 +206,18 @@ export default function Dashboard({
       setCatLoading(false);
     }
   };
-
   // ===== 获取标签（仅管理员） =====
-  // ✅ 获取 Tags（使用 lastId 分页）
+  // ✅ 使用 fetchWithAuth 自动带 accessToken + refreshToken
   const fetchTags = async (lastId?: number) => {
     try {
       setTagLoading(true);
-      const token = localStorage.getItem("token");
+
       const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
         lastId ? `&lastId=${lastId}` : ""
       }`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // ✅ 使用 fetchWithAuth，而不是手动 fetch
+      const res = await fetchWithAuth(url);
       const result = await res.json();
 
       if (!result.success) {
@@ -189,10 +225,13 @@ export default function Dashboard({
         return;
       }
 
+      // ✅ 支持后端返回 data 或 data.data 的结构
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
-      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+
+      const nextCursor =
+        result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
 
       if (lastId) {
         setTags((prev) => [...prev, ...list]);
@@ -218,17 +257,16 @@ export default function Dashboard({
     if (!newName || newName.trim() === oldName) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name: newName.trim(),
         }),
       });
+
       const result = await res.json();
 
       if (result.success) {
@@ -251,28 +289,27 @@ export default function Dashboard({
       return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      // ✅ 改成 fetchWithAuth
+      const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       const result = await res.json();
       const msg = result.message || result.error || "";
 
+      // ⚠️ 如果被使用中，提示是否强制删除
       if (!result.success && /used by/i.test(msg)) {
         const forceConfirm = window.confirm(
           "⚠️ This category is still used by some articles.\n\nIf you force delete it, all related articles will have no category.\n\nDo you want to force delete this category?"
         );
+
         if (forceConfirm) {
-          const forceRes = await fetch(
+          const forceRes = await fetchWithAuth(
             `${API_BASE_URL}/categories/${id}?force=true`,
-            {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-            }
+            { method: "DELETE" }
           );
           const forceResult = await forceRes.json();
+
           if (forceResult.success) {
             setMessage(`✅ ${forceResult.message || "Category deleted"}`);
             setCategories((prev) => prev.filter((c) => c.id !== id));
@@ -304,16 +341,16 @@ export default function Dashboard({
     if (!newName || newName.trim() === oldName) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/tags/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ name: newName.trim() }),
       });
+
       const result = await res.json();
+
       if (result.success) {
         setMessage(`✅ Tag updated to "${newName.trim()}"`);
         setTags((prev) =>
@@ -333,11 +370,10 @@ export default function Dashboard({
     if (!window.confirm("Are you sure you want to delete this tag?")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/tags/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
+
       const result = await res.json();
 
       if (result.success) {

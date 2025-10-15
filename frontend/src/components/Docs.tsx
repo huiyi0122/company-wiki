@@ -5,6 +5,77 @@ import { API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
 import "../styles/Docs.css";
 
+// ====================== ✅ 加在最上面：fetchWithAuth 实现 ======================
+async function fetchWithAuth(
+  input: RequestInfo,
+  init?: RequestInit
+): Promise<Response> {
+  const accessToken = localStorage.getItem("accessToken");
+  const refreshToken = localStorage.getItem("refreshToken");
+
+  // ✅ 先带上 access token 发请求
+  const response = await fetch(input, {
+    ...init,
+    credentials: "include",
+    headers: {
+      ...(init?.headers || {}),
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  // ✅ 如果 access token 过期（401）
+  if (response.status === 401 && refreshToken) {
+    try {
+      console.log("🔁 Access token expired, trying refresh...");
+
+      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!refreshRes.ok) throw new Error("Failed to refresh token");
+
+      const refreshData = await refreshRes.json();
+      const newAccessToken = refreshData.accessToken;
+
+      if (newAccessToken) {
+        // ✅ 更新 localStorage
+        localStorage.setItem("token", newAccessToken);
+
+        // ✅ 再重试原本的请求
+        const retryResponse = await fetch(input, {
+          ...init,
+          credentials: "include",
+          headers: {
+            ...(init?.headers || {}),
+            Authorization: `Bearer ${newAccessToken}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        return retryResponse;
+      } else {
+        throw new Error("No new access token received");
+      }
+    } catch (err) {
+      console.error("❌ Token refresh failed:", err);
+      // ❌ refresh token 也失效，强制登出
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      window.location.href = "/login";
+      throw err;
+    }
+  }
+
+  return response;
+}
+// ============================================================================
+
 interface DocsProps {
   currentUser: User | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -17,11 +88,8 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
-
-  // Tab state
   const [activeTab, setActiveTab] = useState<"all" | "my">("all");
 
-  // 📦 分页状态
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalResults, setTotalResults] = useState<number>(0);
@@ -30,14 +98,10 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 📦 加载分类映射
+  // 📦 加载分类映射（✅ 改成 fetchWithAuth）
   const fetchCategories = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetchWithAuth(`${API_BASE_URL}/categories`);
       const result = await res.json();
       if (result.success && Array.isArray(result.data)) {
         const map: Record<number, string> = {};
@@ -49,40 +113,21 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
     }
   };
 
-  /**
-   * 📡 统一的文章获取函数
-   * @param page 页码
-   * @param searchQuery 搜索词
-   * @param categoryId 分类ID
-   */
+  // 📡 获取文章（✅ 改成 fetchWithAuth）
   const fetchDocs = useCallback(
     async (page: number, searchQuery: string, categoryId: string) => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setError("User not logged in.");
-        return;
-      }
-
       setLoading(true);
       setError(null);
 
       try {
         const params = new URLSearchParams();
         params.append("limit", pageSize.toString());
-
-        // 判断是否为搜索模式
         const hasFilters = searchQuery.trim() || categoryId;
 
         let endpoint: string;
-        let articles: any[] = [];
-        let totalVal: number = 0;
-        let pagesVal: number = 1;
-
         if (hasFilters) {
-          // --- 搜索模式：使用 /articles/search ---
           endpoint = "/articles/search";
           params.append("page", page.toString());
-
           if (searchQuery.trim()) {
             if (searchQuery.startsWith("#")) {
               params.append("tags", searchQuery.substring(1).trim());
@@ -94,10 +139,8 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             params.append("category_id", categoryId);
           }
         } else {
-          // --- 普通模式：使用 /articles ---
           endpoint = "/articles";
           params.append("page", page.toString());
-
           if (activeTab === "my" && currentUser?.id) {
             params.append("author_id", currentUser.id.toString());
           }
@@ -106,18 +149,14 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
         const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
         console.log(`📡 Fetching (page ${page}):`, url);
 
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
+        const res = await fetchWithAuth(url);
         if (!res.ok)
           throw new Error(`Failed to fetch articles (${res.status})`);
-        const result = await res.json();
 
-        // 解析响应
-        articles = result.data || [];
-        totalVal = result.meta?.total || articles.length;
-        pagesVal = result.meta?.totalPages || 1;
+        const result = await res.json();
+        const articles = result.data || [];
+        const totalVal = result.meta?.total || articles.length;
+        const pagesVal = result.meta?.totalPages || 1;
 
         setDocs(articles);
         setTotalResults(totalVal);
@@ -133,22 +172,18 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
     [activeTab, currentUser, pageSize]
   );
 
-  // 🏁 初始化分类映射
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  // 🔁 从 URL 读取参数并更新状态
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const cat = params.get("category_id") || "";
     const searchQuery = params.get("q") || "";
-
     setCategory(cat);
     setSearch(searchQuery);
   }, [location.search]);
 
-  // 🔁 当 URL 参数变化时，重置到第一页并重新加载
   useEffect(() => {
     if (Object.keys(categoryMap).length > 0) {
       setCurrentPage(1);
@@ -156,7 +191,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
     }
   }, [search, category, activeTab, categoryMap, fetchDocs]);
 
-  // 📄 页码变化处理
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages && !loading) {
       fetchDocs(newPage, search, category);
@@ -164,7 +198,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
     }
   };
 
-  // 🎨 渲染页码按钮
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
@@ -172,32 +205,28 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
     const maxVisible = 5;
 
     if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i);
-      }
+      for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+    } else if (currentPage <= 3) {
+      pageNumbers.push(1, 2, 3, 4, "...", totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pageNumbers.push(
+        1,
+        "...",
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages
+      );
     } else {
-      if (currentPage <= 3) {
-        pageNumbers.push(1, 2, 3, 4, "...", totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pageNumbers.push(
-          1,
-          "...",
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages
-        );
-      } else {
-        pageNumbers.push(
-          1,
-          "...",
-          currentPage - 1,
-          currentPage,
-          currentPage + 1,
-          "...",
-          totalPages
-        );
-      }
+      pageNumbers.push(
+        1,
+        "...",
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        "...",
+        totalPages
+      );
     }
 
     return (

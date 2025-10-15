@@ -24,6 +24,7 @@ export interface DocItem {
   category?: string; // 后端 JOIN category 时的名称
   author_id?: number;
   author?: string;
+  created_by_name?: string;
   created_at?: string;
   updated_at?: string;
 
@@ -36,14 +37,19 @@ export interface DocItem {
   views?: number;
 }
 
-
 // ===== 权限定义 =====
 export const PERMISSIONS: Record<Role, string[]> = {
-  admin: ["deleteAll", "view", "addCategory", "edit", "save", "category_create"],
+  admin: [
+    "deleteAll",
+    "view",
+    "addCategory",
+    "edit",
+    "save",
+    "category_create",
+  ],
   editor: ["edit", "save", "deleteOwn", "view", "category_create"],
   viewer: ["view"],
 };
-
 
 // ===== 默认分类 =====
 const DEFAULT_CATEGORIES = ["HR", "Tech", "Onboarding"];
