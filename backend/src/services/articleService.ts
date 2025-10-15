@@ -1,11 +1,118 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 import { ensureTags } from "../utils/tagHelper";
+import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { QueryDslQueryContainer } from "@elastic/elasticsearch/lib/api/types";
 
-export async function createArticle(body: any, user: any) {
-  const { title, content, category_id, tags, page = "1", limit = "20" } = body;
+export interface User {
+  id: number;
+  username: string;
+  email?: string;
+  role: "admin" | "editor" | "viewer";
+}
 
-  if (!title && !content) throw new Error("Title and content are required");
+export interface TagObject {
+  id: number;
+  name: string;
+}
+
+export interface CreateArticleBody {
+  title: string;
+  content: string;
+  category_id?: number | null;
+  tags?: string[];
+  page?: string;
+  limit?: string;
+}
+
+export interface UpdateArticleBody extends Partial<CreateArticleBody> {}
+
+export interface Article {
+  id: number;
+  title: string;
+  content: string;
+  category_id?: number | null;
+  category_name?: string;
+  tags: string[];
+  author: string;
+  author_id?: number;
+  created_by?: string;
+  updated_by?: string;
+  is_active: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+}
+
+interface ArticleRow extends RowDataPacket {
+  id: number;
+  title: string;
+  content: string;
+  category_id: number | null;
+  is_active: number;
+  author_id: number;
+  created_at: Date;
+  updated_at: Date;
+  author: string;
+  created_by_name: string;
+  updated_by_name: string;
+  author_name?: string;
+  category_name?: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+interface TagRow extends RowDataPacket {
+  article_id: number;
+  name: string;
+  id?: number;
+}
+
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+
+interface UserRow extends RowDataPacket {
+  created_by_name: string;
+  updated_by_name: string;
+}
+
+// Elasticsearch 响应类型
+interface ESHit {
+  _id: string;
+  _source: {
+    title: string;
+    content: string;
+    category_id: number | null;
+    tags: string[];
+    author_id: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+interface ESSearchResponse {
+  hits: {
+    hits: ESHit[];
+    total: number | { value: number };
+  };
+}
+
+interface SearchParams {
+  queryString?: string;
+  categoryId?: number;
+  tags?: string[];
+  pageNumber: number;
+  pageSize: number;
+}
+
+// ===== 创建文章 =====
+export async function createArticle(
+  body: CreateArticleBody,
+  user: User
+): Promise<Article> {
+  const { title, content, category_id, tags } = body;
+
   if (!title) throw new Error("Title is required");
   if (!content) throw new Error("Content is required");
 
@@ -13,13 +120,17 @@ export async function createArticle(body: any, user: any) {
   await connection.beginTransaction();
 
   try {
-    const [articleResult]: any = await connection.query(
+    const [articleResult] = await connection.query<ResultSetHeader>(
       "INSERT INTO articles (title, content, category_id, author_id, created_by, updated_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [title, content, category_id || null, user.id, user.id, user.id, 1]
+      [title, content, category_id ?? null, user.id, user.id, user.id, 1]
     );
-    const articleId = articleResult.insertId;
+    const articleId: number = articleResult.insertId;
 
-    const allTagObjects = await ensureTags(connection, tags || [], user.id);
+    const allTagObjects: TagObject[] = await ensureTags(
+      connection,
+      tags ?? [],
+      user.id
+    );
     if (allTagObjects.length > 0) {
       const articleTagValues = allTagObjects.map((t) => [articleId, t.id]);
       await connection.query(
@@ -50,7 +161,7 @@ export async function createArticle(body: any, user: any) {
         document: {
           title,
           content,
-          category_id: category_id || null,
+          category_id: category_id ?? null,
           author_id: user.id,
           tags: allTagObjects.map((t) => t.name),
           is_active: true,
@@ -58,7 +169,6 @@ export async function createArticle(body: any, user: any) {
           updated_at: new Date().toISOString(),
         },
       });
-
       console.log(`✅ Synced to Elasticsearch: article ${articleId}`);
     } catch (esErr) {
       console.error("❌ Elasticsearch sync failed:", esErr);
@@ -91,31 +201,30 @@ export async function getArticles(page: number, limit: number) {
   try {
     const offset = (page - 1) * limit;
 
-    const [countRows]: any = await connection.query(
+    const [countRows] = await connection.query<CountRow[]>(
       "SELECT COUNT(*) AS total FROM articles"
     );
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    const [rows]: any = await connection.query(
+    const [rows] = await connection.query<ArticleRow[]>(
       `
-    SELECT 
-  a.id,
-  a.title,
-  a.content,
-  a.category_id,
-  a.is_active,
-  a.created_at,
-  u_author.username AS author,
-  u_created.username AS created_by_name,
-  u_updated.username AS updated_by_name
-FROM articles a
-LEFT JOIN users u_author ON a.author_id = u_author.id
-LEFT JOIN users u_created ON a.created_by = u_created.id
-LEFT JOIN users u_updated ON a.updated_by = u_updated.id
-ORDER BY a.id DESC
-LIMIT ? OFFSET ?
-
+      SELECT 
+        a.id,
+        a.title,
+        a.content,
+        a.category_id,
+        a.is_active,
+        a.created_at,
+        u_author.username AS author,
+        u_created.username AS created_by_name,
+        u_updated.username AS updated_by_name
+      FROM articles a
+      LEFT JOIN users u_author ON a.author_id = u_author.id
+      LEFT JOIN users u_created ON a.created_by = u_created.id
+      LEFT JOIN users u_updated ON a.updated_by = u_updated.id
+      ORDER BY a.id DESC
+      LIMIT ? OFFSET ?
       `,
       [limit, offset]
     );
@@ -127,8 +236,8 @@ LIMIT ? OFFSET ?
       };
     }
 
-    const articleIds = rows.map((r: any) => r.id);
-    const [tagRows]: any = await connection.query(
+    const articleIds = rows.map((r) => r.id);
+    const [tagRows] = await connection.query<TagRow[]>(
       `
       SELECT at.article_id, t.name
       FROM article_tags at
@@ -138,13 +247,13 @@ LIMIT ? OFFSET ?
       [articleIds]
     );
 
-    const tagMap = tagRows.reduce((acc: any, cur: any) => {
+    const tagMap: Record<number, string[]> = tagRows.reduce((acc, cur) => {
       if (!acc[cur.article_id]) acc[cur.article_id] = [];
       acc[cur.article_id].push(cur.name);
       return acc;
-    }, {});
+    }, {} as Record<number, string[]>);
 
-    const data = rows.map((r: any) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       title: r.title,
       content: r.content,
@@ -166,14 +275,6 @@ LIMIT ? OFFSET ?
   }
 }
 
-interface SearchParams {
-  queryString?: string;
-  categoryId?: number;
-  tags?: string[];
-  pageNumber: number;
-  pageSize: number;
-}
-
 export async function searchArticles({
   queryString = "",
   categoryId,
@@ -183,8 +284,8 @@ export async function searchArticles({
 }: SearchParams) {
   const from = (pageNumber - 1) * pageSize;
 
-  const must: any[] = [];
-  const filter: any[] = [{ term: { is_active: true } }];
+  const must: QueryDslQueryContainer[] = [];
+  const filter: QueryDslQueryContainer[] = [{ term: { is_active: true } }];
 
   if (queryString) {
     const trimmedQuery = queryString.trim();
@@ -240,18 +341,22 @@ export async function searchArticles({
   const totalHits =
     typeof searchResponse.hits.total === "number"
       ? searchResponse.hits.total
-      : searchResponse.hits.total?.value || 0;
+      : (searchResponse.hits.total as { value: number })?.value || 0;
 
-  const data = hits.map((hit: any) => ({
-    id: parseInt(hit._id, 10),
-    title: hit._source.title,
-    content: hit._source.content,
-    category_id: hit._source.category_id,
-    tags: Array.isArray(hit._source.tags) ? hit._source.tags : [],
-    author_id: hit._source.author_id,
-    is_active: !!hit._source.is_active,
-    created_at: hit._source.created_at,
-    updated_at: hit._source.updated_at,
+  const data = hits.map((hit) => ({
+    id: parseInt(hit._id as string, 10),
+    title: (hit._source as Record<string, unknown>)?.title as string,
+    content: (hit._source as Record<string, unknown>)?.content as string,
+    category_id: (hit._source as Record<string, unknown>)?.category_id as
+      | number
+      | null,
+    tags: Array.isArray((hit._source as Record<string, unknown>)?.tags)
+      ? ((hit._source as Record<string, unknown>)?.tags as string[])
+      : [],
+    author_id: (hit._source as Record<string, unknown>)?.author_id as number,
+    is_active: !!(hit._source as Record<string, unknown>)?.is_active,
+    created_at: (hit._source as Record<string, unknown>)?.created_at as string,
+    updated_at: (hit._source as Record<string, unknown>)?.updated_at as string,
   }));
 
   const totalPages = Math.ceil(totalHits / pageSize);
@@ -267,8 +372,8 @@ export async function searchArticles({
   };
 }
 
-export async function getArticleById(id: number, user: any) {
-  const [rows]: any = await database.query(
+export async function getArticleById(id: number, user: User) {
+  const [rows] = await database.query<ArticleRow[]>(
     `
     SELECT 
       a.id,
@@ -303,7 +408,7 @@ export async function getArticleById(id: number, user: any) {
     throw new Error("FORBIDDEN_VIEW");
   }
 
-  const [tagRows]: any = await database.query(
+  const [tagRows] = await database.query<TagRow[]>(
     `
     SELECT t.name
     FROM article_tags at
@@ -313,7 +418,7 @@ export async function getArticleById(id: number, user: any) {
     [id]
   );
 
-  const tags = tagRows.map((t: any) => t.name);
+  const tags = tagRows.map((t) => t.name);
 
   return {
     id: article.id,
@@ -322,21 +427,25 @@ export async function getArticleById(id: number, user: any) {
     category_id: article.category_id,
     category_name: article.category_name,
     tags,
-    author: article.author_name,
+    author: article.author_name || "Unknown",
     created_by: article.created_by_name,
     updated_by: article.updated_by_name,
     is_active: Boolean(article.is_active),
   };
 }
 
-export async function updateArticle(id: string, body: any, user: any) {
+export async function updateArticle(
+  id: string,
+  body: UpdateArticleBody,
+  user: User
+) {
   const { title, content, category_id, tags } = body;
 
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    const [originalRows]: any = await connection.query(
+    const [originalRows] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
@@ -345,21 +454,22 @@ export async function updateArticle(id: string, body: any, user: any) {
     }
     const original = originalRows[0];
 
-    const [origTagRows]: any = await connection.query(
+    const [origTagRows] = await connection.query<TagRow[]>(
       "SELECT t.id, t.name FROM tags t JOIN article_tags at ON t.id = at.tag_id WHERE at.article_id = ?",
       [id]
     );
-    const originalTagObjects: { id: number; name: string }[] =
-      origTagRows || [];
+    const originalTagObjects: TagObject[] = origTagRows.map((t) => ({
+      id: t.id!,
+      name: t.name,
+    }));
 
-    const [userRows]: any = await connection.query(
+    const [userRows] = await connection.query<UserRow[]>(
       `SELECT 
-      u_created.username AS created_by_name,
-      u_updated.username AS updated_by_name
-    FROM users u_created
-    JOIN users u_updated
-      ON 1=1
-    WHERE u_created.id = ? AND u_updated.id = ?`,
+        u_created.username AS created_by_name,
+        u_updated.username AS updated_by_name
+      FROM users u_created
+      JOIN users u_updated ON 1=1
+      WHERE u_created.id = ? AND u_updated.id = ?`,
       [original.created_by, original.updated_by]
     );
 
@@ -375,6 +485,7 @@ export async function updateArticle(id: string, body: any, user: any) {
           ? null
           : category_id
         : original.category_id;
+
     const allowedFields = ["title", "content", "category_id", "tags"];
     const invalidFields = Object.keys(body).filter(
       (key) => !allowedFields.includes(key)
@@ -383,7 +494,7 @@ export async function updateArticle(id: string, body: any, user: any) {
       throw new Error(`Invalid fields: ${invalidFields.join(", ")}`);
     }
 
-    let finalTagObjects: { id: number; name: string }[] = originalTagObjects;
+    let finalTagObjects: TagObject[] = originalTagObjects;
 
     if (typeof tags !== "undefined") {
       if (!Array.isArray(tags)) {
@@ -411,7 +522,7 @@ export async function updateArticle(id: string, body: any, user: any) {
     }
 
     const fields: string[] = [];
-    const params: any[] = [];
+    const params: (string | number | null)[] = [];
 
     if (typeof title !== "undefined") {
       fields.push("title = ?");
@@ -454,31 +565,9 @@ export async function updateArticle(id: string, body: any, user: any) {
         }),
       ]
     );
-    console.log("🔍 Updating ES with document:", {
-      index: "articles",
-      id: id.toString(),
-      refresh: true,
-      title: updatedTitle,
-      content: updatedContent,
-      category_id: updatedCategory,
-      tags: finalTagObjects.map((t) => t.name),
-    });
-
-    await connection.query(
-      "UPDATE articles SET last_activity = ? WHERE id = ?",
-      ["UPDATE", id]
-    );
 
     try {
-      console.log("🟡 Preparing to update Elasticsearch:", {
-        id,
-        title,
-        content,
-        category_id,
-        tags: finalTagObjects.map((t) => t.name),
-      });
-
-      const result = await esClient.index({
+      await esClient.index({
         index: "articles",
         id: id.toString(),
         refresh: true,
@@ -495,8 +584,7 @@ export async function updateArticle(id: string, body: any, user: any) {
           updated_at: new Date().toISOString(),
         },
       });
-
-      console.log("🟢 Elasticsearch response:", result);
+      console.log("✅ Elasticsearch updated");
     } catch (esErr) {
       console.error("❌ Elasticsearch update failed:", esErr);
     }
@@ -522,12 +610,12 @@ export async function updateArticle(id: string, body: any, user: any) {
   }
 }
 
-export async function deleteArticle(articleId: number, user: any) {
+export async function deleteArticle(articleId: number, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    const [articles]: any = await connection.query(
+    const [articles] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [articleId]
     );
@@ -586,12 +674,12 @@ export async function deleteArticle(articleId: number, user: any) {
   }
 }
 
-export async function restoreArticle(id: string, user: any) {
+export async function restoreArticle(id: string, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    const [rows]: any = await connection.query(
+    const [rows] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
@@ -645,12 +733,12 @@ export async function restoreArticle(id: string, user: any) {
   }
 }
 
-export async function hardDeleteArticle(id: string, user: any) {
+export async function hardDeleteArticle(id: string, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    const [articles]: any = await connection.query(
+    const [articles] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );

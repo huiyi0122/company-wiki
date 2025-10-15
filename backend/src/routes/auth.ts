@@ -11,16 +11,16 @@ import { successResponse, errorResponse } from "../utils/response";
 const router = Router();
 router.use(cookieParser());
 
-// === JWT Secret Key ===
+//  JWT Secret Key
 const ACCESS_SECRET = process.env.JWT_SECRET as string;
 const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
-// === Token generator ===
+// Token generator
 function generateAccessToken(user: any) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role },
     ACCESS_SECRET,
-    { expiresIn: "1h" } // Access token 有效期 1 小时
+    { expiresIn: "1h" }
   );
 }
 
@@ -32,7 +32,7 @@ function generateRefreshToken(user: any) {
   );
 }
 
-// === LOGIN ===
+//  LOGIN
 router.post("/login", async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -49,22 +49,29 @@ router.post("/login", async (req: Request, res: Response) => {
     if (!passwordMatches)
       return res.status(401).json(errorResponse("Wrong password"));
 
-    // ✅ Generate tokens
+    // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // ✅ Send refresh token via HttpOnly cookie
+    //Send both tokens via HttpOnly cookies
+    const isProd = process.env.NODE_ENV === "production";
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000, // 15分钟
+    });
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7天
     });
 
+    //不返回 tokens 到 body
     res.json(
       successResponse({
-        accessToken, // ✅ 改名更清晰
-        refreshToken, // ✅ 新增
         user: { id: user.id, username: user.username, role: user.role },
       })
     );
@@ -74,17 +81,14 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-// === REFRESH TOKEN ===
 router.post("/refresh-token", async (req: Request, res: Response) => {
   try {
     const oldToken = req.cookies.refreshToken;
     if (!oldToken)
       return res.status(401).json(errorResponse("No refresh token found"));
 
-    // ✅ Verify refresh token (no need to check DB)
     const payload: any = jwt.verify(oldToken, REFRESH_SECRET);
 
-    // ✅ Get user info from DB (in case user is deleted)
     const [rows]: any = await database.query(
       "SELECT * FROM users WHERE id = ?",
       [payload.id]
@@ -93,19 +97,32 @@ router.post("/refresh-token", async (req: Request, res: Response) => {
     if (!user)
       return res.status(403).json(errorResponse("User no longer exists"));
 
-    // ✅ Create new tokens
+    //生成新的 token
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
 
-    // ✅ Set new refresh cookie
-    res.cookie("refreshToken", newRefreshToken, {
+    const isProd = process.env.NODE_ENV === "production";
+
+    res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000, // 15分钟
     });
 
-    res.json(successResponse({ token: newAccessToken }));
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7天
+    });
+
+    //不返回 token 到 body
+    res.json(
+      successResponse({
+        user: { id: user.id, username: user.username, role: user.role },
+      })
+    );
   } catch (err: any) {
     console.error("Refresh token error:", err);
     res
@@ -118,6 +135,7 @@ router.post("/refresh-token", async (req: Request, res: Response) => {
 
 // === LOGOUT ===
 router.post("/logout", (req: Request, res: Response) => {
+  res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
   res.json(successResponse({ message: "Logged out successfully" }));
 });

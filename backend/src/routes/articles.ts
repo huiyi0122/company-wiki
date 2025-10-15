@@ -36,13 +36,15 @@ router.get(
   "/",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_READ),
+
   async (req: Request, res: Response) => {
     try {
       const page = Math.max(parseInt(req.query.page as string) || 1, 1);
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
 
       const result = await getArticles(page, limit); // 👈 改参数
-
+      res.clearCookie("accessToken");
+      res.clearCookie("refreshToken");
       res.json(successResponse(result));
     } catch (err: any) {
       console.error("GET /articles error:", err);
