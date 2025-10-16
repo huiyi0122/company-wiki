@@ -15,10 +15,10 @@ app.use(express.json());
 // CORS 配置 - localStorage 不需要 credentials
 app.use(
   cors({
-    origin: "http://192.168.0.44:5173",
-    credentials: false, // 改为 false，因为用 localStorage 而不是 cookies
+    origin: "http://localhost:5173",
+    credentials: false,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"], // 添加 Authorization header
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
