@@ -24,6 +24,7 @@ export default function Login({ setCurrentUser }: LoginProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
+        credentials: "include", // ✅ 必须加，发送和接收 cookie
       });
 
       const data = await res.json();
@@ -32,10 +33,6 @@ export default function Login({ setCurrentUser }: LoginProps) {
         console.error("Invalid username or password!");
         return;
       }
-
-      // ✅ 保存 token
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
 
       if (data.user) {
         setCurrentUser({

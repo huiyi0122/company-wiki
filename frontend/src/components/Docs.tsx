@@ -6,67 +6,54 @@ import type { User, DocItem } from "./CommonTypes";
 import "../styles/Docs.css";
 
 // ====================== ✅ 加在最上面：fetchWithAuth 实现 ======================
+// ✅ 完全使用 Cookie 模式，不依赖 localStorage 或 Authorization header
 async function fetchWithAuth(
   input: RequestInfo,
   init?: RequestInit
 ): Promise<Response> {
-  const accessToken = localStorage.getItem("accessToken");
-  const refreshToken = localStorage.getItem("refreshToken");
-
-  // ✅ 先带上 access token 发请求
+  // 第一次请求，自动带 cookie
   const response = await fetch(input, {
     ...init,
-    credentials: "include",
+    credentials: "include", // 🔥 必须加
     headers: {
       ...(init?.headers || {}),
-      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
   });
 
-  // ✅ 如果 access token 过期（401）
-  if (response.status === 401 && refreshToken) {
-    try {
-      console.log("🔁 Access token expired, trying refresh...");
+  // 如果 accessToken 过期（401）
+  if (response.status === 401) {
+    console.log("🔁 Access token expired, trying to refresh...");
 
-      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    try {
+      // 请求后端刷新 token（cookie 会自动带上 refreshToken）
+      const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include", // 🔥 必须
       });
 
-      if (!refreshRes.ok) throw new Error("Failed to refresh token");
-
-      const refreshData = await refreshRes.json();
-      const newAccessToken = refreshData.accessToken;
-
-      if (newAccessToken) {
-        // ✅ 更新 localStorage
-        localStorage.setItem("token", newAccessToken);
-
-        // ✅ 再重试原本的请求
-        const retryResponse = await fetch(input, {
-          ...init,
-          credentials: "include",
-          headers: {
-            ...(init?.headers || {}),
-            Authorization: `Bearer ${newAccessToken}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        return retryResponse;
-      } else {
-        throw new Error("No new access token received");
+      if (!refreshRes.ok) {
+        console.error("❌ Refresh token failed, redirect to login");
+        return response;
       }
+
+      console.log(
+        "✅ Token refreshed successfully, retrying original request..."
+      );
+
+      // 再重试一次原始请求
+      const retryResponse = await fetch(input, {
+        ...init,
+        credentials: "include",
+        headers: {
+          ...(init?.headers || {}),
+          "Content-Type": "application/json",
+        },
+      });
+
+      return retryResponse;
     } catch (err) {
-      console.error("❌ Token refresh failed:", err);
-      // ❌ refresh token 也失效，强制登出
-      localStorage.removeItem("token");
-      localStorage.removeItem("refreshToken");
+      console.error("❌ Refresh process failed:", err);
       window.location.href = "/login";
       throw err;
     }
@@ -74,6 +61,7 @@ async function fetchWithAuth(
 
   return response;
 }
+
 // ============================================================================
 
 interface DocsProps {

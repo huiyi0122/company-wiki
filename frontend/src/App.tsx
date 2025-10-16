@@ -1,129 +1,141 @@
-// src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useState, useEffect } from "react";
-import { jwtDecode } from "jwt-decode";
-import type { User, JWTPayload } from "./components/CommonTypes";
+import type { User } from "./components/CommonTypes";
 import Login from "./components/Login";
 import Docs from "./components/Docs";
 import DocDetail from "./components/DocDetail";
 import EditorPage from "./components/EditorPage";
 import Dashboard from "./components/Dashboard";
-import EnrollPage from "./components/EnrollPage";
-import ProfilePage from "./components/ProfilePage";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./styles/App.css";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    try {
-      const decoded = jwtDecode<JWTPayload>(token);
-      if (decoded.exp * 1000 > Date.now()) {
-        setCurrentUser({
-          id: decoded.id,
-          username: decoded.username,
-            email: "",  // ✅ 新增默认值
-          role: decoded.role,
+    // 检查是否已经登录（根据 cookie）
+    const checkLogin = async () => {
+      try {
+        const res = await fetch("http://192.168.0.206:3000/me", {
+          credentials: "include", // ⭐ 带上 cookie
         });
-      } else {
-        localStorage.removeItem("token");
+
+        const data = await res.json();
+
+        if (res.ok && data.success && data.user) {
+          setCurrentUser({
+            id: data.user.id,
+            username: data.user.username,
+            role: data.user.role,
+          });
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (err) {
+        console.error("❌ Failed to check login:", err);
+        setCurrentUser(null);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      localStorage.removeItem("token");
-    }
+    };
+
+    checkLogin();
   }, []);
+
+  if (loading) return <div className="loading">Loading...</div>;
 
   return (
     <Router>
       <Routes>
-        {/* 默认跳转到登录 */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* 登录页 */}
+        {/* 如果已登录，访问 /login 会跳去 /dashboard */}
         <Route
           path="/login"
-          element={<Login setCurrentUser={setCurrentUser} />}
-        />
-
-        {/* 仪表盘 */}
-        <Route
-          path="/dashboard"
           element={
-            <Dashboard
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
+            currentUser ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Login setCurrentUser={setCurrentUser} />
+            )
           }
         />
 
-        {/* 文章系统 */}
+        {/* 登录后才能进 Dashboard */}
+        <Route
+          path="/dashboard"
+          element={
+            currentUser ? (
+              <Dashboard
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        {/* 文档相关页面 */}
         <Route
           path="/docs"
           element={
-            <Docs
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
+            currentUser ? (
+              <Docs currentUser={currentUser} setCurrentUser={setCurrentUser} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
         <Route
           path="/docs/:id"
           element={
-            <DocDetail
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
+            currentUser ? (
+              <DocDetail
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
-
-        {/* 编辑器 */}
         <Route
           path="/editor"
           element={
-            <EditorPage
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
+            currentUser ? (
+              <EditorPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
         <Route
           path="/editor/:id"
           element={
-            <EditorPage
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
+            currentUser ? (
+              <EditorPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
 
-        {/* 用户注册（仅 admin 可见） */}
-        <Route
-          path="/enroll"
-          element={
-            <EnrollPage
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
-          }
-        />
-
-        {/* ✅ 用户资料页 */}
-        <Route
-          path="/profile"
-          element={
-            <ProfilePage
-              currentUser={currentUser}
-              setCurrentUser={setCurrentUser}
-            />
-          }
-        />
+        {/* 默认重定向 */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
 
-      {/* Toast 通知容器 */}
       <ToastContainer position="top-right" autoClose={3000} />
     </Router>
   );

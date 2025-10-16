@@ -7,6 +7,8 @@ export const authenticate = (
   res: Response,
   next: NextFunction
 ) => {
+  console.log("Authenticate middleware hit, token:", req.cookies.accessToken);
+
   const token = req.cookies.accessToken;
   if (!token) {
     return res.status(401).json(errorResponse("Missing token"));

@@ -27,83 +27,94 @@ interface Tag {
   updated_by_name?: string | null;
   updated_at?: string | null;
 }
-// 🔥 通用 fetch（自动 refresh token）
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  let accessToken = localStorage.getItem("accessToken");
 
-  let response = await fetch(url, {
-    ...options,
+// 🔥 通用 fetch（用 cookie 自动认证）
+// utils/fetchWithAuth.ts
+export async function fetchWithAuth(
+  input: RequestInfo,
+  init: RequestInit = {}
+) {
+  // 确保每次请求都带 cookie
+  const opts: RequestInit = {
+    ...init,
+    credentials: "include",
     headers: {
-      ...(options.headers || {}),
-      Authorization: accessToken ? `Bearer ${accessToken}` : "",
+      ...(init?.headers || {}),
       "Content-Type": "application/json",
     },
-    credentials: "include", // ✅ 让浏览器自动带 refreshToken cookie
-  });
+  };
 
-  // 如果 access token 过期
-  if (response.status === 401 || response.status === 403) {
-    console.warn("⚠️ Access token expired, trying to refresh...");
+  // 发请求
+  let res = await fetch(input, opts);
 
-    const refreshResponse = await fetch(`${API_BASE_URL}/refresh-token`, {
+  // 如果 401 -> 尝试刷新 token（refresh endpoint 会 set-cookie）
+  if (res.status === 401) {
+    console.log("Access token expired — attempting refresh...");
+    const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
       method: "POST",
-      credentials: "include", // ✅ 自动带 cookie
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
     });
 
-    const refreshData = await refreshResponse.json();
-
-    if (refreshData.success && refreshData.token) {
-      // ✅ 更新新的 access token
-      localStorage.setItem("accessToken", refreshData.token);
-
-      // 🔁 再发一次原本请求
-      response = await fetch(url, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          Authorization: `Bearer ${refreshData.token}`,
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-    } else {
-      console.error("❌ Refresh token expired, please login again.");
-      localStorage.removeItem("accessToken");
+    if (!refreshRes.ok) {
+      // 刷新失败：跳转登录或处理登出
+      console.error("Refresh failed, redirecting to login");
       window.location.href = "/login";
-      throw new Error("Token expired");
+      throw new Error("Refresh failed");
     }
+
+    // 刷新成功（后端已 set-cookie 新的 accessToken）
+    // 重新发原请求一次
+    res = await fetch(input, opts);
   }
 
-  return response;
+  return res;
+}
+
+// 🔥 获取当前登录用户（通过 cookie）
+async function fetchCurrentUser(): Promise<User | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/protected`, {
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      console.log("User not authenticated");
+      return null;
+    }
+
+    const data = await res.json();
+    return data.data?.user || null;
+  } catch (err) {
+    console.error("❌ Failed to fetch current user:", err);
+    return null;
+  }
 }
 
 const fetchStats = async () => {
   try {
     let totalArticles = 0;
-    let nextCursor: number | null = null;
+    let page = 1;
     const limit = 50;
+    let hasMore = true;
 
-    do {
-      const url = `${API_BASE_URL}/articles?limit=${limit}${
-        nextCursor ? `&lastId=${nextCursor}` : ""
-      }`;
-
-      const res = await fetchWithAuth(url); // ✅ 用封装的 fetchWithAuth
+    while (hasMore) {
+      const url = `${API_BASE_URL}/articles?page=${page}&limit=${limit}`;
+      const res = await fetchWithAuth(url);
       const result = await res.json();
 
-      if (!result.success)
-        throw new Error(result.message || "Failed to fetch articles");
+      if (!result.success) {
+        console.error("Failed to fetch articles:", result.message);
+        break;
+      }
 
-      const list = Array.isArray(result.data?.data)
-        ? result.data.data
-        : Array.isArray(result.data)
-        ? result.data
-        : [];
-
+      const list = Array.isArray(result.data) ? result.data : [];
       totalArticles += list.length;
-      nextCursor =
-        result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
-    } while (nextCursor);
+
+      // 如果返回的数据少于 limit，说明没有更多了
+      hasMore = list.length === limit;
+      page++;
+    }
 
     return {
       totalArticles,
@@ -135,25 +146,31 @@ export default function Dashboard({
   const [catLoading, setCatLoading] = useState(false);
   const [tagLoading, setTagLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [catPagination, setCatPagination] = useState<{
-    nextCursor: number | null;
-    limit: number;
-  }>({
-    nextCursor: null,
-    limit: 20,
-  });
-  const [tagPagination, setTagPagination] = useState<{
-    nextCursor: number | null;
-    limit: number;
-  }>({
-    nextCursor: null,
-    limit: 20,
-  });
+
+  const [catPage, setCatPage] = useState(1);
+  const [tagPage, setTagPage] = useState(1);
+  const [catHasMore, setCatHasMore] = useState(true);
+  const [tagHasMore, setTagHasMore] = useState(true);
 
   const setCategory = () => {};
 
   const canManage =
     currentUser && PERMISSIONS[currentUser.role].includes("edit");
+
+  // 🔥 页面加载时获取用户
+  useEffect(() => {
+    const initUser = async () => {
+      if (!currentUser) {
+        const user = await fetchCurrentUser();
+        if (!user) {
+          window.location.href = "/login";
+          return;
+        }
+        setCurrentUser(user);
+      }
+    };
+    initUser();
+  }, [currentUser, setCurrentUser]);
 
   useEffect(() => {
     if (canManage) {
@@ -168,37 +185,34 @@ export default function Dashboard({
   }, [canManage]);
 
   // ===== 获取分类（仅管理员） =====
-  // ✅ 获取 Categories（使用 lastId 分页）
-  const fetchCategories = async (lastId?: number) => {
+  const fetchCategories = async (
+    pageNum: number = 1,
+    append: boolean = false
+  ) => {
     try {
       setCatLoading(true);
-      const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
-        lastId ? `&lastId=${lastId}` : ""
-      }`;
 
-      const res = await fetchWithAuth(url); // ✅
+      const url = `${API_BASE_URL}/categories?page=${pageNum}&limit=20`;
+      const res = await fetchWithAuth(url);
       const result = await res.json();
 
       if (!result.success) {
-        setMessage(`❌ ${result.message}`);
+        setMessage(`❌ ${result.message || "Failed to fetch categories."}`);
         return;
       }
 
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
-      const nextCursor = result.meta?.nextCursor ?? null;
 
-      if (lastId) {
+      if (append) {
         setCategories((prev) => [...prev, ...list]);
       } else {
         setCategories(list);
       }
 
-      setCatPagination({
-        nextCursor,
-        limit: result.meta?.limit ?? 20,
-      });
+      setCatHasMore(list.length === 20);
+      setCatPage(pageNum);
     } catch (err) {
       console.error("Category fetch error:", err);
       setMessage("❌ Failed to connect to server.");
@@ -206,43 +220,33 @@ export default function Dashboard({
       setCatLoading(false);
     }
   };
+
   // ===== 获取标签（仅管理员） =====
-  // ✅ 使用 fetchWithAuth 自动带 accessToken + refreshToken
-  const fetchTags = async (lastId?: number) => {
+  const fetchTags = async (pageNum: number = 1, append: boolean = false) => {
     try {
       setTagLoading(true);
 
-      const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
-        lastId ? `&lastId=${lastId}` : ""
-      }`;
-
-      // ✅ 使用 fetchWithAuth，而不是手动 fetch
+      const url = `${API_BASE_URL}/tags?page=${pageNum}&limit=20`;
       const res = await fetchWithAuth(url);
       const result = await res.json();
 
       if (!result.success) {
-        setMessage(`❌ ${result.message}`);
+        setMessage(`❌ ${result.message || "Failed to fetch tags."}`);
         return;
       }
 
-      // ✅ 支持后端返回 data 或 data.data 的结构
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
 
-      const nextCursor =
-        result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
-
-      if (lastId) {
+      if (append) {
         setTags((prev) => [...prev, ...list]);
       } else {
         setTags(list);
       }
 
-      setTagPagination({
-        nextCursor,
-        limit: result.meta?.limit ?? 20,
-      });
+      setTagHasMore(list.length === 20);
+      setTagPage(pageNum);
     } catch (err) {
       console.error("Tag fetch error:", err);
       setMessage("❌ Failed to connect to server.");
@@ -259,12 +263,7 @@ export default function Dashboard({
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newName.trim(),
-        }),
+        body: JSON.stringify({ name: newName.trim() }),
       });
 
       const result = await res.json();
@@ -289,7 +288,6 @@ export default function Dashboard({
       return;
 
     try {
-      // ✅ 改成 fetchWithAuth
       const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "DELETE",
       });
@@ -297,7 +295,6 @@ export default function Dashboard({
       const result = await res.json();
       const msg = result.message || result.error || "";
 
-      // ⚠️ 如果被使用中，提示是否强制删除
       if (!result.success && /used by/i.test(msg)) {
         const forceConfirm = window.confirm(
           "⚠️ This category is still used by some articles.\n\nIf you force delete it, all related articles will have no category.\n\nDo you want to force delete this category?"
@@ -330,7 +327,7 @@ export default function Dashboard({
         setMessage(`❌ ${msg || "Failed to delete category."}`);
       }
     } catch (err) {
-      console.error("Delete error:", err);
+      console.error("Delete category error:", err);
       setMessage("❌ Server connection failed.");
     }
   };
@@ -343,9 +340,6 @@ export default function Dashboard({
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/tags/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ name: newName.trim() }),
       });
 
@@ -390,15 +384,16 @@ export default function Dashboard({
 
   useEffect(() => {
     if (currentUser?.role === "admin") {
-      fetchCategories();
-      fetchTags();
+      fetchCategories(1);
+      fetchTags(1);
     }
   }, [currentUser]);
 
   if (!currentUser) {
     return (
       <div className="dashboard-container">
-        Please login to view the dashboard.
+        <div className="loading-spinner"></div>
+        <p>Loading user information...</p>
       </div>
     );
   }
@@ -515,9 +510,10 @@ export default function Dashboard({
                   <h2>📂 Category Management</h2>
                   <button
                     className="refresh-btn"
-                    onClick={() => fetchCategories()} // ✅ 不传 nextCursor，重新加载第一页
+                    onClick={() => fetchCategories(1, false)}
+                    disabled={catLoading}
                   >
-                    🔄 Refresh
+                    {catLoading ? "Loading..." : "🔄 Refresh"}
                   </button>
                 </div>
 
@@ -570,20 +566,18 @@ export default function Dashboard({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={7} className="no-data">
+                          <td colSpan={6} className="no-data">
                             No categories found.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
-                  {catPagination.nextCursor && (
+                  {catHasMore && (
                     <div className="loadmore-container">
                       <button
                         className="btn-loadmore"
-                        onClick={() =>
-                          fetchCategories(catPagination.nextCursor!)
-                        }
+                        onClick={() => fetchCategories(catPage + 1, true)}
                         disabled={catLoading}
                       >
                         {catLoading ? "Loading..." : "↓ Load More"}
@@ -599,17 +593,10 @@ export default function Dashboard({
                   <h2>🏷️ Tag Management</h2>
                   <button
                     className="refresh-btn"
-                    onClick={() => fetchTags()} // ✅ 正确：重载第一页
+                    onClick={() => fetchTags(1, false)}
                     disabled={tagLoading}
                   >
-                    {tagLoading ? (
-                      <>
-                        <span className="loading-spinner-small"></span>
-                        Refreshing...
-                      </>
-                    ) : (
-                      "🔄 Refresh"
-                    )}
+                    {tagLoading ? "Loading..." : "🔄 Refresh"}
                   </button>
                 </div>
 
@@ -660,18 +647,18 @@ export default function Dashboard({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="no-data">
+                          <td colSpan={6} className="no-data">
                             No tags found.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
-                  {tagPagination.nextCursor && (
+                  {tagHasMore && (
                     <div className="loadmore-container">
                       <button
                         className="btn-loadmore"
-                        onClick={() => fetchTags(tagPagination.nextCursor!)}
+                        onClick={() => fetchTags(tagPage + 1, true)}
                         disabled={tagLoading}
                       >
                         {tagLoading ? "Loading..." : "↓ Load More"}

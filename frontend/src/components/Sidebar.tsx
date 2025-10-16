@@ -82,41 +82,29 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   // 🔥 获取分类列表（带 refresh-token 自动续签）
   useEffect(() => {
     const fetchCategories = async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      if (!accessToken) return;
-
       let response = await fetch(`${API_BASE_URL}/categories`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        credentials: "include",
+        credentials: "include", // ✅ 关键点
       });
 
-      // ❌ Token 过期时尝试刷新
+      // 🔁 如果 access token 过期
       if (response.status === 401 || response.status === 403) {
         console.warn("Access token expired, trying to refresh...");
 
         const refreshResponse = await fetch(`${API_BASE_URL}/refresh-token`, {
           method: "POST",
-          credentials: "include", // ✅ 关键，自动附带 cookie
+          credentials: "include", // ✅ 自动附带 refreshToken cookie
         });
 
-        const refreshData = await refreshResponse.json();
-
-        if (refreshData.success && refreshData.token) {
-          // ✅ 存新的 access token
-          localStorage.setItem("accessToken", refreshData.token);
-
-          // ✅ 重新发请求
-          response = await fetch(`${API_BASE_URL}/categories`, {
-            headers: { Authorization: `Bearer ${refreshData.token}` },
-            credentials: "include",
-          });
-        } else {
+        if (!refreshResponse.ok) {
           console.error("Refresh token failed, please login again.");
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
           navigate("/login");
           return;
         }
+
+        // ✅ 成功刷新后重试
+        response = await fetch(`${API_BASE_URL}/categories`, {
+          credentials: "include",
+        });
       }
 
       const result = await response.json();
@@ -156,8 +144,9 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
     categoryId: number,
     isLoadMore = false
   ) => {
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return;
+    // ❌ 不再用 localStorage token
+    // const accessToken = localStorage.getItem("accessToken");
+    // if (!accessToken) return;
 
     setLoadingCategories((prev) => [...prev, categoryId]);
 
@@ -166,10 +155,31 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
       let url = `${API_BASE_URL}/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
       if (cursor) url += `&cursor=${cursor}`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      // ✅ 改成这样：只加 credentials
+      let res = await fetch(url, {
         credentials: "include",
       });
+
+      // ✅ 如果 access token 过期，自动 refresh 再重试一次
+      if (res.status === 401 || res.status === 403) {
+        console.warn("Access token expired, trying to refresh...");
+
+        const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
+          method: "POST",
+          credentials: "include",
+        });
+
+        if (!refreshRes.ok) {
+          console.error("Refresh token failed, please login again.");
+          navigate("/login");
+          return;
+        }
+
+        // 🔁 刷新成功后再重试一次
+        res = await fetch(url, {
+          credentials: "include",
+        });
+      }
 
       const result = await res.json();
 

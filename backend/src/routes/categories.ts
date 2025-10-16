@@ -125,6 +125,8 @@ router.delete(
   authenticate,
   authorize(PERMISSIONS.CATEGORY_DELETE),
   async (req: Request, res: Response) => {
+    console.log("DELETE /categories/:id hit", req.params.id);
+
     const { id } = req.params;
     const currentUser = (req as any).user;
     const force = req.query.force === "true";

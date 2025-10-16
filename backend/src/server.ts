@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+
 import authRoutes from "./routes/auth";
 import articleRoutes from "./routes/articles";
 import userRouters from "./routes/user";
@@ -8,15 +10,18 @@ import tagRouters from "./routes/tags";
 import logsRouter from "./routes/logs";
 
 const app = express();
+
+// ✅ 顺序很重要！
+app.use(cookieParser());
+app.use(express.json());
+
+// ✅ 一定要指定具体 origin + credentials
 app.use(
   cors({
-    origin: "http://localhost:5173", // ✅ 你的前端地址
-    credentials: true, // ✅ 允许发送 cookie / token
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: "http://192.168.0.206:5173",
+    credentials: true,
   })
 );
-app.use(express.json());
 
 app.use("/", authRoutes);
 app.use("/articles", articleRoutes);

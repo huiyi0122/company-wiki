@@ -59,4 +59,4 @@ export function getCategories(): string[] {
 }
 
 // 后端地址
-export const API_BASE_URL = "http://192.168.0.204:3000";
+export const API_BASE_URL = "http://192.168.0.206:3000";
