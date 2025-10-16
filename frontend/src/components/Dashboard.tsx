@@ -25,60 +25,59 @@ interface Tag {
   is_active?: number;
   created_by_name?: string | null;
   updated_by_name?: string | null;
-  updated_at?: string | null;
+  updated_at?: string;
 }
 
-const fetchStats = async () => {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) throw new Error("Missing token");
+// ===== 通用 fetch（自动 refresh token） =====
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  let accessToken = localStorage.getItem("accessToken");
 
-    let totalArticles = 0;
-    let nextCursor: number | null = null;
-    const limit = 50; // 每次取 50，减少请求次数
+  let response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: accessToken ? `Bearer ${accessToken}` : "",
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
 
-    do {
-      const url = `${API_BASE_URL}/articles?limit=${limit}${
-        nextCursor ? `&lastId=${nextCursor}` : ""
-      }`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+  if (response.status === 401 || response.status === 403) {
+    try {
+      const refreshResponse = await fetch(`${API_BASE_URL}/refresh-token`, {
+        method: "POST",
+        credentials: "include",
       });
 
-      const result = await res.json();
-      if (!result.success)
-        throw new Error(result.message || "Failed to fetch articles");
+      const refreshData = await refreshResponse.json();
 
-      // 兼容后端格式：data 可能在 result.data 或 result.data.data 里
-      const list = Array.isArray(result.data?.data)
-        ? result.data.data
-        : Array.isArray(result.data)
-        ? result.data
-        : [];
+      if (refreshData.success && refreshData.token) {
+        localStorage.setItem("accessToken", refreshData.token);
 
-      totalArticles += list.length;
-
-      // 更新分页游标
-      nextCursor =
-        result.meta?.nextCursor ?? result.data?.meta?.nextCursor ?? null;
-    } while (nextCursor); // 只要还有下一页就继续
-
-    return {
-      totalArticles,
-      draftsPendingReview: 0,
-      newUsersLast7Days: 0,
-    };
-  } catch (err) {
-    console.error("❌ Failed to fetch stats:", err);
-    return {
-      totalArticles: 0,
-      draftsPendingReview: 0,
-      newUsersLast7Days: 0,
-    };
+        response = await fetch(url, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: `Bearer ${refreshData.token}`,
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+      } else {
+        localStorage.removeItem("accessToken");
+        return { error: "TOKEN_EXPIRED" };
+      }
+    } catch (err) {
+      console.error("Refresh token failed:", err);
+      localStorage.removeItem("accessToken");
+      return { error: "TOKEN_EXPIRED" };
+    }
   }
-};
 
+  return response;
+}
+
+// ===== Dashboard Component =====
 export default function Dashboard({
   currentUser,
   setCurrentUser,
@@ -94,53 +93,74 @@ export default function Dashboard({
   const [catLoading, setCatLoading] = useState(false);
   const [tagLoading, setTagLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [catPagination, setCatPagination] = useState<{
-    nextCursor: number | null;
-    limit: number;
-  }>({
-    nextCursor: null,
-    limit: 20,
+  const [catPagination, setCatPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
   });
-  const [tagPagination, setTagPagination] = useState<{
-    nextCursor: number | null;
-    limit: number;
-  }>({
-    nextCursor: null,
-    limit: 20,
+  const [tagPagination, setTagPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
   });
+
+  const canManage =
+    currentUser && PERMISSIONS[currentUser.role]?.includes("edit");
 
   const setCategory = () => {};
 
-  const canManage =
-    currentUser && PERMISSIONS[currentUser.role].includes("edit");
+  // ===== 获取统计数据 =====
+  const fetchStats = async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/articles?limit=50`);
+      if ((res as any)?.error === "TOKEN_EXPIRED") {
+        setMessage("⚠️ Session expired, please login again.");
+        setCurrentUser(null);
+        return {
+          totalArticles: 0,
+          draftsPendingReview: 0,
+          newUsersLast7Days: 0,
+        };
+      }
 
-  useEffect(() => {
-    if (canManage) {
-      setLoading(true);
-      fetchStats().then((data) => {
-        setStats(data);
-        setLoading(false);
-      });
-    } else {
-      setLoading(false);
+      const result = await (res as Response).json();
+      if (!result.success) throw new Error(result.message);
+
+      const list = Array.isArray(result.data?.data)
+        ? result.data.data
+        : Array.isArray(result.data)
+        ? result.data
+        : [];
+
+      return {
+        totalArticles: list.length,
+        draftsPendingReview: 0,
+        newUsersLast7Days: 0,
+      };
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+      return {
+        totalArticles: 0,
+        draftsPendingReview: 0,
+        newUsersLast7Days: 0,
+      };
     }
-  }, [canManage]);
+  };
 
-  // ===== 获取分类（仅管理员） =====
-  // ✅ 获取 Categories（使用 lastId 分页）
-  const fetchCategories = async (lastId?: number) => {
+  // ===== 获取分类 =====
+  const fetchCategories = async (page = 1) => {
     try {
       setCatLoading(true);
-      const token = localStorage.getItem("token");
-      const url = `${API_BASE_URL}/categories?limit=${catPagination.limit}${
-        lastId ? `&lastId=${lastId}` : ""
-      }`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
+      const url = `${API_BASE_URL}/categories?page=${page}&limit=${catPagination.limit}`;
+      const res = await fetchWithAuth(url);
+      if ((res as any)?.error === "TOKEN_EXPIRED") {
+        setMessage("⚠️ Session expired, please login again.");
+        setCurrentUser(null);
+        return;
+      }
 
+      const result = await (res as Response).json();
       if (!result.success) {
         setMessage(`❌ ${result.message}`);
         return;
@@ -149,17 +169,13 @@ export default function Dashboard({
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
-      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+      const total = result.meta?.total ?? list.length;
 
-      if (lastId) {
-        setCategories((prev) => [...prev, ...list]);
-      } else {
-        setCategories(list);
-      }
-
+      setCategories(list);
       setCatPagination({
-        nextCursor,
-        limit: result.meta?.limit ?? 20,
+        page,
+        limit: result.meta?.limit ?? 10,
+        total,
       });
     } catch (err) {
       console.error("Category fetch error:", err);
@@ -169,21 +185,20 @@ export default function Dashboard({
     }
   };
 
-  // ===== 获取标签（仅管理员） =====
-  // ✅ 获取 Tags（使用 lastId 分页）
-  const fetchTags = async (lastId?: number) => {
+  // ===== 获取标签 =====
+  const fetchTags = async (page = 1) => {
     try {
       setTagLoading(true);
-      const token = localStorage.getItem("token");
-      const url = `${API_BASE_URL}/tags?limit=${tagPagination.limit}${
-        lastId ? `&lastId=${lastId}` : ""
-      }`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
+      const url = `${API_BASE_URL}/tags?page=${page}&limit=${tagPagination.limit}`;
+      const res = await fetchWithAuth(url);
+      if ((res as any)?.error === "TOKEN_EXPIRED") {
+        setMessage("⚠️ Session expired, please login again.");
+        setCurrentUser(null);
+        return;
+      }
 
+      const result = await (res as Response).json();
       if (!result.success) {
         setMessage(`❌ ${result.message}`);
         return;
@@ -192,17 +207,13 @@ export default function Dashboard({
       const list = Array.isArray(result.data)
         ? result.data
         : result.data?.data || [];
-      const nextCursor = result.meta?.nextCursor ?? null; // ✅ 正确方式
+      const total = result.meta?.total ?? list.length;
 
-      if (lastId) {
-        setTags((prev) => [...prev, ...list]);
-      } else {
-        setTags(list);
-      }
-
+      setTags(list);
       setTagPagination({
-        nextCursor,
-        limit: result.meta?.limit ?? 20,
+        page,
+        limit: result.meta?.limit ?? 10,
+        total,
       });
     } catch (err) {
       console.error("Tag fetch error:", err);
@@ -218,27 +229,20 @@ export default function Dashboard({
     if (!newName || newName.trim() === oldName) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: newName.trim(),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
       });
-      const result = await res.json();
-
-      if (result.success) {
-        setMessage(`✅ Category "${newName.trim()}" updated successfully`);
-        setCategories((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, name: newName.trim() } : c))
-        );
-      } else {
+      const result = await (res as Response).json();
+      if (!result.success) {
         setMessage(`❌ ${result.message || "Failed to update category."}`);
+        return;
       }
+      setMessage(`✅ Category "${newName.trim()}" updated successfully`);
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, name: newName.trim() } : c))
+      );
     } catch (err) {
       console.error("Edit category error:", err);
       setMessage("❌ Server connection failed.");
@@ -251,39 +255,32 @@ export default function Dashboard({
       return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/categories/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
-
-      const result = await res.json();
+      const result = await (res as Response).json();
       const msg = result.message || result.error || "";
 
       if (!result.success && /used by/i.test(msg)) {
         const forceConfirm = window.confirm(
-          "⚠️ This category is still used by some articles.\n\nIf you force delete it, all related articles will have no category.\n\nDo you want to force delete this category?"
+          "⚠️ This category is still used by some articles.\nForce delete?"
         );
-        if (forceConfirm) {
-          const forceRes = await fetch(
-            `${API_BASE_URL}/categories/${id}?force=true`,
-            {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          const forceResult = await forceRes.json();
-          if (forceResult.success) {
-            setMessage(`✅ ${forceResult.message || "Category deleted"}`);
-            setCategories((prev) => prev.filter((c) => c.id !== id));
-          } else {
-            setMessage(`❌ ${forceResult.message || "Force delete failed"}`);
-          }
-          return;
-        } else {
+        if (!forceConfirm) {
           setMessage("❎ Force delete cancelled.");
           return;
         }
+        const forceRes = await fetchWithAuth(
+          `${API_BASE_URL}/categories/${id}?force=true`,
+          { method: "DELETE" }
+        );
+        const forceResult = await (forceRes as Response).json();
+        if (forceResult.success) {
+          setMessage(`✅ ${forceResult.message || "Category deleted"}`);
+          setCategories((prev) => prev.filter((c) => c.id !== id));
+        } else {
+          setMessage(`❌ ${forceResult.message || "Force delete failed"}`);
+        }
+        return;
       }
 
       if (result.success) {
@@ -304,24 +301,20 @@ export default function Dashboard({
     if (!newName || newName.trim() === oldName) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/tags/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName.trim() }),
       });
-      const result = await res.json();
-      if (result.success) {
-        setMessage(`✅ Tag updated to "${newName.trim()}"`);
-        setTags((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, name: newName.trim() } : t))
-        );
-      } else {
+      const result = await (res as Response).json();
+      if (!result.success) {
         setMessage(`❌ ${result.message || "Failed to update tag."}`);
+        return;
       }
+      setMessage(`✅ Tag updated to "${newName.trim()}"`);
+      setTags((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, name: newName.trim() } : t))
+      );
     } catch (err) {
       console.error("Edit tag error:", err);
       setMessage("❌ Server connection failed.");
@@ -333,13 +326,10 @@ export default function Dashboard({
     if (!window.confirm("Are you sure you want to delete this tag?")) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/tags/${id}`, {
+      const res = await fetchWithAuth(`${API_BASE_URL}/tags/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await res.json();
-
+      const result = await (res as Response).json();
       if (result.success) {
         setMessage(`✅ ${result.data || result.message || "Tag deleted."}`);
         setTags((prev) => prev.filter((t) => t.id !== id));
@@ -352,8 +342,17 @@ export default function Dashboard({
     }
   };
 
+  // ===== useEffect 初始化 =====
   useEffect(() => {
-    if (currentUser?.role === "admin") {
+    if (!currentUser) return;
+
+    setLoading(true);
+    fetchStats().then((data) => {
+      setStats(data);
+      setLoading(false);
+    });
+
+    if (currentUser.role === "admin") {
       fetchCategories();
       fetchTags();
     }
@@ -412,6 +411,7 @@ export default function Dashboard({
     );
   }
 
+  // ===== 渲染 Dashboard =====
   return (
     <div className="layout">
       <Sidebar
@@ -421,16 +421,13 @@ export default function Dashboard({
       />
       <div className="main-content-with-sidebar">
         <div className="dashboard-page">
-          {/* Header Section */}
           <div className="page-header">
             <h1>Dashboard</h1>
             <p>
-              Welcome back, {currentUser.username}! Here's your workspace
-              overview.
+              Welcome back, {currentUser.username}! Here's your workspace overview.
             </p>
           </div>
 
-          {/* Stats Grid */}
           <section className="stats-section">
             <div className="stats-grid">
               <div className="stat-card">
@@ -459,32 +456,27 @@ export default function Dashboard({
             </div>
           </section>
 
-          {/* Message Display */}
           {message && (
-            <div
-              className={`message ${
-                message.includes("❌") ? "error" : "success"
-              }`}
-            >
+            <div className={`message ${message.includes("❌") ? "error" : "success"}`}>
               {message}
             </div>
           )}
 
-          {/* Admin Management Sections */}
+          {/* ===== Admin Management ===== */}
           {currentUser.role === "admin" && (
             <div className="admin-sections">
-              {/* Category Management */}
+              {/* Categories Table */}
               <div className="management-card">
                 <div className="card-header">
                   <h2>📂 Category Management</h2>
                   <button
                     className="refresh-btn"
-                    onClick={() => fetchCategories()} // ✅ 不传 nextCursor，重新加载第一页
+                    onClick={() => fetchCategories(1)}
+                    disabled={catLoading}
                   >
-                    🔄 Refresh
+                    {catLoading ? "Refreshing..." : "🔄 Refresh"}
                   </button>
                 </div>
-
                 <div className="table-container">
                   <table className="management-table">
                     <thead>
@@ -501,32 +493,20 @@ export default function Dashboard({
                       {categories.length > 0 ? (
                         categories.map((cat) => (
                           <tr key={cat.id}>
-                            <td className="id-cell">#{cat.id}</td>
-                            <td className="name-cell">{cat.name}</td>
+                            <td>#{cat.id}</td>
+                            <td>{cat.name}</td>
                             <td>
-                              <span
-                                className={`status-badge ${
-                                  cat.is_active ? "active" : "inactive"
-                                }`}
-                              >
+                              <span className={cat.is_active ? "active" : "inactive"}>
                                 {cat.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
                             <td>{cat.created_by_name || "-"}</td>
                             <td>{cat.updated_by_name || "-"}</td>
-                            <td className="actions-cell">
-                              <button
-                                className="btn-edit"
-                                onClick={() =>
-                                  handleEditCategory(cat.id, cat.name)
-                                }
-                              >
+                            <td>
+                              <button onClick={() => handleEditCategory(cat.id, cat.name)}>
                                 Edit
                               </button>
-                              <button
-                                className="btn-delete"
-                                onClick={() => handleDeleteCategory(cat.id)}
-                              >
+                              <button onClick={() => handleDeleteCategory(cat.id)}>
                                 Delete
                               </button>
                             </td>
@@ -534,49 +514,26 @@ export default function Dashboard({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={7} className="no-data">
-                            No categories found.
-                          </td>
+                          <td colSpan={6}>No categories found.</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
-                  {catPagination.nextCursor && (
-                    <div className="loadmore-container">
-                      <button
-                        className="btn-loadmore"
-                        onClick={() =>
-                          fetchCategories(catPagination.nextCursor!)
-                        }
-                        disabled={catLoading}
-                      >
-                        {catLoading ? "Loading..." : "↓ Load More"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Tag Management */}
+              {/* Tags Table */}
               <div className="management-card">
                 <div className="card-header">
                   <h2>🏷️ Tag Management</h2>
                   <button
                     className="refresh-btn"
-                    onClick={() => fetchTags()} // ✅ 正确：重载第一页
+                    onClick={() => fetchTags(1)}
                     disabled={tagLoading}
                   >
-                    {tagLoading ? (
-                      <>
-                        <span className="loading-spinner-small"></span>
-                        Refreshing...
-                      </>
-                    ) : (
-                      "🔄 Refresh"
-                    )}
+                    {tagLoading ? "Refreshing..." : "🔄 Refresh"}
                   </button>
                 </div>
-
                 <div className="table-container">
                   <table className="management-table">
                     <thead>
@@ -593,30 +550,20 @@ export default function Dashboard({
                       {tags.length > 0 ? (
                         tags.map((tag) => (
                           <tr key={tag.id}>
-                            <td className="id-cell">#{tag.id}</td>
-                            <td className="name-cell">{tag.name}</td>
+                            <td>#{tag.id}</td>
+                            <td>{tag.name}</td>
                             <td>
-                              <span
-                                className={`status-badge ${
-                                  tag.is_active ? "active" : "inactive"
-                                }`}
-                              >
+                              <span className={tag.is_active ? "active" : "inactive"}>
                                 {tag.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
                             <td>{tag.created_by_name || "-"}</td>
                             <td>{tag.updated_by_name || "-"}</td>
-                            <td className="actions-cell">
-                              <button
-                                className="btn-edit"
-                                onClick={() => handleEditTag(tag.id, tag.name)}
-                              >
+                            <td>
+                              <button onClick={() => handleEditTag(tag.id, tag.name)}>
                                 Edit
                               </button>
-                              <button
-                                className="btn-delete"
-                                onClick={() => handleDeleteTag(tag.id)}
-                              >
+                              <button onClick={() => handleDeleteTag(tag.id)}>
                                 Delete
                               </button>
                             </td>
@@ -624,62 +571,15 @@ export default function Dashboard({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="no-data">
-                            No tags found.
-                          </td>
+                          <td colSpan={6}>No tags found.</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
-                  {tagPagination.nextCursor && (
-                    <div className="loadmore-container">
-                      <button
-                        className="btn-loadmore"
-                        onClick={() => fetchTags(tagPagination.nextCursor!)}
-                        disabled={tagLoading}
-                      >
-                        {tagLoading ? "Loading..." : "↓ Load More"}
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           )}
-
-          {/* Recent Activity */}
-          <div className="activity-card">
-            <h2>Recent Activity</h2>
-            <div className="activity-list">
-              <div className="activity-item">
-                <div className="activity-icon">📄</div>
-                <div className="activity-content">
-                  <p>
-                    <strong>ABC</strong> submitted a new draft
-                  </p>
-                  <span className="activity-time">2 hours ago</span>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-icon">✅</div>
-                <div className="activity-content">
-                  <p>
-                    <strong>DEF</strong> approved an article
-                  </p>
-                  <span className="activity-time">5 hours ago</span>
-                </div>
-              </div>
-              <div className="activity-item">
-                <div className="activity-icon">📂</div>
-                <div className="activity-content">
-                  <p>
-                    New category <strong>HR</strong> created
-                  </p>
-                  <span className="activity-time">1 day ago</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

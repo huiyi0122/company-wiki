@@ -3,40 +3,37 @@ import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 import "../styles/Login.css";
-
+ 
 interface LoginProps {
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
-
+ 
 export default function Login({ setCurrentUser }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
-
+ 
   const handleLogin = async () => {
     if (!username || !password) {
       console.error("Please fill all fields!");
       return;
     }
-
+ 
     try {
       const res = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
+        credentials: "include", // ✅ 必须加，发送和接收 cookie
       });
-
+ 
       const data = await res.json();
-
+ 
       if (!res.ok || !data.success) {
         console.error("Invalid username or password!");
         return;
       }
-
-      // ✅ 保存 token
-      localStorage.setItem("token", data.token);
-
-      // ✅ 使用后端返回的 user 对象，而不是 jwtDecode
+ 
       if (data.user) {
         setCurrentUser({
           id: data.user.id,
@@ -48,16 +45,16 @@ export default function Login({ setCurrentUser }: LoginProps) {
         console.error("No user data in response!");
         return;
       }
-
+ 
       console.log("Login successful:", data.user);
-
+ 
       // ✅ 登录成功跳转
       navigate("/docs");
     } catch (err) {
       console.error("Login failed:", err);
     }
   };
-
+ 
   return (
     <div className="login-container">
       <div className="login-split">
@@ -82,3 +79,5 @@ export default function Login({ setCurrentUser }: LoginProps) {
     </div>
   );
 }
+ 
+ 

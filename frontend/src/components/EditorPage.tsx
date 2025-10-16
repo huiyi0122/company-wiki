@@ -33,13 +33,17 @@ export default function EditorPage({
   const [content, setContent] = useState<string>("## Start writing your article...");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]); // 内存中所有标签
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dropdownLocked, setDropdownLocked] = useState(false);
+
   const navigate = useNavigate();
 
-  // ---------------------- 获取分类 + 加载文章 ----------------------
+  // ---------------------- 初始化：获取分类、标签、加载文章 ----------------------
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -58,6 +62,18 @@ export default function EditorPage({
       })
       .catch((err) => console.error("Error fetching categories:", err));
 
+    // 获取所有标签到内存
+    fetch(`${API_BASE_URL}/tags?limit=1000`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success && result.data) {
+          setAllTags(result.data);
+        }
+      })
+      .catch((err) => console.error("Error fetching tags:", err));
+
     // 编辑模式加载文章
     if (id) {
       fetch(`${API_BASE_URL}/articles/${id}`, {
@@ -70,7 +86,42 @@ export default function EditorPage({
             setTitle(article.title);
             setContent(article.content);
             setCategoryId(article.category_id || null);
-            setSelectedTags(article.tag_ids || []);
+
+            // 处理标签：从返回的数据中提取 tag IDs
+            if (article.tags && Array.isArray(article.tags)) {
+              // 将文章的标签与 allTags 匹配
+              setAllTags((prevTags) => {
+                const selectedTagIds: number[] = [];
+                const newTagsToAdd: Tag[] = [];
+
+                article.tags.forEach((tag: any) => {
+                  const tagName = typeof tag === 'object' ? tag.name : tag;
+                  const tagId = typeof tag === 'object' ? tag.id : undefined;
+
+                  // 在 allTags 中查找
+                  const existingTag = prevTags.find(
+                    (t) => t.name.toLowerCase() === tagName.toLowerCase()
+                  );
+
+                  if (existingTag) {
+                    // 找到了，使用它的 ID
+                    selectedTagIds.push(existingTag.id);
+                  } else if (tagId) {
+                    // API 返回了 ID，使用它
+                    selectedTagIds.push(tagId);
+                    newTagsToAdd.push({ id: tagId, name: tagName });
+                  } else {
+                    // 没有 ID，创建新的（用 tagName 作为临时 ID）
+                    const tempId = `tag_${tagName}`.hashCode?.() || tagName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+                    selectedTagIds.push(tempId);
+                    newTagsToAdd.push({ id: tempId, name: tagName });
+                  }
+                });
+
+                setSelectedTags(selectedTagIds);
+                return [...prevTags, ...newTagsToAdd];
+              });
+            }
           }
         })
         .catch((err) => console.error(err))
@@ -79,6 +130,161 @@ export default function EditorPage({
       setLoading(false);
     }
   }, [id]);
+
+  // ---------------------- 实时搜索标签（客户端 + 服务端） ----------------------
+  const handleTagInputChange = async (value: string) => {
+    setTagInput(value);
+
+    if (!value.trim()) {
+      setTagSuggestions([]);
+      setShowTagDropdown(false);
+      return;
+    }
+
+    const trimmedValue = value.trim().toLowerCase();
+
+    // 1️⃣ 先从内存中的 allTags 搜索（前缀匹配 + 模糊匹配）
+    const filtered = allTags.filter((tag) => {
+      const tagNameLower = tag.name.toLowerCase();
+      // 前缀匹配或包含匹配
+      return (
+        tagNameLower.startsWith(trimmedValue) ||
+        tagNameLower.includes(trimmedValue)
+      );
+    });
+
+    // 去掉已选中的标签
+    const suggestions = filtered.filter(
+      (t) => !selectedTags.includes(t.id)
+    );
+
+    setTagSuggestions(suggestions);
+    setShowTagDropdown(true);
+
+    // 2️⃣ 同时从服务端搜索（异步，更新到 allTags）
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/tags?search=${encodeURIComponent(trimmedValue)}&limit=20`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const result = await res.json();
+
+        if (result.success && result.data) {
+          // 合并服务端返回的标签到 allTags
+          setAllTags((prev) => {
+            const existingIds = new Set(prev.map((t) => t.id));
+            const newTags = result.data.filter(
+              (t: Tag) => !existingIds.has(t.id)
+            );
+            return [...prev, ...newTags];
+          });
+
+          // 重新过滤建议
+          const combined = [
+            ...allTags,
+            ...result.data.filter(
+              (t: Tag) => !allTags.some((existing) => existing.id === t.id)
+            ),
+          ];
+
+          const refilteredSuggestions = combined.filter((tag) => {
+            const tagNameLower = tag.name.toLowerCase();
+            return (
+              (tagNameLower.startsWith(trimmedValue) ||
+                tagNameLower.includes(trimmedValue)) &&
+              !selectedTags.includes(tag.id)
+            );
+          });
+
+          setTagSuggestions(refilteredSuggestions);
+        }
+      } catch (err) {
+        console.error("Tag search error:", err);
+      }
+    }
+  };
+
+  // ---------------------- 选择标签 ----------------------
+  const handleTagSelect = (tag: Tag) => {
+    if (!selectedTags.includes(tag.id)) {
+      setSelectedTags([...selectedTags, tag.id]);
+    }
+    setTagInput("");
+    setTagSuggestions([]);
+    setShowTagDropdown(false);
+    setDropdownLocked(false);
+  };
+
+  // ---------------------- 创建新标签 ----------------------
+  const handleCreateNewTag = async () => {
+    const name = tagInput.trim();
+    if (!name) {
+      toast.warning("Tag name cannot be empty.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/tags`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      const result = await res.json();
+      if (!result.success) {
+        throw new Error(result.message || "Failed to create tag");
+      }
+
+      // 从响应中获取新标签的 ID
+      const newTagId = result.data?.id || result.tag?.id || Date.now();
+      const newTag: Tag = {
+        id: newTagId,
+        name,
+      };
+
+      // ✅ 立即添加到 allTags 和 selectedTags
+      setAllTags((prev) => [...prev, newTag]);
+      setSelectedTags((prev) => [...prev, newTag.id]);
+
+      setTagInput("");
+      setTagSuggestions([]);
+      setShowTagDropdown(false);
+      toast.success(`Tag "${name}" created successfully!`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create tag.");
+    }
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (tagSuggestions.length > 0) {
+        handleTagSelect(tagSuggestions[0]);
+      } else {
+        handleCreateNewTag();
+      }
+    } else if (e.key === ",") {
+      e.preventDefault();
+      if (tagSuggestions.length > 0) {
+        handleTagSelect(tagSuggestions[0]);
+      } else {
+        handleCreateNewTag();
+      }
+    }
+  };
+
+  const removeTag = (tagId: number) => {
+    setSelectedTags(selectedTags.filter((id) => id !== tagId));
+  };
 
   // ---------------------- 新增分类 ----------------------
   const handleAddCategory = async () => {
@@ -102,10 +308,13 @@ export default function EditorPage({
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.message || "Failed to add category");
+      if (!result.success)
+        throw new Error(result.message || "Failed to add category");
 
       toast.success(`Category "${name.trim()}" added successfully!`);
       const newCatObj = { id: result.data?.id || Date.now(), name: name.trim() };
+      
+      // ✅ 立即添加到 categories 和设置为当前选择
       setCategories((prev) => [...prev, newCatObj]);
       setCategoryId(newCatObj.id);
     } catch (err) {
@@ -114,73 +323,15 @@ export default function EditorPage({
     }
   };
 
-  // ---------------------- 标签输入逻辑 ----------------------
-  const handleTagInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      const name = tagInput.trim().toLowerCase();
-      if (!name) return;
-      setTagInput("");
-
-      // 检查是否已选
-      if (tags.some((t) => t.name.toLowerCase() === name)) {
-        const existingTag = tags.find((t) => t.name.toLowerCase() === name)!;
-        if (!selectedTags.includes(existingTag.id)) {
-          setSelectedTags([...selectedTags, existingTag.id]);
-        }
-        return;
-      }
-
-      const token = localStorage.getItem("token");
-      try {
-        // 1️⃣ 检查后端是否已有该 tag
-        const res = await fetch(`${API_BASE_URL}/tags/search?name=${encodeURIComponent(name)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await res.json();
-
-        if (result.success && result.data?.id) {
-          // 已存在 → 选中
-          if (!selectedTags.includes(result.data.id)) {
-            setTags((prev) => [...prev, result.data]);
-            setSelectedTags([...selectedTags, result.data.id]);
-          }
-        } else {
-          // 2️⃣ 不存在 → 创建新 tag
-          const createRes = await fetch(`${API_BASE_URL}/tags`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ name }),
-          });
-          const createResult = await createRes.json();
-          if (createResult.success && createResult.data?.id) {
-            const newTag = { id: createResult.data.id, name };
-            setTags((prev) => [...prev, newTag]);
-            setSelectedTags([...selectedTags, newTag.id]);
-            toast.success(`Created new tag "${name}"`);
-          }
-        }
-      } catch (err) {
-        console.error("Tag add error:", err);
-      }
-    }
-  };
-
-  const removeTag = (tagId: number) => {
-    setSelectedTags(selectedTags.filter((id) => id !== tagId));
-  };
-
   // ---------------------- 保存文章 ----------------------
   const handleSave = async () => {
-    if (!title || !content) return toast.warning("Title and content are required.");
+    if (!title || !content)
+      return toast.warning("Title and content are required.");
 
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const selectedTagNames = tags
+    const selectedTagNames = allTags
       .filter((tag) => selectedTags.includes(tag.id))
       .map((tag) => tag.name);
 
@@ -223,7 +374,11 @@ export default function EditorPage({
   if (loading) {
     return (
       <div className="layout">
-        <Sidebar setCategory={() => {}} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+        <Sidebar
+          setCategory={() => {}}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+        />
         <div className="main-content-with-sidebar">
           <div className="editor-page">
             <div className="loading-state">
@@ -247,7 +402,11 @@ export default function EditorPage({
         <div className="editor-page">
           <div className="page-header">
             <h1>{id ? "Edit Article" : "Create New Article"}</h1>
-            <p>{id ? "Update your existing article" : "Write and publish a new article"}</p>
+            <p>
+              {id
+                ? "Update your existing article"
+                : "Write and publish a new article"}
+            </p>
           </div>
 
           <div className="editor-card">
@@ -295,25 +454,73 @@ export default function EditorPage({
                 <label>Tags</label>
                 <div className="tag-input-section">
                   <div className="selected-tags">
-                    {tags
+                    {allTags
                       .filter((tag) => selectedTags.includes(tag.id))
                       .map((tag) => (
                         <span key={tag.id} className="tag-chip">
                           {tag.name}
-                          <button className="remove-tag" onClick={() => removeTag(tag.id)}>
+                          <button
+                            className="remove-tag"
+                            onClick={() => removeTag(tag.id)}
+                          >
                             ×
                           </button>
                         </span>
                       ))}
                   </div>
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagInputKeyDown}
-                    placeholder="Type tag name and press Enter"
-                    className="form-input"
-                  />
+
+                  <div className="tag-input-wrapper">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => handleTagInputChange(e.target.value)}
+                      onKeyDown={handleTagInputKeyDown}
+                      onFocus={() =>
+                        tagInput &&
+                        tagSuggestions.length > 0 &&
+                        setShowTagDropdown(true)
+                      }
+                      onBlur={() => {
+                        if (!dropdownLocked) {
+                          setShowTagDropdown(false);
+                        }
+                      }}
+                      placeholder="Type tag name (press Enter or comma)"
+                      className="form-input"
+                    />
+
+                    {showTagDropdown && tagInput && (
+                      <div
+                        className="tag-dropdown"
+                        onMouseDown={() => setDropdownLocked(true)}
+                        onMouseUp={() => setDropdownLocked(false)}
+                      >
+                        {tagSuggestions.length > 0 ? (
+                          <>
+                            <div className="tag-suggestions">
+                              {tagSuggestions.map((tag) => (
+                                <div
+                                  key={tag.id}
+                                  className="tag-suggestion-item"
+                                  onClick={() => handleTagSelect(tag)}
+                                >
+                                  {tag.name}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="tag-divider"></div>
+                          </>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="tag-create-btn"
+                          onClick={handleCreateNewTag}
+                        >
+                          + Create "{tagInput}"
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -325,7 +532,9 @@ export default function EditorPage({
                     value={content}
                     onChange={(val) => setContent(val || "")}
                     height={400}
-                    previewOptions={{ remarkPlugins: [remarkGfm, remarkGemoji] }}
+                    previewOptions={{
+                      remarkPlugins: [remarkGfm, remarkGemoji],
+                    }}
                   />
                 </div>
               </div>
