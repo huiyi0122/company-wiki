@@ -1,7 +1,5 @@
 import express from "express";
 import cors from "cors";
-import cookieParser from "cookie-parser";
-
 import authRoutes from "./routes/auth";
 import articleRoutes from "./routes/articles";
 import userRouters from "./routes/user";
@@ -11,18 +9,20 @@ import logsRouter from "./routes/logs";
 
 const app = express();
 
-// ✅ 顺序很重要！
-app.use(cookieParser());
+// ✅ 中间件顺序很重要
 app.use(express.json());
 
-// ✅ 一定要指定具体 origin + credentials
+// CORS 配置 - localStorage 不需要 credentials
 app.use(
   cors({
-    origin: "http://192.168.0.206:5173",
-    credentials: true,
+    origin: "http://192.168.0.44:5173",
+    credentials: false, // 改为 false，因为用 localStorage 而不是 cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"], // 添加 Authorization header
   })
 );
 
+// 路由
 app.use("/", authRoutes);
 app.use("/articles", articleRoutes);
 app.use("/users", userRouters);
@@ -30,6 +30,7 @@ app.use("/categories", categoryRouters);
 app.use("/tags", tagRouters);
 app.use("/logs", logsRouter);
 
+// 健康检查
 app.get("/", (req, res) => {
   res.send("✅ API is running");
 });

@@ -28,8 +28,6 @@ interface Tag {
   updated_at?: string | null;
 }
 
-// 🔥 通用 fetch（用 cookie 自动认证）
-// utils/fetchWithAuth.ts
 export async function fetchWithAuth(
   input: RequestInfo,
   init: RequestInit = {}
@@ -59,7 +57,6 @@ export async function fetchWithAuth(
     if (!refreshRes.ok) {
       // 刷新失败：跳转登录或处理登出
       console.error("Refresh failed, redirecting to login");
-      window.location.href = "/login";
       throw new Error("Refresh failed");
     }
 
@@ -156,14 +153,13 @@ export default function Dashboard({
 
   const canManage =
     currentUser && PERMISSIONS[currentUser.role].includes("edit");
-
-  // 🔥 页面加载时获取用户
   useEffect(() => {
     const initUser = async () => {
       if (!currentUser) {
         const user = await fetchCurrentUser();
         if (!user) {
-          window.location.href = "/login";
+          console.warn("No user, stay on page (not redirecting yet)");
+          // window.location.href = "/login";
           return;
         }
         setCurrentUser(user);
@@ -193,6 +189,7 @@ export default function Dashboard({
       setCatLoading(true);
 
       const url = `${API_BASE_URL}/categories?page=${pageNum}&limit=20`;
+
       const res = await fetchWithAuth(url);
       const result = await res.json();
 
