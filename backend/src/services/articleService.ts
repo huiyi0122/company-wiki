@@ -1,11 +1,118 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 import { ensureTags } from "../utils/tagHelper";
+import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { QueryDslQueryContainer } from "@elastic/elasticsearch/lib/api/types";
 
-export async function createArticle(body: any, user: any) {
-  const { title, content, category_id, tags, page = "1", limit = "20" } = body;
+export interface User {
+  id: number;
+  username: string;
+  email?: string;
+  role: "admin" | "editor" | "viewer";
+}
 
-  if (!title && !content) throw new Error("Title and content are required");
+export interface TagObject {
+  id: number;
+  name: string;
+}
+
+export interface CreateArticleBody {
+  title: string;
+  content: string;
+  category_id?: number | null;
+  tags?: string[];
+  page?: string;
+  limit?: string;
+}
+
+export interface UpdateArticleBody extends Partial<CreateArticleBody> {}
+
+export interface Article {
+  id: number;
+  title: string;
+  content: string;
+  category_id?: number | null;
+  category_name?: string;
+  tags: string[];
+  author: string;
+  author_id?: number;
+  created_by?: string;
+  updated_by?: string;
+  is_active: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+}
+
+interface ArticleRow extends RowDataPacket {
+  id: number;
+  title: string;
+  content: string;
+  category_id: number | null;
+  is_active: number;
+  author_id: number;
+  created_at: Date;
+  updated_at: Date;
+  author: string;
+  created_by_name: string;
+  updated_by_name: string;
+  author_name?: string;
+  category_name?: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+interface TagRow extends RowDataPacket {
+  article_id: number;
+  name: string;
+  id?: number;
+}
+
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+
+interface UserRow extends RowDataPacket {
+  created_by_name: string;
+  updated_by_name: string;
+}
+
+// Elasticsearch 响应类型
+interface ESHit {
+  _id: string;
+  _source: {
+    title: string;
+    content: string;
+    category_id: number | null;
+    tags: string[];
+    author_id: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+interface ESSearchResponse {
+  hits: {
+    hits: ESHit[];
+    total: number | { value: number };
+  };
+}
+
+interface SearchParams {
+  queryString?: string;
+  categoryId?: number;
+  tags?: string[];
+  pageNumber: number;
+  pageSize: number;
+}
+
+// ===== 创建文章 =====
+export async function createArticle(
+  body: CreateArticleBody,
+  user: User
+): Promise<Article> {
+  const { title, content, category_id, tags } = body;
+
   if (!title) throw new Error("Title is required");
   if (!content) throw new Error("Content is required");
 
@@ -13,15 +120,17 @@ export async function createArticle(body: any, user: any) {
   await connection.beginTransaction();
 
   try {
-    // 创建文章
-    const [articleResult]: any = await connection.query(
+    const [articleResult] = await connection.query<ResultSetHeader>(
       "INSERT INTO articles (title, content, category_id, author_id, created_by, updated_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [title, content, category_id || null, user.id, user.id, user.id, 1]
+      [title, content, category_id ?? null, user.id, user.id, user.id, 1]
     );
-    const articleId = articleResult.insertId;
+    const articleId: number = articleResult.insertId;
 
-    // 处理标签
-    const allTagObjects = await ensureTags(connection, tags || [], user.id);
+    const allTagObjects: TagObject[] = await ensureTags(
+      connection,
+      tags ?? [],
+      user.id
+    );
     if (allTagObjects.length > 0) {
       const articleTagValues = allTagObjects.map((t) => [articleId, t.id]);
       await connection.query(
@@ -30,7 +139,6 @@ export async function createArticle(body: any, user: any) {
       );
     }
 
-    // 写日志
     await connection.query(
       "INSERT INTO article_logs (article_id, action, changed_by, new_data) VALUES (?, 'CREATE', ?, ?)",
       [
@@ -45,24 +153,22 @@ export async function createArticle(body: any, user: any) {
       ]
     );
 
-    // 同步到 Elasticsearch
     try {
       await esClient.index({
         index: "articles",
         id: articleId.toString(),
-        refresh: true, // 加上 refresh，方便测试时马上能查到
+        refresh: true,
         document: {
           title,
           content,
-          category_id: category_id || null,
+          category_id: category_id ?? null,
           author_id: user.id,
           tags: allTagObjects.map((t) => t.name),
-          is_active: true, // ✅ 改这里成真正的 boolean
+          is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
       });
-
       console.log(`✅ Synced to Elasticsearch: article ${articleId}`);
     } catch (esErr) {
       console.error("❌ Elasticsearch sync failed:", esErr);
@@ -95,33 +201,30 @@ export async function getArticles(page: number, limit: number) {
   try {
     const offset = (page - 1) * limit;
 
-    // 1️⃣ 查总数
-    const [countRows]: any = await connection.query(
+    const [countRows] = await connection.query<CountRow[]>(
       "SELECT COUNT(*) AS total FROM articles"
     );
     const total = countRows[0].total;
     const totalPages = Math.ceil(total / limit);
 
-    // 2️⃣ 查数据
-    const [rows]: any = await connection.query(
+    const [rows] = await connection.query<ArticleRow[]>(
       `
-    SELECT 
-  a.id,
-  a.title,
-  a.content,
-  a.category_id,
-  a.is_active,
-  a.created_at,
-  u_author.username AS author,
-  u_created.username AS created_by_name,
-  u_updated.username AS updated_by_name
-FROM articles a
-LEFT JOIN users u_author ON a.author_id = u_author.id
-LEFT JOIN users u_created ON a.created_by = u_created.id
-LEFT JOIN users u_updated ON a.updated_by = u_updated.id
-ORDER BY a.id DESC
-LIMIT ? OFFSET ?
-
+      SELECT 
+        a.id,
+        a.title,
+        a.content,
+        a.category_id,
+        a.is_active,
+        a.created_at,
+        u_author.username AS author,
+        u_created.username AS created_by_name,
+        u_updated.username AS updated_by_name
+      FROM articles a
+      LEFT JOIN users u_author ON a.author_id = u_author.id
+      LEFT JOIN users u_created ON a.created_by = u_created.id
+      LEFT JOIN users u_updated ON a.updated_by = u_updated.id
+      ORDER BY a.id DESC
+      LIMIT ? OFFSET ?
       `,
       [limit, offset]
     );
@@ -133,9 +236,8 @@ LIMIT ? OFFSET ?
       };
     }
 
-    // 3️⃣ 查 tags
-    const articleIds = rows.map((r: any) => r.id);
-    const [tagRows]: any = await connection.query(
+    const articleIds = rows.map((r) => r.id);
+    const [tagRows] = await connection.query<TagRow[]>(
       `
       SELECT at.article_id, t.name
       FROM article_tags at
@@ -145,14 +247,13 @@ LIMIT ? OFFSET ?
       [articleIds]
     );
 
-    const tagMap = tagRows.reduce((acc: any, cur: any) => {
+    const tagMap: Record<number, string[]> = tagRows.reduce((acc, cur) => {
       if (!acc[cur.article_id]) acc[cur.article_id] = [];
       acc[cur.article_id].push(cur.name);
       return acc;
-    }, {});
+    }, {} as Record<number, string[]>);
 
-    // 4️⃣ 拼装数据
-    const data = rows.map((r: any) => ({
+    const data = rows.map((r) => ({
       id: r.id,
       title: r.title,
       content: r.content,
@@ -162,10 +263,9 @@ LIMIT ? OFFSET ?
       created_by_name: r.created_by_name,
       updated_by_name: r.updated_by_name,
       is_active: Boolean(r.is_active),
-      created_at: r.created_at, // ✅ 新增字段
+      created_at: r.created_at,
     }));
 
-    // 5️⃣ 返回带分页信息
     return {
       meta: { page, limit, total, totalPages },
       data,
@@ -173,14 +273,6 @@ LIMIT ? OFFSET ?
   } finally {
     connection.release();
   }
-}
-
-interface SearchParams {
-  queryString?: string;
-  categoryId?: number;
-  tags?: string[];
-  pageNumber: number;
-  pageSize: number;
 }
 
 export async function searchArticles({
@@ -192,18 +284,15 @@ export async function searchArticles({
 }: SearchParams) {
   const from = (pageNumber - 1) * pageSize;
 
-  const must: any[] = [];
-  const filter: any[] = [{ term: { is_active: true } }];
+  const must: QueryDslQueryContainer[] = [];
+  const filter: QueryDslQueryContainer[] = [{ term: { is_active: true } }];
 
-  // 🔍 改进的搜索逻辑
   if (queryString) {
     const trimmedQuery = queryString.trim();
 
-    // 使用 bool + should 组合多种匹配策略
     must.push({
       bool: {
         should: [
-          // 原有的 multi_match（保持兼容）
           {
             multi_match: {
               query: trimmedQuery,
@@ -211,7 +300,6 @@ export async function searchArticles({
               fuzziness: "AUTO",
             },
           },
-          // 新增：通配符查询（支持部分匹配）
           {
             wildcard: {
               title: {
@@ -229,7 +317,7 @@ export async function searchArticles({
             },
           },
         ],
-        minimum_should_match: 1, // 至少匹配一个条件
+        minimum_should_match: 1,
       },
     });
   }
@@ -242,7 +330,6 @@ export async function searchArticles({
     filter.push({ terms: { tags } });
   }
 
-  // 保持原有的查询结构
   const searchResponse = await esClient.search({
     index: "articles",
     from,
@@ -254,18 +341,22 @@ export async function searchArticles({
   const totalHits =
     typeof searchResponse.hits.total === "number"
       ? searchResponse.hits.total
-      : searchResponse.hits.total?.value || 0;
+      : (searchResponse.hits.total as { value: number })?.value || 0;
 
-  const data = hits.map((hit: any) => ({
-    id: parseInt(hit._id, 10),
-    title: hit._source.title,
-    content: hit._source.content,
-    category_id: hit._source.category_id,
-    tags: Array.isArray(hit._source.tags) ? hit._source.tags : [],
-    author_id: hit._source.author_id,
-    is_active: !!hit._source.is_active,
-    created_at: hit._source.created_at,
-    updated_at: hit._source.updated_at,
+  const data = hits.map((hit) => ({
+    id: parseInt(hit._id as string, 10),
+    title: (hit._source as Record<string, unknown>)?.title as string,
+    content: (hit._source as Record<string, unknown>)?.content as string,
+    category_id: (hit._source as Record<string, unknown>)?.category_id as
+      | number
+      | null,
+    tags: Array.isArray((hit._source as Record<string, unknown>)?.tags)
+      ? ((hit._source as Record<string, unknown>)?.tags as string[])
+      : [],
+    author_id: (hit._source as Record<string, unknown>)?.author_id as number,
+    is_active: !!(hit._source as Record<string, unknown>)?.is_active,
+    created_at: (hit._source as Record<string, unknown>)?.created_at as string,
+    updated_at: (hit._source as Record<string, unknown>)?.updated_at as string,
   }));
 
   const totalPages = Math.ceil(totalHits / pageSize);
@@ -281,9 +372,8 @@ export async function searchArticles({
   };
 }
 
-export async function getArticleById(id: number, user: any) {
-  // 1️⃣ 查文章
-  const [rows]: any = await database.query(
+export async function getArticleById(id: number, user: User) {
+  const [rows] = await database.query<ArticleRow[]>(
     `
     SELECT 
       a.id,
@@ -310,7 +400,6 @@ export async function getArticleById(id: number, user: any) {
 
   const article = rows[0];
 
-  // 2️⃣ 权限检查
   if (
     !article.is_active &&
     user.role !== "admin" &&
@@ -319,8 +408,7 @@ export async function getArticleById(id: number, user: any) {
     throw new Error("FORBIDDEN_VIEW");
   }
 
-  // 3️⃣ 查 tags
-  const [tagRows]: any = await database.query(
+  const [tagRows] = await database.query<TagRow[]>(
     `
     SELECT t.name
     FROM article_tags at
@@ -330,9 +418,8 @@ export async function getArticleById(id: number, user: any) {
     [id]
   );
 
-  const tags = tagRows.map((t: any) => t.name);
+  const tags = tagRows.map((t) => t.name);
 
-  // 4️⃣ 返回整合数据
   return {
     id: article.id,
     title: article.title,
@@ -340,22 +427,25 @@ export async function getArticleById(id: number, user: any) {
     category_id: article.category_id,
     category_name: article.category_name,
     tags,
-    author: article.author_name,
+    author: article.author_name || "Unknown",
     created_by: article.created_by_name,
     updated_by: article.updated_by_name,
     is_active: Boolean(article.is_active),
   };
 }
 
-export async function updateArticle(id: string, body: any, user: any) {
+export async function updateArticle(
+  id: string,
+  body: UpdateArticleBody,
+  user: User
+) {
   const { title, content, category_id, tags } = body;
 
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1) 读取原文章与原 tags（用于 old_data / 默认值）
-    const [originalRows]: any = await connection.query(
+    const [originalRows] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
@@ -364,28 +454,28 @@ export async function updateArticle(id: string, body: any, user: any) {
     }
     const original = originalRows[0];
 
-    const [origTagRows]: any = await connection.query(
+    const [origTagRows] = await connection.query<TagRow[]>(
       "SELECT t.id, t.name FROM tags t JOIN article_tags at ON t.id = at.tag_id WHERE at.article_id = ?",
       [id]
     );
-    const originalTagObjects: { id: number; name: string }[] =
-      origTagRows || [];
-    // 在 try { ... } 内，获取 original 文章后
-    const [userRows]: any = await connection.query(
+    const originalTagObjects: TagObject[] = origTagRows.map((t) => ({
+      id: t.id!,
+      name: t.name,
+    }));
+
+    const [userRows] = await connection.query<UserRow[]>(
       `SELECT 
-      u_created.username AS created_by_name,
-      u_updated.username AS updated_by_name
-    FROM users u_created
-    JOIN users u_updated
-      ON 1=1
-    WHERE u_created.id = ? AND u_updated.id = ?`,
+        u_created.username AS created_by_name,
+        u_updated.username AS updated_by_name
+      FROM users u_created
+      JOIN users u_updated ON 1=1
+      WHERE u_created.id = ? AND u_updated.id = ?`,
       [original.created_by, original.updated_by]
     );
 
     const createdBy = userRows[0]?.created_by_name || "";
     const updatedBy = userRows[0]?.updated_by_name || "";
 
-    // 2) 计算更新后的值（如果对应字段未提供就用原来的）
     const updatedTitle = typeof title !== "undefined" ? title : original.title;
     const updatedContent =
       typeof content !== "undefined" ? content : original.content;
@@ -395,6 +485,7 @@ export async function updateArticle(id: string, body: any, user: any) {
           ? null
           : category_id
         : original.category_id;
+
     const allowedFields = ["title", "content", "category_id", "tags"];
     const invalidFields = Object.keys(body).filter(
       (key) => !allowedFields.includes(key)
@@ -403,26 +494,21 @@ export async function updateArticle(id: string, body: any, user: any) {
       throw new Error(`Invalid fields: ${invalidFields.join(", ")}`);
     }
 
-    // 3) 如果有传 tags（包括空数组），处理 tags 逻辑；如果没传 tags 则保持原 tags
-    let finalTagObjects: { id: number; name: string }[] = originalTagObjects;
+    let finalTagObjects: TagObject[] = originalTagObjects;
 
     if (typeof tags !== "undefined") {
-      // tags 被明确传入（可能是 [] 或数组）
       if (!Array.isArray(tags)) {
         throw new Error("Tags must be an array");
       }
 
-      // 删除旧的关联
       await connection.query("DELETE FROM article_tags WHERE article_id = ?", [
         id,
       ]);
 
       if (tags.length > 0) {
-        // 确保 tags（已有的取出，新标签插入）
         const ensured = await ensureTags(connection, tags, user.id);
         finalTagObjects = ensured;
 
-        // 插入 article_tags 关联
         const articleTagValues = finalTagObjects.map((t) => [id, t.id]);
         if (articleTagValues.length > 0) {
           await connection.query(
@@ -431,16 +517,12 @@ export async function updateArticle(id: string, body: any, user: any) {
           );
         }
       } else {
-        // tags === [] -> finalTagObjects 已为 []
         finalTagObjects = [];
-        // 已删除关联，无需再插入
       }
     }
-    // 如果 tags 未传入 -> finalTagObjects 保持 originalTagObjects（不作改动）
 
-    // 4) 动态构建 UPDATE 语句（只更新被提供的字段），并保证 updated_by / updated_at 总是写入
     const fields: string[] = [];
-    const params: any[] = [];
+    const params: (string | number | null)[] = [];
 
     if (typeof title !== "undefined") {
       fields.push("title = ?");
@@ -455,7 +537,6 @@ export async function updateArticle(id: string, body: any, user: any) {
       params.push(updatedCategory);
     }
 
-    // Always update updated_by and updated_at
     fields.push("updated_by = ?");
     params.push(user.id);
     fields.push("updated_at = NOW()");
@@ -465,8 +546,6 @@ export async function updateArticle(id: string, body: any, user: any) {
       params.push(id);
       await connection.query(sql, params);
     }
-
-    // 5) 写日志：记录 old_data 与 new_data（完整快照）
 
     await connection.query(
       "INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data) VALUES (?, 'UPDATE', ?, ?, ?)",
@@ -486,33 +565,9 @@ export async function updateArticle(id: string, body: any, user: any) {
         }),
       ]
     );
-    console.log("🔍 Updating ES with document:", {
-      index: "articles",
-      id: id.toString(),
-      refresh: true,
-      title: updatedTitle,
-      content: updatedContent,
-      category_id: updatedCategory,
-      tags: finalTagObjects.map((t) => t.name),
-    });
 
-    // 🔄 同步更新 articles.last_activity
-    await connection.query(
-      "UPDATE articles SET last_activity = ? WHERE id = ?",
-      ["UPDATE", id]
-    );
-
-    // 6) 同步到 Elasticsearch（把完整最新内容 index/replace）
     try {
-      console.log("🟡 Preparing to update Elasticsearch:", {
-        id,
-        title,
-        content,
-        category_id,
-        tags: finalTagObjects.map((t) => t.name),
-      });
-
-      const result = await esClient.index({
+      await esClient.index({
         index: "articles",
         id: id.toString(),
         refresh: true,
@@ -520,17 +575,16 @@ export async function updateArticle(id: string, body: any, user: any) {
           title: updatedTitle,
           content: updatedContent,
           category_id: updatedCategory,
-          author_id: original.author_id, // 如果需要 username 可以加 author: authorUsername
+          author_id: original.author_id,
           tags: finalTagObjects.map((t) => t.name),
           is_active: !!original.is_active,
-          created_by: createdBy, // 这里是用户名
-          updated_by: updatedBy, // 这里是用户名
+          created_by: createdBy,
+          updated_by: updatedBy,
           created_at: original.created_at,
           updated_at: new Date().toISOString(),
         },
       });
-
-      console.log("🟢 Elasticsearch response:", result);
+      console.log("✅ Elasticsearch updated");
     } catch (esErr) {
       console.error("❌ Elasticsearch update failed:", esErr);
     }
@@ -538,7 +592,6 @@ export async function updateArticle(id: string, body: any, user: any) {
     await connection.commit();
     connection.release();
 
-    // 7) 返回最新的文章快照（tags 为数组）
     return {
       id: parseInt(id, 10),
       title: updatedTitle,
@@ -557,13 +610,12 @@ export async function updateArticle(id: string, body: any, user: any) {
   }
 }
 
-export async function deleteArticle(articleId: number, user: any) {
+export async function deleteArticle(articleId: number, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 找到文章
-    const [articles]: any = await connection.query(
+    const [articles] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [articleId]
     );
@@ -574,12 +626,10 @@ export async function deleteArticle(articleId: number, user: any) {
 
     const article = articles[0];
 
-    // 2️⃣ 权限检查
     if (user.role !== "admin" && article.author_id !== user.id) {
       throw new Error("You cannot delete this article");
     }
 
-    // 3️⃣ 写日志
     await connection.query(
       `INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data)
        VALUES (?, 'SOFT_DELETE', ?, ?, ?)`,
@@ -590,19 +640,17 @@ export async function deleteArticle(articleId: number, user: any) {
           title: article.title,
           content: article.content,
           category_id: article.category_id,
-          tags: [], // 可扩展：也可以查关联 tags
+          tags: [],
         }),
         JSON.stringify({ is_active: false }),
       ]
     );
 
-    // 4️⃣ 软删除
     await connection.query(
       "UPDATE articles SET is_active = 0, updated_by = ? WHERE id = ?",
       [user.id, articleId]
     );
 
-    // 5️⃣ Elasticsearch 同步
     try {
       await esClient.update({
         index: "articles",
@@ -626,13 +674,12 @@ export async function deleteArticle(articleId: number, user: any) {
   }
 }
 
-export async function restoreArticle(id: string, user: any) {
+export async function restoreArticle(id: string, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查询文章
-    const [rows]: any = await connection.query(
+    const [rows] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
@@ -643,12 +690,10 @@ export async function restoreArticle(id: string, user: any) {
 
     const article = rows[0];
 
-    // 2️⃣ 权限检查
     if (user.role !== "admin" && article.author_id !== user.id) {
       throw new Error("You cannot restore this article");
     }
 
-    // 3️⃣ 写日志
     await connection.query(
       `INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data)
        VALUES (?, 'RESTORE', ?, ?, ?)`,
@@ -660,19 +705,17 @@ export async function restoreArticle(id: string, user: any) {
       ]
     );
 
-    // 4️⃣ 恢复文章
     await connection.query(
       "UPDATE articles SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?",
       [user.id, id]
     );
 
-    // 5️⃣ Elasticsearch 同步
     try {
       await esClient.update({
         index: "articles",
         id: id.toString(),
         doc: { is_active: true, updated_at: new Date() },
-        refresh: true, // 👈 立即可见
+        refresh: true,
       });
       console.log(`✅ Elasticsearch restored article ${id}`);
     } catch (esErr) {
@@ -690,25 +733,22 @@ export async function restoreArticle(id: string, user: any) {
   }
 }
 
-export async function hardDeleteArticle(id: string, user: any) {
+export async function hardDeleteArticle(id: string, user: User) {
   const connection = await database.getConnection();
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查出旧数据
-    const [articles]: any = await connection.query(
+    const [articles] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
     if (!articles.length) throw new Error("Article not found");
     const article = articles[0];
 
-    // 2️⃣ 权限检查
     if (user.role !== "admin" && article.author_id !== user.id) {
       throw new Error("You cannot delete this article");
     }
 
-    // 3️⃣ 先写 log（确保记录留下来）
     await connection.query(
       `INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data)
        VALUES (?, 'DELETE', ?, ?, ?)`,
@@ -720,15 +760,12 @@ export async function hardDeleteArticle(id: string, user: any) {
       ]
     );
 
-    // 4️⃣ 删除关联表，避免外键冲突
     await connection.query("DELETE FROM article_tags WHERE article_id = ?", [
       id,
     ]);
 
-    // 5️⃣ 删除主表
     await connection.query("DELETE FROM articles WHERE id = ?", [id]);
 
-    // 6️⃣ 删除 ES
     try {
       await esClient.delete({
         index: "articles",

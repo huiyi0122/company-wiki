@@ -24,15 +24,16 @@ export default function DocDetail({
   setCurrentUser,
 }: DocDetailProps) {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
   const [doc, setDoc] = useState<DocItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  const navigate = useNavigate();
 
-  // 🧩 加载分类映射 (Same as before)
+  // ------------------- 加载分类 -------------------
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessToken");
     if (!token) return;
 
     fetch(`${API_BASE_URL}/categories`, {
@@ -49,9 +50,9 @@ export default function DocDetail({
       .catch((err) => console.error("❌ Error loading categories:", err));
   }, []);
 
-  // 🏷️ 加载所有标签
+  // ------------------- 加载标签 -------------------
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessToken");
     if (!token) return;
 
     fetch(`${API_BASE_URL}/tags`, {
@@ -66,14 +67,13 @@ export default function DocDetail({
       .catch((err) => console.error("❌ Error loading tags:", err));
   }, []);
 
-  // 📄 加载文档详情 (修正标签依赖问题)
+  // ------------------- 加载文章 -------------------
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token || !id) return;
-    
-    // ⚠️ 只有在标签加载完成（或至少开始加载）后，才开始加载文档详情。
-    // 但是，最关键的是确保在处理文档数据时 allTags 是最新的。
-    // 我们信任 React 的依赖数组。当 allTags 第一次加载完成时，会触发此 effect。
+    const token = localStorage.getItem("accessToken");
+    if (!token || !id) {
+      setLoading(false); // ✅ 避免无限 loading
+      return;
+    }
 
     setLoading(true);
 
@@ -83,21 +83,10 @@ export default function DocDetail({
       .then((res) => res.json())
       .then((result) => {
         if (result.success && result.data) {
-          let article = result.data as DocItem;
-
-          // ✅ 如果后端没有返回 tags (对象数组)，但有 tag_ids (ID 数组)
-          // 并且 allTags 已经加载完成，则进行映射
-          if (!article.tags && Array.isArray(article.tag_ids) && allTags.length > 0) {
-            article.tags = allTags.filter((t) =>
-              article.tag_ids!.includes(t.id)
-            );
-          }
-          
-          // 如果后端直接返回 tag_ids，但没有返回 author_id 或 created_at，这里也不会报错。
-          setDoc(article);
+          setDoc(result.data);
         } else {
           toast.error(result.message || "Failed to load document");
-          setDoc(null); // 设置为 null 以显示 "Document not found"
+          setDoc(null);
         }
       })
       .catch((err) => {
@@ -106,13 +95,27 @@ export default function DocDetail({
         setDoc(null);
       })
       .finally(() => setLoading(false));
-  }, [id, allTags]); // 依赖 allTags，确保标签加载完成后，文档处理逻辑能正确运行
+  }, [id]);
 
-  // 🗑️ 删除文章 (Same as before)
+  // ------------------- 填充标签 -------------------
+  useEffect(() => {
+    if (!doc || allTags.length === 0) return;
+    if (!doc.tags && Array.isArray(doc.tag_ids)) {
+      setDoc((prev) =>
+        prev && {
+          ...prev,
+          tags: allTags.filter((t) => doc.tag_ids!.includes(t.id)),
+        }
+      );
+    }
+  }, [doc, allTags]);
+
+  // ------------------- 删除文章 -------------------
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this document?")) return;
+    if (!window.confirm("Are you sure you want to delete this document?"))
+      return;
 
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessToken");
     if (!token || !id) return;
 
     try {
@@ -132,15 +135,43 @@ export default function DocDetail({
     }
   };
 
-  // ✅ 权限判断
+  // ------------------- 权限判断 -------------------
   const canEdit =
     currentUser &&
     (currentUser.role === "admin" ||
       (currentUser.role === "editor" && doc?.author_id === currentUser.id));
   const canDelete = canEdit;
 
-  if (loading) return <p className="loading-message">Loading document...</p>;
-  if (!doc) return <p className="loading-message">Document not found ❌</p>;
+  // ------------------- 渲染 -------------------
+  if (loading) {
+    return (
+      <div className="layout">
+        <Sidebar
+          setCategory={() => {}}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+        />
+        <div className="main-content-with-sidebar">
+          <div className="doc-loading">Loading document...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!doc) {
+    return (
+      <div className="layout">
+        <Sidebar
+          setCategory={() => {}}
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+        />
+        <div className="main-content-with-sidebar">
+          <div className="doc-not-found">Document not found ❌</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="layout">
@@ -151,81 +182,90 @@ export default function DocDetail({
       />
 
       <div className="main-content-with-sidebar">
-        <div className="doc-top">
-          <h2>{doc.title}</h2>
+        <div className="doc-detail-container">
+          <nav className="breadcrumb">
+            <button onClick={() => navigate("/docs")} className="breadcrumb-link">
+              Articles
+            </button>
+            <span className="breadcrumb-separator">›</span>
+            <button
+              onClick={() => navigate(`/docs?category_id=${doc.category_id}`)}
+              className="breadcrumb-link"
+            >
+              {categoryMap[doc.category_id || 0] || "Uncategorized"}
+            </button>
+            <span className="breadcrumb-separator">›</span>
+            <span className="breadcrumb-current">{doc.title}</span>
+          </nav>
 
-          <p>
-            <strong>Category:</strong>{" "}
-            {categoryMap[doc.category_id || 0] || "Uncategorized"}
-          </p>
-
-          <p>
-            <strong>Author:</strong> {doc.author || "Unknown"}
-          </p>
-
-          {doc.tags && Array.isArray(doc.tags) && doc.tags.length > 0 && (
-            <div className="article-tags">
-              <strong>Tags: </strong>
-              {doc.tags.map((t: any, index: number) => {
-                const tagName = typeof t === "string" ? t : t.name || "Untitled";
-                return (
-                  <span key={t.id || tagName} className="tag-pill-sm">
-                    #{tagName}
-                    {index < doc.tags.length - 1 && " "} {/* 用空格分隔 */}
-                  </span>
-                );
-              })}
+          {(canEdit || canDelete) && (
+            <div className="doc-actions">
+              {canEdit && (
+                <button
+                  className="action-btn edit-btn"
+                  onClick={() => navigate(`/editor/${id}`)}
+                  title="Edit article"
+                >
+                  ✏️ Edit
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="action-btn delete-btn"
+                  onClick={handleDelete}
+                  title="Delete article"
+                >
+                  🗑️ Delete
+                </button>
+              )}
             </div>
           )}
 
+          <h1 className="doc-title">{doc.title}</h1>
 
-
-          <p>
-            <strong>Created:</strong>{" "}
-            {doc.created_at
-              ? new Date(doc.created_at).toLocaleString()
-              : "N/A"}
-          </p>
-
-          <div className="doc-buttons" style={{ marginBottom: "20px" }}>
-            {canEdit && (
-              <button
-                className="edit"
-                onClick={() => navigate(`/editor/${id}`)}
-              >
-                Edit
-              </button>
-            )}
-            {canDelete && (
-              <button className="delete" onClick={handleDelete}>
-                Delete
-              </button>
-            )}
+          <div className="doc-meta">
+            <span className="meta-item">
+              <span className="meta-icon">👤</span>
+              {doc.author || "Unknown"}
+            </span>
+            <span className="meta-separator">•</span>
+            <span className="meta-item">
+              <span className="meta-icon">📅</span>
+              {doc.created_at
+                ? new Date(doc.created_at).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : "N/A"}
+            </span>
           </div>
 
-          <div
-            id="doc-content"
-            style={{
-              padding: "0",
-              background: "none",
-              border: "none",
-              borderRadius: "0",
-            }}
-          >
-            <MDEditor
-              value={doc.content}
-              preview="preview"
-              hideToolbar={true}
-              height={700}
-              previewOptions={{
-                remarkPlugins: [remarkGfm, remarkGemoji],
-              }}
+          {Array.isArray(doc.tags) && doc.tags.length > 0 && (
+            <div className="doc-tags">
+              {doc.tags.map((t: any, i) => (
+                <span key={i} className="tag-badge">
+                  #{typeof t === "string" ? t : t.name || "Untitled"}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <hr className="doc-divider" />
+
+          <div className="doc-content">
+            <MDEditor.Markdown
+              source={doc.content}
+              style={{ background: "transparent" }}
+              remarkPlugins={[remarkGfm, remarkGemoji]}
             />
           </div>
 
-          <button className="view" onClick={() => navigate("/docs")}>
-            Back to Docs
-          </button>
+          <div className="doc-footer">
+            <button className="back-btn" onClick={() => navigate("/docs")}>
+              ← Back to Articles
+            </button>
+          </div>
         </div>
       </div>
     </div>

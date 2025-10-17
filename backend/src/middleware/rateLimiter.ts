@@ -1,13 +1,12 @@
 import rateLimit from "express-rate-limit";
 
-// 根据角色生成 limiter
 export function getRateLimiter(role: string) {
-  let maxRequests = 5; // 默认普通用户
+  let maxRequests = 5;
   if (role === "admin") maxRequests = 20;
-  if (role === "manager") maxRequests = 10;
+  if (role === "editor") maxRequests = 10;
 
   return rateLimit({
-    windowMs: 10 * 1000, // 10秒窗口
+    windowMs: 10 * 1000,
     max: maxRequests,
     message: {
       success: false,

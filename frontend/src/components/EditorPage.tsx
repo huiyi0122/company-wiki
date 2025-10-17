@@ -44,92 +44,62 @@ export default function EditorPage({
   const navigate = useNavigate();
 
   // ---------------------- 初始化：获取分类、标签、加载文章 ----------------------
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+useEffect(() => {
+  const loadData = async () => {
+    const token = localStorage.getItem("accessToken");
     if (!token) return;
 
     setLoading(true);
 
-    // 获取分类
-    fetch(`${API_BASE_URL}/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && Array.isArray(result.data)) {
-          setCategories(result.data);
-        }
-      })
-      .catch((err) => console.error("Error fetching categories:", err));
-
-    // 获取所有标签到内存
-    fetch(`${API_BASE_URL}/tags?limit=1000`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && result.data) {
-          setAllTags(result.data);
-        }
-      })
-      .catch((err) => console.error("Error fetching tags:", err));
-
-    // 编辑模式加载文章
-    if (id) {
-      fetch(`${API_BASE_URL}/articles/${id}`, {
+    try {
+      // 1. fetch categories
+      const catRes = await fetch(`${API_BASE_URL}/categories`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((result) => {
-          if (result.success && result.data) {
-            const article = result.data;
-            setTitle(article.title);
-            setContent(article.content);
-            setCategoryId(article.category_id || null);
+      });
+      const catData = await catRes.json();
+      if (catData.success && Array.isArray(catData.data)) setCategories(catData.data);
 
-            // 处理标签：从返回的数据中提取 tag IDs
-            if (article.tags && Array.isArray(article.tags)) {
-              // 将文章的标签与 allTags 匹配
-              setAllTags((prevTags) => {
-                const selectedTagIds: number[] = [];
-                const newTagsToAdd: Tag[] = [];
+      // 2. fetch all tags
+      const tagRes = await fetch(`${API_BASE_URL}/tags?limit=1000`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const tagData = await tagRes.json();
+      let tags: Tag[] = [];
+      if (tagData.success && Array.isArray(tagData.data)) tags = tagData.data;
+      setAllTags(tags);
 
-                article.tags.forEach((tag: any) => {
-                  const tagName = typeof tag === 'object' ? tag.name : tag;
-                  const tagId = typeof tag === 'object' ? tag.id : undefined;
+      // 3. fetch article if editing
+      if (id) {
+        const artRes = await fetch(`${API_BASE_URL}/articles/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const artData = await artRes.json();
+        if (artData.success && artData.data) {
+          const article = artData.data;
+          setTitle(article.title);
+          setContent(article.content);
+          setCategoryId(article.category_id || null);
 
-                  // 在 allTags 中查找
-                  const existingTag = prevTags.find(
-                    (t) => t.name.toLowerCase() === tagName.toLowerCase()
-                  );
-
-                  if (existingTag) {
-                    // 找到了，使用它的 ID
-                    selectedTagIds.push(existingTag.id);
-                  } else if (tagId) {
-                    // API 返回了 ID，使用它
-                    selectedTagIds.push(tagId);
-                    newTagsToAdd.push({ id: tagId, name: tagName });
-                  } else {
-                    // 没有 ID，创建新的（用 tagName 作为临时 ID）
-                    const tempId = `tag_${tagName}`.hashCode?.() || tagName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-                    selectedTagIds.push(tempId);
-                    newTagsToAdd.push({ id: tempId, name: tagName });
-                  }
-                });
-
-                setSelectedTags(selectedTagIds);
-                return [...prevTags, ...newTagsToAdd];
-              });
-            }
+          // 匹配标签
+          if (article.tags && Array.isArray(article.tags)) {
+            const selectedTagIds = article.tags.map((t: any) => {
+              const existing = tags.find((tag) => tag.name.toLowerCase() === (t.name || t).toLowerCase());
+              return existing ? existing.id : t.id;
+            });
+            setSelectedTags(selectedTagIds);
           }
-        })
-        .catch((err) => console.error(err))
-        .finally(() => setLoading(false));
-    } else {
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
       setLoading(false);
     }
-  }, [id]);
+  };
+
+  loadData();
+}, [id]);
+
 
   // ---------------------- 实时搜索标签（客户端 + 服务端） ----------------------
   const handleTagInputChange = async (value: string) => {
@@ -328,7 +298,7 @@ export default function EditorPage({
     if (!title || !content)
       return toast.warning("Title and content are required.");
 
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessToken");
     if (!token) return;
 
     const selectedTagNames = allTags

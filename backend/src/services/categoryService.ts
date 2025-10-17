@@ -21,14 +21,12 @@ export async function createCategory(name: string, user: any) {
     );
     const categoryId = result.insertId;
 
-    // 写日志
     await connection.query(
       `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'CREATE', ?, NULL, ?)`,
       [categoryId, user.id, JSON.stringify({ name, slug })]
     );
 
-    // 同步到 ES
     await esClient.index({
       index: "categories",
       id: categoryId.toString(),
@@ -85,7 +83,7 @@ export async function searchCategoriesES(options: {
 
   const res = await esClient.search({
     index: "categories",
-    size: 1000, // ✅ 默认最多取 1000 条，可视需要调整
+    size: 1000,
     query,
   });
 
@@ -97,7 +95,6 @@ export async function searchCategoriesES(options: {
   }));
 }
 
-// 更新 category
 export interface UpdateCategoryData {
   name?: string;
   is_active?: boolean;
@@ -133,7 +130,6 @@ export async function updateCategory(
       ]
     );
 
-    // 写日志
     await connection.query(
       `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'UPDATE', ?, ?, ?)`,
@@ -203,7 +199,6 @@ export async function deleteCategory(id: number, user: any, force = false) {
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 获取 category 原始数据
     const [rows]: any = await connection.query(
       "SELECT * FROM categories WHERE id = ?",
       [id]
@@ -211,7 +206,6 @@ export async function deleteCategory(id: number, user: any, force = false) {
     if (!rows.length) throw new Error("Category not found");
     const original = rows[0];
 
-    // 2️⃣ 检查是否被文章使用
     const [used]: any = await connection.query(
       "SELECT COUNT(*) AS count FROM articles WHERE category_id = ?",
       [id]
@@ -222,7 +216,6 @@ export async function deleteCategory(id: number, user: any, force = false) {
       );
     }
 
-    // 3️⃣ 如果 force=true，把这些文章的 category_id 设为 NULL
     if (force) {
       await connection.query(
         "UPDATE articles SET category_id = NULL WHERE category_id = ?",
@@ -230,13 +223,11 @@ export async function deleteCategory(id: number, user: any, force = false) {
       );
     }
 
-    // 4️⃣ soft delete category
     await connection.query(
       "UPDATE categories SET is_active = 0, updated_by = ?, updated_at = NOW() WHERE id = ?",
       [user.id, id]
     );
 
-    // 5️⃣ 写 category_logs
     await connection.query(
       `
       INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
@@ -256,7 +247,6 @@ export async function deleteCategory(id: number, user: any, force = false) {
       ]
     );
 
-    // 6️⃣ 同步 Elasticsearch（可选，如果你 categories 也进 ES）
     try {
       await esClient.delete({
         index: "categories",
@@ -285,7 +275,6 @@ export async function hardDeleteCategory(id: number, user: any) {
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查询 category
     const [categories]: any = await connection.query(
       "SELECT * FROM categories WHERE id = ?",
       [id]
@@ -293,7 +282,6 @@ export async function hardDeleteCategory(id: number, user: any) {
     if (!categories.length) throw new Error("Category not found");
     const category = categories[0];
 
-    // 2️⃣ 写 log
     await connection.query(
       `
       INSERT INTO category_logs (
@@ -309,10 +297,8 @@ export async function hardDeleteCategory(id: number, user: any) {
       [id, user.id, JSON.stringify(category), JSON.stringify({ deleted: true })]
     );
 
-    // 3️⃣ 真正删除 category
     await connection.query("DELETE FROM categories WHERE id = ?", [id]);
 
-    // 4️⃣ Elasticsearch 删除（可选）
     try {
       await esClient.delete({
         index: "categories",
@@ -339,7 +325,6 @@ export async function restoreCategory(id: number, user: any) {
   await connection.beginTransaction();
 
   try {
-    // 1️⃣ 查询标签
     const [categories]: any = await connection.query(
       "SELECT * FROM categories WHERE id = ?",
       [id]
@@ -349,13 +334,11 @@ export async function restoreCategory(id: number, user: any) {
     const category = categories[0];
     if (category.is_active === 1) throw new Error("Category is already active");
 
-    // 2️⃣ 更新状态为启用
     await connection.query(
       "UPDATE categories SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?",
       [user.id, id]
     );
 
-    // 3️⃣ 写日志
     await connection.query(
       `INSERT INTO category_logs (category_id, action, changed_by, old_data, new_data)
        VALUES (?, 'RESTORE', ?, ?, ?)`,
@@ -367,7 +350,6 @@ export async function restoreCategory(id: number, user: any) {
       ]
     );
 
-    // 4️⃣ Elasticsearch 同步
     try {
       await esClient.update({
         index: "categories",

@@ -1,104 +1,340 @@
-.doc-top {
-    margin: 50px;
+/* src/styles/DocDetail.css */
+
+.doc-detail-container {
+  max-width: 900px;
+  padding: 40px 60px;
+  background: #ffffff;
+  min-height: 100vh;
 }
 
-.w-md-editor {
-    text-align: left;
-    border-radius: 8px;
-    padding: 0;
-    position: relative;
-    background-color: transparent;   
-    font-family: "Segoe UI", Arial, sans-serif;  
-    box-shadow: none;            
-    border: 1px solid #e2e8f0;  
-    display: flex;
-    flex-direction: column;
-}
-
-.doc-top .w-md-editor-preview {
-    padding: 0;
-    line-height: 1.7;
-    font-size: 1rem;
-    color: #2d3748;
-    overflow: scroll;
-    background: transparent !important;
-}
-
-/* Markdown 标题样式 */
-.w-md-editor-preview h1,
-.w-md-editor-preview h2,
-.w-md-editor-preview h3 {
-    margin-top: 1.2em;
-    margin-bottom: 0.6em;
-    font-weight: 600;
-    color: #1a202c;
-}
-
-.w-md-editor-preview p {
-    margin: 0.8em 0;
-}
-
-.w-md-editor-preview pre {
-    background: #f7fafc;
-    padding: 12px;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-size: 0.9rem;
-}
-
-.w-md-editor-preview blockquote {
-    border-left: 4px solid #4299e1;
-    padding-left: 12px;
-    margin: 1em 0;
-    color: #4a5568;
-    border-radius: 4px;
-}
-
-.confirm-modal {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
+/* 面包屑导航 */
+.breadcrumb {
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 9999;
+  gap: 8px;
+  margin-bottom: 32px;
+  font-size: 0.9rem;
+  color: #6b7280;
+  flex-wrap: wrap;
 }
 
-.confirm-content {
-  background: #fff;
-  padding: 20px 30px;
-  border-radius: 8px;
-  text-align: center;
+.breadcrumb-link {
+  background: none;
+  border: none;
+  color: #4299e1;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  transition: color 0.2s ease;
 }
 
-.confirm-buttons button {
-  margin: 0 10px;
-  padding: 5px 15px;
+.breadcrumb-link:hover {
+  color: #2b6cb0;
+  text-decoration: underline;
 }
 
-.tag-pill {
-  display: inline-block;
-  background-color: #e0e7ff;
-  color: #1e40af;
-  border-radius: 12px;
-  padding: 3px 10px;
-  margin: 0 5px;
+.breadcrumb-separator {
+  color: #cbd5e0;
+  user-select: none;
+}
+
+.breadcrumb-current {
+  color: #2d3748;
+  font-weight: 500;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 操作按钮（右上角） */
+.doc-actions {
+  position: absolute;
+  top: 40px;
+  right: 60px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #4a5568;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-btn:hover {
+  border-color: #4299e1;
+  color: #4299e1;
+  background: #ebf8ff;
+}
+
+.delete-btn:hover {
+  border-color: #fc8181;
+  color: #c53030;
+  background: #fff5f5;
+}
+
+/* 文章标题 */
+.doc-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0 0 20px 0;
+  line-height: 1.2;
+}
+
+/* 文章元信息 */
+.doc-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: #718096;
+  font-size: 0.95rem;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meta-icon {
+  font-size: 1rem;
+}
+
+.meta-separator {
+  color: #cbd5e0;
+}
+
+/* 标签 */
+.doc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tag-badge {
+  background: #edf2f7;
+  color: #4a5568;
+  padding: 4px 12px;
+  border-radius: 16px;
   font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tag-badge:hover {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+/* 分割线 */
+.doc-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 32px 0;
+}
+
+/* 文章内容 */
+.doc-content {
+  margin: 40px 0;
+  line-height: 1.75;
+  color: #2d3748;
+}
+
+.doc-content .wmde-markdown {
+  background: transparent !important;
+  color: #2d3748;
+  font-size: 1rem;
+}
+
+.doc-content .wmde-markdown h1,
+.doc-content .wmde-markdown h2,
+.doc-content .wmde-markdown h3 {
+  color: #1a202c;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  font-weight: 600;
+}
+
+.doc-content .wmde-markdown h1 {
+  font-size: 2rem;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0.3em;
+}
+
+.doc-content .wmde-markdown h2 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.3em;
+}
+
+.doc-content .wmde-markdown h3 {
+  font-size: 1.25rem;
+}
+
+.doc-content .wmde-markdown a {
+  color: #4299e1;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.doc-content .wmde-markdown a:hover {
+  border-bottom-color: #4299e1;
+}
+
+.doc-content .wmde-markdown code {
+  background: #edf2f7;
+  color: #c53030;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.doc-content .wmde-markdown pre {
+  background: #1a202c !important;
+  border-radius: 8px;
+  /* padding: 16px; */
+  overflow-x: auto;
+}
+
+.doc-content .wmde-markdown blockquote {
+  border-left: 4px solid #4299e1;
+  padding-left: 16px;
+  margin: 1.5em 0;
+  color: #4a5568;
+  font-style: italic;
+}
+
+/* 底部返回按钮 */
+.doc-footer {
+  margin-top: 60px;
+  padding-top: 32px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.back-btn {
+  padding: 10px 20px;
+  border: 1px solid #cbd5e0;
+  background: white;
+  color: #4a5568;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #f7fafc;
+  border-color: #a0aec0;
+  transform: translateX(-4px);
+}
+
+/* 加载和错误状态 */
+.doc-loading,
+.doc-not-found {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  font-size: 1.1rem;
+  color: #718096;
+}
+
+.doc-not-found {
+  color: #c53030;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .doc-detail-container {
+    padding: 30px 40px;
+  }
+
+  .doc-actions {
+    top: 30px;
+    right: 40px;
+  }
 }
 
 @media (max-width: 768px) {
-    .doc-top {
-        margin: 100px 20px 20px;
-    }
+  .doc-detail-container {
+    padding: 20px 24px;
+  }
 
-    .w-md-editor-preview {
-        font-size: 0.95rem;
-        padding: 0;
-    }
+  .doc-actions {
+    position: static;
+    margin-bottom: 24px;
+    justify-content: flex-end;
+  }
+
+  .doc-title {
+    font-size: 2rem;
+  }
+
+  .breadcrumb {
+    font-size: 0.85rem;
+  }
+
+  .doc-content .wmde-markdown h1 {
+    font-size: 1.75rem;
+  }
+
+  .doc-content .wmde-markdown h2 {
+    font-size: 1.4rem;
+  }
 }
 
 @media (max-width: 480px) {
-    #doc-content {
-        padding: 10px;
-    }
+  .doc-detail-container {
+    padding: 16px;
+  }
+
+  .doc-title {
+    font-size: 1.75rem;
+  }
+
+  .doc-meta {
+    font-size: 0.85rem;
+  }
+
+  .action-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .breadcrumb-current {
+    max-width: 200px;
+  }
+}
+
+/* 确保 MDEditor 在 preview 模式下样式正确 */
+.w-md-editor-preview {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.w-md-editor {
+  background: transparent !important;
+  box-shadow: none !important;
 }

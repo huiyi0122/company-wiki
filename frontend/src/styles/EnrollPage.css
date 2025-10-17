@@ -329,6 +329,16 @@
   margin: 80px auto;
 }
 
+.password-value.clickable {
+  cursor: pointer;
+  background-color: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.password-value.clickable:hover {
+  background-color: #e0e0e0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .enroll-page {

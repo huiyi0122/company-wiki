@@ -3,58 +3,55 @@ import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 import "../styles/Login.css";
- 
+
 interface LoginProps {
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
- 
+
 export default function Login({ setCurrentUser }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
- 
+
   const handleLogin = async () => {
     if (!username || !password) {
-      console.error("Please fill all fields!");
+      alert("Please fill all fields!");
       return;
     }
- 
+
     try {
       const res = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
-        credentials: "include", // ✅ 必须加，发送和接收 cookie
       });
- 
+
       const data = await res.json();
- 
+      console.log("Response:", data);
+
       if (!res.ok || !data.success) {
-        console.error("Invalid username or password!");
+        alert(data.message || "Invalid username or password!");
         return;
       }
- 
-      if (data.user) {
-        setCurrentUser({
-          id: data.user.id,
-          username: data.user.username,
-          email: data.user.email,
-          role: data.user.role,
-        });
-      } else {
-        console.error("No user data in response!");
-        return;
-      }
- 
-      console.log("Login successful:", data.user);
- 
-      // ✅ 登录成功跳转
+
+      // 后端返回的结构是直接包含 accessToken / refreshToken / user
+      const { accessToken, refreshToken, user } = data;
+
+      // 存储 token
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+
+      // 更新当前用户状态
+      setCurrentUser(user);
+
+      // 跳转
       navigate("/docs");
     } catch (err) {
       console.error("Login failed:", err);
+      alert("Login request failed. Please check your connection or server.");
     }
-  };
- 
+  }; 
+
   return (
     <div className="login-container">
       <div className="login-split">
@@ -79,5 +76,3 @@ export default function Login({ setCurrentUser }: LoginProps) {
     </div>
   );
 }
- 
- 

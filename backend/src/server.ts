@@ -13,6 +13,7 @@ import userRouters from "./routes/user";
 import categoryRouters from "./routes/categories";
 
 import tagRouters from "./routes/tags";
+<<<<<<< HEAD
  
 const app = express();
  
@@ -34,6 +35,26 @@ app.use(cookieParser());
 
 app.use(express.json());
  
+=======
+import logsRouter from "./routes/logs";
+
+const app = express();
+
+// ✅ 中间件顺序很重要
+app.use(express.json());
+
+// CORS 配置 - localStorage 不需要 credentials
+app.use(
+  cors({
+    origin: "http://192.168.0.44:5173",
+    credentials: false, // 改为 false，因为用 localStorage 而不是 cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"], // 添加 Authorization header
+  })
+);
+
+// 路由
+>>>>>>> df6af74d5c5a51141167e7d58829beca9c5ae11a
 app.use("/", authRoutes);
 
 app.use("/articles", articleRoutes);
@@ -43,7 +64,13 @@ app.use("/users", userRouters);
 app.use("/categories", categoryRouters);
 
 app.use("/tags", tagRouters);
+<<<<<<< HEAD
  
+=======
+app.use("/logs", logsRouter);
+
+// 健康检查
+>>>>>>> df6af74d5c5a51141167e7d58829beca9c5ae11a
 app.get("/", (req, res) => {
 
   res.send("✅ API is running");

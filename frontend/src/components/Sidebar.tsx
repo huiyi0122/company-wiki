@@ -82,50 +82,79 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   // 🔥 获取分类列表（带 refresh-token 自动续签）
 useEffect(() => {
   const fetchCategories = async () => {
+    // ⚠️ 尝试获取 tokens
+    let accessToken = localStorage.getItem("accessToken");
+    let refreshToken = localStorage.getItem("refreshToken");
+
+    if (!accessToken) return; // 未登录就不 fetch
+
     const tryFetch = async (token: string) => {
       const res = await fetch(`${API_BASE_URL}/categories`, {
+        // 不需要 credentials: "include"，因为 token 在 Header 中
         headers: { Authorization: `Bearer ${token}` },
-        credentials: "include",
       });
       return res;
     };
 
-    let accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return; // 未登录就不 fetch
-
     let response = await tryFetch(accessToken);
 
     if (response.status === 401 || response.status === 403) {
+      // 检查是否有 refresh token 才能尝试续签
+      if (!refreshToken) {
+        console.warn("Access token expired and no refresh token found. Skipping categories fetch.");
+        // 可选：如果需要，可以导航到登录页面，但你之前注释了这行
+        // navigate("/login");
+        return;
+      }
+
       // refresh token
       const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
         method: "POST",
-        credentials: "include",
+        headers: { "Content-Type": "application/json" }, // 必须指定 content-type
+        body: JSON.stringify({ refreshToken: refreshToken }), // 🚨 将 refresh token 放在请求体中
       });
+
       const refreshData = await refreshRes.json();
-      if (refreshData.success && refreshData.token) {
-        accessToken = refreshData.token;
+      
+      // ⚠️ 成功续签后，后端应该返回新的 accessToken 和 refreshToken
+      if (refreshData.success && refreshData.accessToken && refreshData.refreshToken) {
+        accessToken = refreshData.accessToken;
+        refreshToken = refreshData.refreshToken; // 更新 refresh token
+        
+        // 存储新的 token
         localStorage.setItem("accessToken", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
+
+        // 使用新的 access token 再次尝试获取分类
         response = await tryFetch(accessToken);
       } else {
-        console.warn("Refresh token failed, skipping categories fetch.");
-        return; // ⚠️ 不再直接 navigate("/login")
+        console.warn("Refresh token failed, user should re-login.");
+        // ⚠️ 续签失败，清除所有 token
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setCurrentUser(null);
+        // 可选：导航到登录页
+        // navigate("/login");
+        return;
       }
     }
 
+    // 处理最终的 response
     const result = await response.json();
-    if (result.success) {
-      const list = Array.isArray(result.data)
-        ? result.data
-        : Array.isArray(result.data?.data)
-        ? result.data.data
-        : [];
-      setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
-    }
+// Sidebar.tsx (Corrected Logic)
+if (result.success) {
+  // 确认 result.data 是一个数组，并且是 Category 列表
+  const list = Array.isArray(result.data) ? result.data : [];
+
+  // 映射数据结构
+  setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
+} else {
+  console.warn("Categories fetch failed:", result);
+}
   };
 
   fetchCategories();
 }, []);
-
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
@@ -162,17 +191,16 @@ useEffect(() => {
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}` },
-        credentials: "include",
       });
 
       const result = await res.json();
 
-      if (result.success && Array.isArray(result.data)) {
-        const newArticles = result.data.map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          category_id: a.category_id,
-        }));
+if (result.success && Array.isArray(result.data)) {
+  const newArticles = result.data.map((a: any) => ({
+    id: a.id,
+    title: a.title,
+    category_id: a.category_id,
+  }));
 
         setCategoryArticles((prev) => {
           const existing = isLoadMore ? prev[categoryId] || [] : [];

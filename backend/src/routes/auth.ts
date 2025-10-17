@@ -1,21 +1,18 @@
 import { Router, Request, Response } from "express";
 import dotenv from "dotenv";
 dotenv.config();
-
 import database from "../db";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import cookieParser from "cookie-parser";
 import { authenticate } from "../middleware/auth";
 import { successResponse, errorResponse } from "../utils/response";
 
 const router = Router();
-router.use(cookieParser());
 
 const ACCESS_SECRET = process.env.JWT_SECRET as string;
 const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
-// --- 生成 Token ---
+// Token generator
 function generateAccessToken(user: any) {
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role },
@@ -25,131 +22,150 @@ function generateAccessToken(user: any) {
 }
 
 function generateRefreshToken(user: any) {
-  return jwt.sign({ id: user.id }, REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id: user.id, username: user.username }, REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
 }
 
-// --- Login ---
-router.post("/login", async (req: Request, res: Response) => {
-  const { username, password } = req.body;
-
+// === LOGIN ===
+router.post("/login", async (req, res) => {
   try {
-    console.log("ENV:", { JWT_SECRET: ACCESS_SECRET, REFRESH_SECRET });
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json(errorResponse("Username and password required"));
+    }
 
     const [rows]: any = await database.query(
       "SELECT * FROM users WHERE username = ?",
       [username]
     );
-    console.log("DB rows:", rows);
-
     const user = rows[0];
-    if (!user) return res.status(401).json(errorResponse("User not found"));
 
-    const passwordMatches = await bcrypt.compare(password, user.password);
-    console.log("Password matches:", passwordMatches);
-    if (!passwordMatches)
+    if (!user) {
+      return res.status(401).json(errorResponse("User not found"));
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
       return res.status(401).json(errorResponse("Wrong password"));
+    }
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    console.log("AccessToken:", accessToken);
-    console.log("RefreshToken:", refreshToken);
+    // 直接在响应体返回 tokens，不存 cookies
+    res.json(
+      successResponse({
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        },
+      })
+    );
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json(errorResponse("Login failed"));
+  }
+});
 
-    await database.query("UPDATE users SET refresh_token = ? WHERE id = ?", [
-      refreshToken,
-      user.id,
-    ]);
+// === REFRESH TOKEN ===
+router.post("/refresh-token", async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    if (!refreshToken) {
+      return res.status(401).json(errorResponse("Refresh token required"));
+    }
+
+    const payload: any = jwt.verify(refreshToken, REFRESH_SECRET);
+    const [rows]: any = await database.query(
+      "SELECT * FROM users WHERE id = ?",
+      [payload.id]
+    );
+    const user = rows[0];
+
+    if (!user) {
+      return res.status(403).json(errorResponse("User no longer exists"));
+    }
+
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
 
     res.json(
       successResponse({
-        token: accessToken,
-        user: { id: user.id, username: user.username, role: user.role },
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        },
       })
     );
   } catch (err: any) {
-    console.error("Login error:", err);
-    res.status(500).json(errorResponse(err.message || "Something went wrong"));
+    console.error("Refresh token error:", err.message);
+    res.status(403).json(errorResponse("Refresh token invalid or expired"));
   }
 });
 
-// --- Refresh Token ---
-router.post("/refresh-token", async (req: Request, res: Response) => {
-  try {
-    const token = req.cookies.refreshToken;
-    if (!token) return res.status(401).json(errorResponse("No refresh token"));
-
-    const payload: any = jwt.verify(token, REFRESH_SECRET);
-    const [rows]: any = await database.query(
-      "SELECT * FROM users WHERE id = ? AND refresh_token = ?",
-      [payload.id, token]
-    );
-    const user = rows[0];
-    if (!user)
-      return res.status(403).json(errorResponse("Invalid refresh token"));
-
-    const newAccessToken = generateAccessToken(user);
-    res.json(successResponse({ token: newAccessToken }));
-  } catch (err: any) {
-    console.error("Refresh token error:", err);
-    res
-      .status(403)
-      .json(errorResponse(err.message || "Refresh token expired or invalid"));
-  }
+// === LOGOUT ===
+router.post("/logout", (req: Request, res: Response) => {
+  // localStorage tokens 由前端管理清除，后端只需返回成功响应
+  res.json(successResponse({ message: "Logged out successfully" }));
 });
 
-// --- Logout ---
-router.post("/logout", async (req: Request, res: Response) => {
-  try {
-    const token = req.cookies.refreshToken;
-    if (token)
-      await database.query(
-        "UPDATE users SET refresh_token = NULL WHERE refresh_token = ?",
-        [token]
-      );
-
-    res.clearCookie("refreshToken");
-    res.json(successResponse({ message: "Logged out" }));
-  } catch (err: any) {
-    console.error("Logout error:", err);
-    res.status(500).json(errorResponse(err.message || "Something went wrong"));
-  }
+// === GET CURRENT USER (ME) ===
+router.get("/me", authenticate, (req: Request, res: Response) => {
+  const user = (req as any).user;
+  res.json(
+    successResponse({
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    })
+  );
 });
 
-// --- Protected route (获取自己信息) ---
+// === TEST Protected Route ===
 router.get("/protected", authenticate, (req: Request, res: Response) => {
   res.json(
     successResponse({
-      message: "You made it! You're logged in.",
+      message: "You are logged in!",
       user: (req as any).user,
     })
   );
 });
 
-// --- Optional: /protected/:id (获取指定用户) ---
-router.get(
-  "/protected/:id",
+// === UPDATE USERNAME ===
+router.put(
+  "/update-username",
   authenticate,
   async (req: Request, res: Response) => {
-    const { id } = req.params;
     try {
-      const [rows]: any = await database.query(
-        "SELECT id, username, role FROM users WHERE id = ?",
-        [id]
-      );
-      const user = rows[0];
-      if (!user) return res.status(404).json(errorResponse("User not found"));
-      res.json(successResponse({ user }));
+      const { username } = req.body;
+      const user = (req as any).user;
+
+      if (!username) {
+        return res.status(400).json(errorResponse("Username required"));
+      }
+
+      await database.query("UPDATE users SET username = ? WHERE id = ?", [
+        username,
+        user.id,
+      ]);
+
+      res.json(successResponse({ message: "Username updated successfully" }));
     } catch (err: any) {
-      console.error("Protected/:id error:", err);
-      res
-        .status(500)
-        .json(errorResponse(err.message || "Something went wrong"));
+      console.error("Update username error:", err);
+      res.status(500).json(errorResponse("Failed to update username"));
     }
   }
 );
