@@ -1,4 +1,3 @@
-// src/resetArticlesIndex.ts
 import { esClient } from "./elasticSearch";
 import database from "./db";
 

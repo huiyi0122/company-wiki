@@ -1,17 +1,16 @@
 import { Client } from "@elastic/elasticsearch";
 import database from "./db";
 
-// -------------------- Elasticsearch Client --------------------
+//  Elasticsearch Client
 export const esClient = new Client({
   node: process.env.ELASTICSEARCH_HOST || "http://localhost:9200",
 });
 
-// -------------------- Articles --------------------
+//  Articles
 export async function createArticlesIndex() {
   try {
     const exists = await esClient.indices.exists({ index: "articles" });
     if (!exists) {
-      // ✅ 不用 .body
       await esClient.indices.create({
         index: "articles",
         mappings: {
@@ -27,12 +26,12 @@ export async function createArticlesIndex() {
           },
         },
       });
-      console.log('✅ Elasticsearch index "articles" created');
+      console.log('Elasticsearch index "articles" created');
     } else {
-      console.log('ℹ️ Index "articles" already exists');
+      console.log('ℹIndex "articles" already exists');
     }
   } catch (err) {
-    console.error("❌ Failed to create articles index:", err);
+    console.error(" Failed to create articles index:", err);
   }
 }
 
@@ -65,10 +64,10 @@ export async function syncArticlesToES() {
     });
   }
 
-  console.log(`✅ Synchronized ${rows.length} articles to Elasticsearch`);
+  console.log(`Synchronized ${rows.length} articles to Elasticsearch`);
 }
 
-// -------------------- Categories 修复版 --------------------
+//  Categories
 export async function createCategoriesIndex() {
   try {
     const exists = await esClient.indices.exists({ index: "categories" });
@@ -81,21 +80,21 @@ export async function createCategoriesIndex() {
             name: { type: "text", fields: { keyword: { type: "keyword" } } },
             slug: { type: "keyword" },
             is_active: { type: "boolean" },
-            created_by: { type: "integer" }, // ✅ 添加
+            created_by: { type: "integer" },
             created_by_name: { type: "keyword" },
-            updated_by: { type: "integer" }, // ✅ 添加
+            updated_by: { type: "integer" },
             updated_by_name: { type: "keyword" },
             created_at: { type: "date" },
             updated_at: { type: "date" },
           },
         },
       });
-      console.log('✅ Elasticsearch index "categories" created');
+      console.log('Elasticsearch index "categories" created');
     } else {
-      console.log('ℹ️ Index "categories" already exists');
+      console.log('ℹIndex "categories" already exists');
     }
   } catch (err) {
-    console.error("❌ Failed to create categories index:", err);
+    console.error("Failed to create categories index:", err);
   }
 }
 
@@ -125,10 +124,10 @@ export async function syncCategoriesToES() {
         id: category.id,
         name: category.name,
         slug: category.slug,
-        is_active: Boolean(category.is_active), // ✅ 统一转布尔值
-        created_by: category.created_by, // ✅ 添加
+        is_active: Boolean(category.is_active),
+        created_by: category.created_by,
         created_by_name: category.created_by_name,
-        updated_by: category.updated_by, // ✅ 添加
+        updated_by: category.updated_by,
         updated_by_name: category.updated_by_name,
         created_at: category.created_at,
         updated_at: category.updated_at,
@@ -136,10 +135,10 @@ export async function syncCategoriesToES() {
     });
   }
 
-  console.log(`✅ Synchronized ${rows.length} categories to Elasticsearch`);
+  console.log(`Synchronized ${rows.length} categories to Elasticsearch`);
 }
 
-// -------------------- Tags 修复版 --------------------
+//  Tags
 export async function createTagsIndex() {
   try {
     const exists = await esClient.indices.exists({ index: "tags" });
@@ -152,21 +151,21 @@ export async function createTagsIndex() {
             name: { type: "text", fields: { keyword: { type: "keyword" } } },
             slug: { type: "keyword" },
             is_active: { type: "boolean" },
-            created_by: { type: "integer" }, // ✅ 添加
+            created_by: { type: "integer" },
             created_by_name: { type: "keyword" },
-            updated_by: { type: "integer" }, // ✅ 添加
+            updated_by: { type: "integer" },
             updated_by_name: { type: "keyword" },
             created_at: { type: "date" },
             updated_at: { type: "date" },
           },
         },
       });
-      console.log('✅ Elasticsearch index "tags" created');
+      console.log('Elasticsearch index "tags" created');
     } else {
-      console.log('ℹ️ Index "tags" already exists');
+      console.log('ℹIndex "tags" already exists');
     }
   } catch (err) {
-    console.error("❌ Failed to create tags index:", err);
+    console.error("Failed to create tags index:", err);
   }
 }
 
@@ -196,10 +195,10 @@ export async function syncTagsToES() {
         id: tag.id,
         name: tag.name,
         slug: tag.slug,
-        is_active: Boolean(tag.is_active), // ✅ 统一转布尔值
-        created_by: tag.created_by, // ✅ 添加
+        is_active: Boolean(tag.is_active),
+        created_by: tag.created_by,
         created_by_name: tag.created_by_name,
-        updated_by: tag.updated_by, // ✅ 添加
+        updated_by: tag.updated_by,
         updated_by_name: tag.updated_by_name,
         created_at: tag.created_at,
         updated_at: tag.updated_at,
@@ -207,7 +206,7 @@ export async function syncTagsToES() {
     });
   }
 
-  console.log(`✅ Synchronized ${rows.length} tags to Elasticsearch`);
+  console.log(`Synchronized ${rows.length} tags to Elasticsearch`);
 }
 
 export async function initAllES() {

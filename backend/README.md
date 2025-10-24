@@ -154,18 +154,18 @@ Authorization: Bearer <token>
 
 This project uses Docker to run the backend, MySQL database, and Elasticsearch. Follow the steps below to get started.
 
-## Prerequisites
+### Prerequisites
 
 - Docker
 - Docker Compose
 
-## Services
+### Services
 
 - **backend**: Node.js API server
 - **db**: MySQL 8 database
 - **elasticsearch**: Elasticsearch 8.15
 
-## Docker Compose Configuration
+### Docker Compose Configuration
 
 ```yaml
 version: "3.8"
@@ -221,7 +221,7 @@ volumes:
   es_data:
 ```
 
-## Start the Containers
+### Start the Containers
 
 ```bash
 docker-compose up --build
@@ -233,7 +233,7 @@ This will:
 2. Start MySQL and Elasticsearch containers.
 3. Run the backend server on [http://localhost:3000](http://localhost:3000).
 
-## Notes
+### Notes
 
 - To reindex Elasticsearch after resetting or updating the schema, run your `resetArticlesIndex.ts` script inside the backend container.
 - Database data and Elasticsearch data are persisted in Docker volum
