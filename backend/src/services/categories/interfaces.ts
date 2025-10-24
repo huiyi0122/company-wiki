@@ -32,12 +32,12 @@ export interface ElasticsearchCategory {
   name: string;
   slug: string;
   is_active: boolean;
-  created_by?: number; // ✅ 添加
+  created_by?: number;
   created_by_name?: string;
-  updated_by?: number; // ✅ 添加
+  updated_by?: number;
   updated_by_name?: string;
-  created_at?: string; // ✅ 添加
-  updated_at?: string; // ✅ 添加
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DatabaseConnection {

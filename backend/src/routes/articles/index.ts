@@ -7,7 +7,6 @@ import restoreRouter from "./restore";
 
 const router = Router();
 
-// 按功能模块组合
 router.use("/", createRouter);
 router.use("/", getRouter);
 router.use("/", updateRouter);
