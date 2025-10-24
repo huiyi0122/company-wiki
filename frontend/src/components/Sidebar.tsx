@@ -80,81 +80,87 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   }, [location.search, location.pathname]);
 
   // 🔥 获取分类列表（带 refresh-token 自动续签）
-useEffect(() => {
-  const fetchCategories = async () => {
-    // ⚠️ 尝试获取 tokens
-    let accessToken = localStorage.getItem("accessToken");
-    let refreshToken = localStorage.getItem("refreshToken");
+  useEffect(() => {
+    const fetchCategories = async () => {
+      // ⚠️ 尝试获取 tokens
+      let accessToken = localStorage.getItem("accessToken");
+      let refreshToken = localStorage.getItem("refreshToken");
 
-    if (!accessToken) return; // 未登录就不 fetch
+      if (!accessToken) return; // 未登录就不 fetch
 
-    const tryFetch = async (token: string) => {
-      const res = await fetch(`${API_BASE_URL}/categories`, {
-        // 不需要 credentials: "include"，因为 token 在 Header 中
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return res;
+      const tryFetch = async (token: string) => {
+        const res = await fetch(`${API_BASE_URL}/categories`, {
+          // 不需要 credentials: "include"，因为 token 在 Header 中
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        return res;
+      };
+
+      let response = await tryFetch(accessToken);
+
+      if (response.status === 401 || response.status === 403) {
+        // 检查是否有 refresh token 才能尝试续签
+        if (!refreshToken) {
+          console.warn(
+            "Access token expired and no refresh token found. Skipping categories fetch."
+          );
+          // 可选：如果需要，可以导航到登录页面，但你之前注释了这行
+          // navigate("/login");
+          return;
+        }
+
+        // refresh token
+        const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }, // 必须指定 content-type
+          body: JSON.stringify({ refreshToken: refreshToken }), // 🚨 将 refresh token 放在请求体中
+        });
+
+        const refreshData = await refreshRes.json();
+
+        // ⚠️ 成功续签后，后端应该返回新的 accessToken 和 refreshToken
+        if (
+          refreshData.success &&
+          refreshData.accessToken &&
+          refreshData.refreshToken
+        ) {
+          accessToken = refreshData.accessToken;
+          refreshToken = refreshData.refreshToken; // 更新 refresh token
+
+          // 存储新的 token
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+
+          // 使用新的 access token 再次尝试获取分类
+          response = await tryFetch(accessToken);
+        } else {
+          console.warn("Refresh token failed, user should re-login.");
+          // ⚠️ 续签失败，清除所有 token
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setCurrentUser(null);
+          // 可选：导航到登录页
+          // navigate("/login");
+          return;
+        }
+      }
+
+      // 处理最终的 response
+      const result = await response.json();
+      // Sidebar.tsx (Corrected Logic)
+      if (result.success) {
+        // 确认 result.data 是一个数组，并且是 Category 列表
+        const list = Array.isArray(result.data) ? result.data : [];
+
+        // 映射数据结构
+        setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
+      } else {
+        console.warn("Categories fetch failed:", result);
+      }
     };
 
-    let response = await tryFetch(accessToken);
-
-    if (response.status === 401 || response.status === 403) {
-      // 检查是否有 refresh token 才能尝试续签
-      if (!refreshToken) {
-        console.warn("Access token expired and no refresh token found. Skipping categories fetch.");
-        // 可选：如果需要，可以导航到登录页面，但你之前注释了这行
-        // navigate("/login");
-        return;
-      }
-
-      // refresh token
-      const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }, // 必须指定 content-type
-        body: JSON.stringify({ refreshToken: refreshToken }), // 🚨 将 refresh token 放在请求体中
-      });
-
-      const refreshData = await refreshRes.json();
-      
-      // ⚠️ 成功续签后，后端应该返回新的 accessToken 和 refreshToken
-      if (refreshData.success && refreshData.accessToken && refreshData.refreshToken) {
-        accessToken = refreshData.accessToken;
-        refreshToken = refreshData.refreshToken; // 更新 refresh token
-        
-        // 存储新的 token
-        localStorage.setItem("accessToken", accessToken);
-        localStorage.setItem("refreshToken", refreshToken);
-
-        // 使用新的 access token 再次尝试获取分类
-        response = await tryFetch(accessToken);
-      } else {
-        console.warn("Refresh token failed, user should re-login.");
-        // ⚠️ 续签失败，清除所有 token
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        setCurrentUser(null);
-        // 可选：导航到登录页
-        // navigate("/login");
-        return;
-      }
-    }
-
-    // 处理最终的 response
-    const result = await response.json();
-// Sidebar.tsx (Corrected Logic)
-if (result.success) {
-  // 确认 result.data 是一个数组，并且是 Category 列表
-  const list = Array.isArray(result.data) ? result.data : [];
-
-  // 映射数据结构
-  setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
-} else {
-  console.warn("Categories fetch failed:", result);
-}
-  };
-
-  fetchCategories();
-}, []);
+    fetchCategories();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
@@ -195,12 +201,12 @@ if (result.success) {
 
       const result = await res.json();
 
-if (result.success && Array.isArray(result.data)) {
-  const newArticles = result.data.map((a: any) => ({
-    id: a.id,
-    title: a.title,
-    category_id: a.category_id,
-  }));
+      if (result.success && Array.isArray(result.data)) {
+        const newArticles = result.data.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          category_id: a.category_id,
+        }));
 
         setCategoryArticles((prev) => {
           const existing = isLoadMore ? prev[categoryId] || [] : [];

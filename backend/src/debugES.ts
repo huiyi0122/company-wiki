@@ -1,4 +1,4 @@
-import { esClient } from "./elasticSearch"; // 路径改对
+import { esClient } from "./elasticSearch";
 
 async function debug() {
   try {
@@ -48,7 +48,6 @@ async function debug() {
     console.error("❌ Elasticsearch debug error:", err);
   }
 }
-// 查看 ES 里所有 category_id
 async function checkCategoryIdType() {
   const res = await esClient.search({
     index: "articles",

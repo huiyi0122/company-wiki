@@ -1,0 +1,49 @@
+services:
+  backend:
+    build:
+      context: . # ✅ 因为 docker-compose.yml 已经在 backend 里
+      dockerfile: Dockerfile.dev # ✅ 不需要 ../
+    container_name: company-wiki-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=company_wiki
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - JWT_SECRET=supersecretkey123
+      - REFRESH_SECRET=anotherSuperSecret456
+    depends_on:
+      - db
+      - elasticsearch
+    volumes:
+      - .:/app # ✅ 当前 backend 文件夹映射到容器的 /app
+    command: npx ts-node-dev --respawn src/server.ts
+
+  db:
+    image: mysql:8
+    container_name: company-wiki-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: company_wiki
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: company-wiki-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+volumes:
+  db_data:
+  es_data:

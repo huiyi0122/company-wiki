@@ -5,14 +5,12 @@ export async function ensureTags(
 ) {
   if (!tags || tags.length === 0) return [];
 
-  // 查已存在标签
   const [existingTags]: any = await connection.query(
     "SELECT id, name FROM tags WHERE name IN (?)",
     [tags]
   );
   const existingTagNames = existingTags.map((t: any) => t.name);
 
-  // 找出新标签
   const newTags = tags.filter((t) => !existingTagNames.includes(t));
   let newTagObjects: any[] = [];
 
@@ -34,7 +32,6 @@ export async function ensureTags(
       name,
     }));
 
-    // ✅ 写 log
     const logValues = newTagObjects.map((t) => [
       t.id,
       "CREATE",

@@ -1,34 +1,32 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { errorResponse } from "../utils/response";
-
+import { AuthenticatedRequest } from "../types";
 export const authenticate = (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
-) => {
-  // 从 Authorization header 获取 token
-  // 格式: "Bearer <token>"
+): void => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("❌ Missing or invalid Authorization header");
-    return res.status(401).json(errorResponse("Missing token"));
+    console.warn("❌ Missing or invalid Authorization header");
+    res.status(401).json(errorResponse("Missing token"));
+    return;
   }
 
-  const token = authHeader.substring(7); // 移除 "Bearer " 前缀
+  const token = authHeader.split(" ")[1];
 
-  jwt.verify(
-    token,
-    process.env.JWT_SECRET as string,
-    (err: jwt.VerifyErrors | null, decoded: any) => {
-      if (err) {
-        console.error("Token verification failed:", err.message);
-        return res.status(403).json(errorResponse("Token invalid or expired"));
-      }
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET as string
+    ) as AuthenticatedRequest["user"];
 
-      (req as any).user = decoded;
-      next();
-    }
-  );
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("❌ Token verification failed:", (err as Error).message);
+    res.status(403).json(errorResponse("Token invalid or expired"));
+  }
 };

@@ -20,7 +20,7 @@
 ## 2. ⚒️ Tech Stack
 
 - **Express.js** (TypeScript) – Backend framework
-- **MySQL / PostgreSQL** – Relational database
+- **MySQL** – Relational database
 - **JWT Authentication** – Secure login and role-based access
 - **Node.js** (v18+)
 - **npm** (v8+)
@@ -149,3 +149,91 @@ Authorization: Bearer <token>
 3. Commit changes: `git commit -m "Add feature"`
 4. Push branch: `git push origin feature/your-feature`
 5. Open a Pull Request
+
+## 9. 🐳 Docker Setup
+
+This project uses Docker to run the backend, MySQL database, and Elasticsearch. Follow the steps below to get started.
+
+## Prerequisites
+
+- Docker
+- Docker Compose
+
+## Services
+
+- **backend**: Node.js API server
+- **db**: MySQL 8 database
+- **elasticsearch**: Elasticsearch 8.15
+
+## Docker Compose Configuration
+
+```yaml
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: company-wiki-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=company_wiki
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - JWT_SECRET=supersecretkey123
+      - REFRESH_SECRET=anotherSuperSecret456
+    depends_on:
+      - db
+      - elasticsearch
+    volumes:
+      - .:/app
+    command: npx ts-node-dev --respawn src/server.ts
+
+  db:
+    image: mysql:8
+    container_name: company-wiki-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: company_wiki
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: company-wiki-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+volumes:
+  db_data:
+  es_data:
+```
+
+## Start the Containers
+
+```bash
+docker-compose up --build
+```
+
+This will:
+
+1. Build the backend image.
+2. Start MySQL and Elasticsearch containers.
+3. Run the backend server on [http://localhost:3000](http://localhost:3000).
+
+## Notes
+
+- To reindex Elasticsearch after resetting or updating the schema, run your `resetArticlesIndex.ts` script inside the backend container.
+- Database data and Elasticsearch data are persisted in Docker volum

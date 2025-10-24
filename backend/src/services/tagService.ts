@@ -1,7 +1,6 @@
 import database from "../db";
 import { esClient } from "../elasticSearch";
 
-// ===== 类型定义 =====
 interface User {
   id: number;
   username: string;
@@ -13,11 +12,12 @@ interface Tag {
   slug: string;
   is_active: boolean;
   created_by?: number;
+  created_by_name?: string; // ✅ 添加这个
   updated_by?: number;
+  updated_by_name?: string; // ✅ 添加这个
   created_at?: string;
   updated_at?: string;
 }
-
 interface TagLog {
   tag_id: number;
   action: "CREATE" | "UPDATE" | "SOFT_DELETE" | "DELETE" | "RESTORE";
@@ -67,7 +67,6 @@ export interface UpdateTagData {
   is_active?: boolean;
 }
 
-// ===== 辅助函数 =====
 function generateSlug(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "-");
 }
@@ -90,7 +89,6 @@ async function withTransaction<T>(
   }
 }
 
-// ===== 核心函数 =====
 export async function createTag(name: string, user: User): Promise<Tag> {
   return withTransaction(async (connection) => {
     const slug = generateSlug(name);
@@ -208,9 +206,18 @@ export async function updateTag(
     const { name, is_active } = data;
     const slug = name ? generateSlug(name) : undefined;
 
-    const [rows] = (await connection.query("SELECT * FROM tags WHERE id = ?", [
-      id,
-    ])) as any[];
+    // ✅ 查询时 JOIN users 表获取用户名
+    const [rows] = (await connection.query(
+      `SELECT 
+        t.*,
+        creator.username as created_by_name,
+        updater.username as updated_by_name
+       FROM tags t
+       LEFT JOIN users creator ON t.created_by = creator.id
+       LEFT JOIN users updater ON t.updated_by = updater.id
+       WHERE t.id = ?`,
+      [id]
+    )) as any[];
 
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new Error("Tag not found");
@@ -218,6 +225,7 @@ export async function updateTag(
 
     const original = rows[0] as Tag;
 
+    // 更新标签（不修改 created_by）
     await connection.query(
       "UPDATE tags SET name=?, slug=?, is_active=?, updated_by=?, updated_at=NOW() WHERE id=?",
       [
@@ -249,11 +257,13 @@ export async function updateTag(
       ]
     );
 
+    // ✅ 更新 ES 时保留 created_by_name
     const esDoc: Partial<ElasticsearchTag> = {
       id,
       name: name || original.name,
       slug: slug || original.slug,
       is_active: Boolean(is_active ?? original.is_active),
+      created_by_name: original.created_by_name, // ✅ 保留创建者名称
       updated_by_name: user.username,
       updated_at: new Date().toISOString(),
     };
@@ -265,11 +275,16 @@ export async function updateTag(
       document: esDoc,
     });
 
+    // ✅ 返回完整数据
     return {
       id,
       name: name || original.name,
       slug: slug || original.slug,
       is_active: is_active ?? original.is_active,
+      created_by: original.created_by, // ✅ 添加
+      created_by_name: original.created_by_name, // ✅ 添加
+      updated_by: user.id, // ✅ 添加
+      updated_by_name: user.username, // ✅ 添加
     };
   });
 }
@@ -286,7 +301,7 @@ export async function getTagById(id: number): Promise<Tag | null> {
         u2.username AS updated_by
       FROM tags t
       LEFT JOIN users u1 ON t.created_by = u1.id
-      LEFT JOIN users u2 ON t.updated_by = u2.id
+      LEFT JOIN users u2 ON t.updated_by = u2.id 
       WHERE t.id = ?
     `,
     [id]
@@ -295,12 +310,9 @@ export async function getTagById(id: number): Promise<Tag | null> {
   return Array.isArray(rows) && rows.length > 0 ? (rows[0] as Tag) : null;
 }
 
-export async function deleteTag(
-  id: number,
-  user: User,
-  force: boolean = false
-): Promise<string> {
+export async function deleteTag(id: number, user: User): Promise<string> {
   return withTransaction(async (connection) => {
+    // 1️⃣ 检查 tag 是否存在
     const [rows] = (await connection.query("SELECT * FROM tags WHERE id=?", [
       id,
     ])) as any[];
@@ -311,6 +323,12 @@ export async function deleteTag(
 
     const original = rows[0] as Tag;
 
+    // 2️⃣ 检查是否已经被 soft delete
+    if (!original.is_active) {
+      throw new Error("Tag already deleted");
+    }
+
+    // 3️⃣ 检查是否被使用中
     const [usageResult] = (await connection.query(
       "SELECT COUNT(*) AS count FROM article_tags WHERE tag_id=?",
       [id]
@@ -319,21 +337,19 @@ export async function deleteTag(
     const usageCount =
       (Array.isArray(usageResult) && usageResult[0]?.count) || 0;
 
-    if (usageCount > 0 && !force) {
+    if (usageCount > 0) {
       throw new Error(
-        "Cannot delete tag because it's still used by articles. Use force option to override."
+        `Cannot delete tag: still used by ${usageCount} article(s).`
       );
     }
 
-    if (force) {
-      await connection.query("DELETE FROM article_tags WHERE tag_id=?", [id]);
-    }
-
+    // 4️⃣ Soft delete tag
     await connection.query(
       "UPDATE tags SET is_active=0, updated_by=?, updated_at=NOW() WHERE id=?",
       [user.id, id]
     );
 
+    // 5️⃣ 写入日志
     const tagLog: TagLog = {
       tag_id: id,
       action: "SOFT_DELETE",
@@ -358,67 +374,48 @@ export async function deleteTag(
       ]
     );
 
+    // 6️⃣ 同步 Elasticsearch
     try {
-      await esClient.delete({
+      await esClient.update({
         index: "tags",
         id: id.toString(),
         refresh: true,
+        doc: {
+          is_active: false,
+          updated_by_name: user.username,
+          updated_at: new Date().toISOString(),
+        },
       });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch delete failed:", esErr);
+    } catch (esErr: any) {
+      if (esErr.meta?.statusCode === 404) {
+        console.warn(`⚠️ Tag ${id} not found in ES, re-indexing...`);
+        const [creators] = (await connection.query(
+          "SELECT username FROM users WHERE id=?",
+          [original.created_by]
+        )) as any[];
+        const createdByName =
+          (Array.isArray(creators) && creators[0]?.username) || "Unknown";
+        await esClient.index({
+          index: "tags",
+          id: id.toString(),
+          refresh: true,
+          document: {
+            id,
+            name: original.name,
+            slug: original.slug,
+            is_active: false,
+            created_by_name: createdByName,
+            updated_by_name: user.username,
+            created_at: original.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        });
+      } else {
+        console.error("❌ Elasticsearch update failed:", esErr);
+      }
     }
 
-    return force
-      ? "Tag forcibly deactivated and unlinked from articles"
-      : "Tag deactivated successfully";
-  });
-}
-
-export async function hardDeleteTag(id: number, user: User): Promise<string> {
-  return withTransaction(async (connection) => {
-    const [tags] = (await connection.query("SELECT * FROM tags WHERE id=?", [
-      id,
-    ])) as any[];
-
-    if (!Array.isArray(tags) || tags.length === 0) {
-      throw new Error("Tag not found");
-    }
-
-    const tag = tags[0] as Tag;
-
-    const tagLog: TagLog = {
-      tag_id: id,
-      action: "DELETE",
-      changed_by: user.id,
-      old_data: JSON.stringify(tag),
-      new_data: JSON.stringify({ deleted: true }),
-    };
-
-    await connection.query(
-      `INSERT INTO tag_logs (tag_id, action, changed_by, old_data, new_data)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        tagLog.tag_id,
-        tagLog.action,
-        tagLog.changed_by,
-        tagLog.old_data,
-        tagLog.new_data,
-      ]
-    );
-
-    await connection.query("DELETE FROM tags WHERE id=?", [id]);
-
-    try {
-      await esClient.delete({
-        index: "tags",
-        id: id.toString(),
-        refresh: true,
-      });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch hard delete failed:", esErr);
-    }
-
-    return "Tag permanently deleted";
+    return "Tag deactivated successfully";
   });
 }
 
@@ -448,7 +445,7 @@ export async function restoreTag(id: number, user: User): Promise<string> {
       action: "RESTORE",
       changed_by: user.id,
       old_data: JSON.stringify(tag),
-      new_data: JSON.stringify({ restored: true }),
+      new_data: JSON.stringify({ is_active: true }),
     };
 
     await connection.query(
@@ -467,15 +464,40 @@ export async function restoreTag(id: number, user: User): Promise<string> {
       await esClient.update({
         index: "tags",
         id: id.toString(),
+        refresh: true,
         doc: {
           is_active: true,
           updated_by_name: user.username,
           updated_at: new Date().toISOString(),
         },
-        refresh: true,
       });
-    } catch (esErr) {
-      console.error("❌ Elasticsearch restore failed:", esErr);
+    } catch (esErr: any) {
+      if (esErr.meta?.statusCode === 404) {
+        console.warn(`⚠️ Tag ${id} not found in ES, re-indexing...`);
+        const [creators] = (await connection.query(
+          "SELECT username FROM users WHERE id=?",
+          [tag.created_by]
+        )) as any[];
+        const createdByName =
+          (Array.isArray(creators) && creators[0]?.username) || "Unknown";
+        await esClient.index({
+          index: "tags",
+          id: id.toString(),
+          refresh: true,
+          document: {
+            id,
+            name: tag.name,
+            slug: tag.slug,
+            is_active: true,
+            created_by_name: createdByName,
+            updated_by_name: user.username,
+            created_at: tag.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        });
+      } else {
+        console.error("❌ Elasticsearch restore failed:", esErr);
+      }
     }
 
     return "Tag restored successfully";

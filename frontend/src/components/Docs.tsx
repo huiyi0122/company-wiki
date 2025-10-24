@@ -29,121 +29,120 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-const fetchCategories = async () => {
-  try {
-    const token = localStorage.getItem("accessToken");
-    const res = await fetch(`${API_BASE_URL}/categories`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (res.status === 401) {
-      console.warn("⚠️ Token expired or invalid, redirecting to login...");
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      navigate("/login");
-      return;
-    }
-
-    const result = await res.json();
-    if (result.success && Array.isArray(result.data)) {
-      const map: Record<number, string> = {};
-      result.data.forEach((c: any) => (map[c.id] = c.name));
-      setCategoryMap(map);
-    } else {
-      console.error("❌ Unexpected categories response:", result);
-    }
-  } catch (err) {
-    console.error("❌ Error loading categories:", err);
-  }
-};
-
-
-const fetchDocs = useCallback(
-  async (page: number, searchQuery: string, categoryId: string) => {
-    setLoading(true);
-    setError(null);
-
+  const fetchCategories = async () => {
     try {
-      let token = localStorage.getItem("accessToken");
-      const refreshToken = localStorage.getItem("refreshToken");
-      if (!token) {
-        console.warn("⚠️ No token found, redirecting to login...");
+      const token = localStorage.getItem("accessToken");
+      const res = await fetch(`${API_BASE_URL}/categories`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        console.warn("⚠️ Token expired or invalid, redirecting to login...");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
         navigate("/login");
         return;
       }
 
-      const params = new URLSearchParams();
-      params.append("limit", pageSize.toString());
-      const hasFilters = searchQuery.trim() || categoryId;
-      let endpoint = hasFilters ? "/articles/search" : "/articles";
-      params.append("page", page.toString());
-      if (activeTab === "my" && currentUser?.id) {
-        params.append("author_id", currentUser.id.toString());
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        const map: Record<number, string> = {};
+        result.data.forEach((c: any) => (map[c.id] = c.name));
+        setCategoryMap(map);
+      } else {
+        console.error("❌ Unexpected categories response:", result);
       }
+    } catch (err) {
+      console.error("❌ Error loading categories:", err);
+    }
+  };
 
-      const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
-      console.log(`📡 Fetching (page ${page}):`, url);
+  const fetchDocs = useCallback(
+    async (page: number, searchQuery: string, categoryId: string) => {
+      setLoading(true);
+      setError(null);
 
-      let res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // ✅ 如果 401，则尝试刷新 token
-      if (res.status === 401 && refreshToken) {
-        console.log("🔁 Access token expired, refreshing...");
-        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          const newToken = refreshData.accessToken;
-          if (newToken) {
-            localStorage.setItem("accessToken", newToken);
-            token = newToken;
-            // 再次请求
-            res = await fetch(url, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-          }
-        } else {
-          console.error("❌ Token refresh failed");
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
+      try {
+        let token = localStorage.getItem("accessToken");
+        const refreshToken = localStorage.getItem("refreshToken");
+        if (!token) {
+          console.warn("⚠️ No token found, redirecting to login...");
           navigate("/login");
           return;
         }
+
+        const params = new URLSearchParams();
+        params.append("limit", pageSize.toString());
+        const hasFilters = searchQuery.trim() || categoryId;
+        let endpoint = hasFilters ? "/articles/search" : "/articles";
+        params.append("page", page.toString());
+        if (activeTab === "my" && currentUser?.id) {
+          params.append("author_id", currentUser.id.toString());
+        }
+
+        const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
+        console.log(`📡 Fetching (page ${page}):`, url);
+
+        let res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        // ✅ 如果 401，则尝试刷新 token
+        if (res.status === 401 && refreshToken) {
+          console.log("🔁 Access token expired, refreshing...");
+          const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            const newToken = refreshData.accessToken;
+            if (newToken) {
+              localStorage.setItem("accessToken", newToken);
+              token = newToken;
+              // 再次请求
+              res = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+            }
+          } else {
+            console.error("❌ Token refresh failed");
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+            navigate("/login");
+            return;
+          }
+        }
+
+        if (!res.ok)
+          throw new Error(`Failed to fetch articles (${res.status})`);
+
+        const result = await res.json();
+        setDocs(result.data || []);
+        setTotalResults(result.meta?.total || 0);
+        setTotalPages(result.meta?.totalPages || 1);
+        setCurrentPage(page);
+      } catch (err: any) {
+        console.error("❌ Fetch error:", err);
+        setError(err.message || "Failed to load documents.");
+      } finally {
+        setLoading(false);
       }
+    },
+    [activeTab, currentUser, pageSize, navigate]
+  );
 
-      if (!res.ok) throw new Error(`Failed to fetch articles (${res.status})`);
-
-      const result = await res.json();
-      setDocs(result.data || []);
-      setTotalResults(result.meta?.total || 0);
-      setTotalPages(result.meta?.totalPages || 1);
-      setCurrentPage(page);
-    } catch (err: any) {
-      console.error("❌ Fetch error:", err);
-      setError(err.message || "Failed to load documents.");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      console.warn("⚠️ No access token, redirecting to login...");
+      navigate("/login");
     }
-  },
-  [activeTab, currentUser, pageSize, navigate]
-);
-
-useEffect(() => {
-  const token = localStorage.getItem("accessToken");
-  if (!token) {
-    console.warn("⚠️ No access token, redirecting to login...");
-    navigate("/login");
-  }
-}, [navigate]);
-
+  }, [navigate]);
 
   useEffect(() => {
     fetchCategories();
