@@ -1,7 +1,6 @@
 import { Client } from "@elastic/elasticsearch";
 import database from "./db";
 
-//  Elasticsearch Client
 export const esClient = new Client({
   node: process.env.ELASTICSEARCH_HOST || "http://localhost:9200",
 });

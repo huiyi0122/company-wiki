@@ -1,4 +1,3 @@
-// routes/user.ts
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import database from "../../db";

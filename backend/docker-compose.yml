@@ -1,8 +1,8 @@
 services:
   backend:
     build:
-      context: . # ✅ 因为 docker-compose.yml 已经在 backend 里
-      dockerfile: Dockerfile.dev # ✅ 不需要 ../
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: company-wiki-backend
     ports:
       - "3000:3000"
@@ -18,7 +18,7 @@ services:
       - db
       - elasticsearch
     volumes:
-      - .:/app # ✅ 当前 backend 文件夹映射到容器的 /app
+      - .:/app
     command: npx ts-node-dev --respawn src/server.ts
 
   db:

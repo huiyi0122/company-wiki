@@ -7,7 +7,6 @@ import userRouters from "./routes/user";
 import categoryRouters from "./routes/categories";
 import tagRouters from "./routes/tags";
 import logsRouter from "./routes/logs";
-import { initAllES } from "./elasticSearch";
 
 const app = express();
 
@@ -41,7 +40,7 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    console.error("❌ Server Error:", err);
+    console.error("Server Error:", err);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -53,13 +52,13 @@ app.use(
 async function startServer() {
   try {
     app.listen(3000, "0.0.0.0", () => {
-      console.log("🚀 Server running at http://0.0.0.0:3000");
-      console.log("📡 CORS enabled for:");
-      console.log("   - http://localhost:5173");
-      console.log("   - http://192.168.0.10:5173");
+      console.log("Server running at http://0.0.0.0:3000");
+      console.log("CORS enabled for:");
+      console.log("- http://localhost:5173");
+      console.log("- http://192.168.0.10:5173");
     });
   } catch (err) {
-    console.error("❌ Failed to start server:", err);
+    console.error("Failed to start server:", err);
     process.exit(1);
   }
 }

@@ -32,9 +32,9 @@ export async function createTag(name: string, user: User): Promise<Tag> {
       name,
       slug,
       true,
-      user.id, // ✅ created_by
+      user.id,
       user.username,
-      user.id, // ✅ updated_by
+      user.id,
       user.username
     );
 

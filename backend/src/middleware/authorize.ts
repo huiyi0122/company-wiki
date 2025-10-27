@@ -1,7 +1,7 @@
 import { Response, NextFunction } from "express";
 import { ROLE_PERMISSIONS } from "../constants/permission";
 import { errorResponse } from "../utils/response";
-import { AuthenticatedRequest } from "../types"; // ✅ 引入你在 authenticate 里定义的类型
+import { AuthenticatedRequest } from "../types";
 
 export const authorize = (requiredPermission: string) => {
   return (

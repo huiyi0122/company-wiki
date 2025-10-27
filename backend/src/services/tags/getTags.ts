@@ -29,12 +29,11 @@ export async function getTagById(id: number): Promise<Tag | null> {
 
   const tag = rows[0];
 
-  // ✅ 统一返回格式：is_active 转为布尔值
   return {
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
-    is_active: Boolean(tag.is_active), // ✅ 转为布尔值
+    is_active: Boolean(tag.is_active),
     created_by: tag.created_by,
     created_by_name: tag.created_by_name,
     updated_by: tag.updated_by,

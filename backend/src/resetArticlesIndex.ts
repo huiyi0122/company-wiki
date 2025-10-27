@@ -20,6 +20,7 @@ async function resetArticlesIndex() {
           content: { type: "text" },
           category_id: { type: "integer" },
           author_id: { type: "integer" },
+          author_name: { type: "keyword" },
           tags: { type: "keyword" },
           is_active: { type: "boolean" },
           created_at: { type: "date" },
@@ -31,9 +32,11 @@ async function resetArticlesIndex() {
     console.log("🔄 Syncing articles from MySQL...");
     const [rows]: any = await database.query(`
       SELECT 
-        a.id, a.title, a.content, a.category_id, a.author_id, a.is_active, a.created_at, a.updated_at,
+        a.id, a.title, a.content, a.category_id, a.author_id, u.username AS author_name,
+        a.is_active, a.created_at, a.updated_at,
         GROUP_CONCAT(t.name) AS tags
       FROM articles a
+      LEFT JOIN users u ON a.author_id = u.id
       LEFT JOIN article_tags at ON a.id = at.article_id
       LEFT JOIN tags t ON at.tag_id = t.id
       GROUP BY a.id
@@ -46,7 +49,18 @@ async function resetArticlesIndex() {
       await esClient.index({
         index: indexName,
         id: article.id.toString(),
-        document: article,
+        document: {
+          id: article.id,
+          title: article.title,
+          content: article.content,
+          category_id: article.category_id,
+          author_id: article.author_id,
+          author_name: article.author_name,
+          tags: article.tags,
+          is_active: article.is_active,
+          created_at: article.created_at,
+          updated_at: article.updated_at,
+        },
       });
     }
 

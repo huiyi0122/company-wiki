@@ -2,19 +2,6 @@ import { esClient } from "../../../elasticSearch";
 import { ElasticsearchTag, Tag, User, DatabaseConnection } from "../interfaces";
 import { getUsernameById } from "./dbHelper";
 
-/**
- * Index a tag to Elasticsearch
- * @param id - Tag ID
- * @param name - Tag name
- * @param slug - Tag slug
- * @param isActive - Active status
- * @param createdBy - Creator user ID (number)
- * @param createdByName - Creator username (string)
- * @param updatedBy - Updater user ID (number)
- * @param updatedByName - Updater username (string)
- * @param createdAt - Creation timestamp
- * @param updatedAt - Update timestamp
- */
 export async function indexTagToES(
   id: number,
   name: string,
@@ -32,9 +19,9 @@ export async function indexTagToES(
     name,
     slug,
     is_active: isActive,
-    created_by: createdBy, // ✅ 添加
+    created_by: createdBy,
     created_by_name: createdByName,
-    updated_by: updatedBy, // ✅ 添加
+    updated_by: updatedBy,
     updated_by_name: updatedByName,
     created_at: createdAt || new Date().toISOString(),
     updated_at: updatedAt || new Date().toISOString(),
@@ -70,7 +57,6 @@ export async function handleESUpdateError(
   if (error.meta?.statusCode === 404) {
     console.warn(`⚠️ Tag ${tag.id} not found in ES, re-indexing...`);
 
-    // ✅ 获取创建者用户名
     const createdByName = await getUsernameById(connection, tag.created_by);
 
     await indexTagToES(
@@ -78,10 +64,10 @@ export async function handleESUpdateError(
       tag.name,
       tag.slug,
       isActive,
-      tag.created_by || 0, // created_by (number)
-      createdByName, // created_by_name (string)
-      user.id, // updated_by (number)
-      user.username, // updated_by_name (string)
+      tag.created_by || 0,
+      createdByName,
+      user.id,
+      user.username,
       tag.created_at,
       new Date().toISOString()
     );

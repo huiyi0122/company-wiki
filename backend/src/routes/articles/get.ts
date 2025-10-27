@@ -1,4 +1,3 @@
-// routes/articles.ts
 import { Router, Request, Response } from "express";
 import { authenticate } from "../../middleware/auth";
 import { authorize } from "../../middleware/authorize";

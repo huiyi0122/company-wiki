@@ -52,12 +52,11 @@ export async function updateTag(
       new Date().toISOString()
     );
 
-    // ✅ 返回布尔值
     return {
       id,
       name: name || original.name,
       slug: slug || original.slug,
-      is_active: Boolean(is_active ?? original.is_active), // ✅ 转为布尔值
+      is_active: Boolean(is_active ?? original.is_active),
       created_by: original.created_by,
       created_by_name: original.created_by_name,
       updated_by: user.id,

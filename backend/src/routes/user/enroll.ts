@@ -1,4 +1,3 @@
-// routes/user.ts
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -25,7 +24,6 @@ const router = Router();
 const ACCESS_SECRET = process.env.JWT_SECRET as string;
 const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
-// 🟢 Enroll User
 router.post(
   "/enroll",
   authenticate,

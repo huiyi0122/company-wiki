@@ -1,4 +1,3 @@
-// routes/user.ts
 import { Router, Request, Response } from "express";
 import database from "../../db";
 import { authenticate } from "../../middleware/auth";

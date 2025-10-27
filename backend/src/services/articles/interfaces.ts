@@ -1,4 +1,3 @@
-// services/articles/interfaces.ts
 import { RowDataPacket } from "mysql2";
 
 export interface User {

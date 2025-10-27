@@ -6,7 +6,7 @@ export async function searchArticles({
   queryString = "",
   categoryId,
   tags,
-  authorId, // ✅ 新增
+  authorId,
   pageNumber,
   pageSize,
 }: SearchParams) {
@@ -96,6 +96,7 @@ export async function searchArticles({
         category_id: (source?.category_id as number) || null,
         tags: Array.isArray(source?.tags) ? (source.tags as string[]) : [],
         author_id: (source?.author_id as number) || 0,
+        author_name: (source?.author_name as string) || "",
         is_active: !!source?.is_active,
         created_at: (source?.created_at as string) || "",
         updated_at: (source?.updated_at as string) || "",
@@ -114,7 +115,7 @@ export async function searchArticles({
       data,
     };
   } catch (err) {
-    console.error("❌ Elasticsearch search error:", err);
+    console.error("Elasticsearch search error:", err);
     throw err;
   }
 }

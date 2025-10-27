@@ -66,9 +66,9 @@ export async function restoreArticle(articleId: number, user: User) {
         },
         refresh: true,
       });
-      console.log(`✅ Elasticsearch restored article ${articleId}`);
+      console.log(`Elasticsearch restored article ${articleId}`);
     } catch (esErr) {
-      console.error("⚠️ Elasticsearch sync failed:", esErr);
+      console.error("Elasticsearch sync failed:", esErr);
     }
 
     await connection.commit();

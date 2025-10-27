@@ -60,15 +60,16 @@ export async function createArticle(
           content,
           category_id: category_id ?? null,
           author_id: user.id,
+          author_name: user.username,
           tags: allTagObjects.map((t) => t.name),
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
       });
-      console.log(`✅ Synced to Elasticsearch: article ${articleId}`);
+      console.log(`Synced to Elasticsearch: article ${articleId}`);
     } catch (esErr) {
-      console.error("❌ Elasticsearch sync failed:", esErr);
+      console.error("Elasticsearch sync failed:", esErr);
     }
 
     await connection.commit();

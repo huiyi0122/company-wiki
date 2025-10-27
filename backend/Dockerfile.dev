@@ -1,20 +1,14 @@
-# --- Dockerfile.dev ---
 FROM node:20-alpine
 
 WORKDIR /app
 
-# 复制依赖文件
 COPY package*.json ./
 
-# 使用国内 npm 镜像（加快安装）
 RUN npm config set registry https://registry.npmmirror.com
 RUN npm install
 
-# 复制所有源代码
 COPY . .
 
-# 暴露端口
 EXPOSE 3000
 
-# 启动命令（使用 ts-node-dev 热重载）
 CMD ["npx", "ts-node-dev", "--respawn", "src/server.ts"]
