@@ -189,6 +189,10 @@
   flex: 1;
 }
 
+.article-meta{
+  display: flex;
+  justify-content: flex-end;
+}
 .category-badge {
   background: #e6fffa;
   color: #234e52;

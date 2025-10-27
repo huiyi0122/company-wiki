@@ -8,12 +8,12 @@ export interface User {
   role: Role;
 }
 
-export interface JWTPayload {
-  id: number;
-  username: string;
-  role: Role;
-  exp: number;
-}
+// export interface JWTPayload {
+//   id: number;
+//   username: string;
+//   role: Role;
+//   exp: number;
+// }
 
 // ✅ 改进后的 DocItem：包含后端常见字段
 export interface DocItem {
@@ -24,6 +24,7 @@ export interface DocItem {
   category?: string; // 后端 JOIN category 时的名称
   author_id?: number;
   author?: string;
+  author_name?:string;
   created_by_name?: string;
   created_at?: string;
   updated_at?: string;
@@ -52,11 +53,11 @@ export const PERMISSIONS: Record<Role, string[]> = {
 };
 
 // ===== 默认分类 =====
-const DEFAULT_CATEGORIES = ["HR", "Tech", "Onboarding"];
+// const DEFAULT_CATEGORIES = ["HR", "Tech", "Onboarding"];
 
-export function getCategories(): string[] {
-  return DEFAULT_CATEGORIES;
-}
+// export function getCategories(): string[] {
+//   return DEFAULT_CATEGORIES;
+// }
 
 // 后端地址
 export const API_BASE_URL = "http://192.168.0.233:3000";

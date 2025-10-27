@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { PERMISSIONS, API_BASE_URL } from "./CommonTypes";
+import { PERMISSIONS } from "./CommonTypes";
 import type { User } from "./CommonTypes";
+import { apiFetch } from "../utils/api";
 import "../styles/Sidebar.css";
 
 interface SidebarProps {
@@ -80,86 +81,31 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   }, [location.search, location.pathname]);
 
   // 🔥 获取分类列表（带 refresh-token 自动续签）
-  useEffect(() => {
+  useEffect(() => { 
     const fetchCategories = async () => {
-      // ⚠️ 尝试获取 tokens
-      let accessToken = localStorage.getItem("accessToken");
-      let refreshToken = localStorage.getItem("refreshToken");
+      try {
+        const response = await apiFetch("/categories");
 
-      if (!accessToken) return; // 未登录就不 fetch
-
-      const tryFetch = async (token: string) => {
-        const res = await fetch(`${API_BASE_URL}/categories`, {
-          // 不需要 credentials: "include"，因为 token 在 Header 中
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        return res;
-      };
-
-      let response = await tryFetch(accessToken);
-
-      if (response.status === 401 || response.status === 403) {
-        // 检查是否有 refresh token 才能尝试续签
-        if (!refreshToken) {
-          console.warn(
-            "Access token expired and no refresh token found. Skipping categories fetch."
-          );
-          // 可选：如果需要，可以导航到登录页面，但你之前注释了这行
-          // navigate("/login");
+        if (!response.ok) {
+          console.warn(`Categories fetch failed with status: ${response.status}`);
           return;
         }
 
-        // refresh token
-        const refreshRes = await fetch(`${API_BASE_URL}/refresh-token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" }, // 必须指定 content-type
-          body: JSON.stringify({ refreshToken: refreshToken }), // 🚨 将 refresh token 放在请求体中
-        });
+        const result = await response.json();
 
-        const refreshData = await refreshRes.json();
-
-        // ⚠️ 成功续签后，后端应该返回新的 accessToken 和 refreshToken
-        if (
-          refreshData.success &&
-          refreshData.accessToken &&
-          refreshData.refreshToken
-        ) {
-          accessToken = refreshData.accessToken;
-          refreshToken = refreshData.refreshToken; // 更新 refresh token
-
-          // 存储新的 token
-          localStorage.setItem("accessToken", accessToken);
-          localStorage.setItem("refreshToken", refreshToken);
-
-          // 使用新的 access token 再次尝试获取分类
-          response = await tryFetch(accessToken);
+        if (result.success) {
+          const list = Array.isArray(result.data) ? result.data : [];
+          setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
         } else {
-          console.warn("Refresh token failed, user should re-login.");
-          // ⚠️ 续签失败，清除所有 token
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          setCurrentUser(null);
-          // 可选：导航到登录页
-          // navigate("/login");
-          return;
+          console.warn("Categories fetch failed:", result);
         }
-      }
-
-      // 处理最终的 response
-      const result = await response.json();
-      // Sidebar.tsx (Corrected Logic)
-      if (result.success) {
-        // 确认 result.data 是一个数组，并且是 Category 列表
-        const list = Array.isArray(result.data) ? result.data : [];
-
-        // 映射数据结构
-        setCategories(list.map((c: any) => ({ id: c.id, name: c.name })));
-      } else {
-        console.warn("Categories fetch failed:", result);
+      } catch (error) {
+        console.error("Fetch categories error:", error);
       }
     };
 
-    fetchCategories();
+    fetchCategories(); // ✅ 调用函数
+
   }, []);
 
   const handleLogout = () => {
@@ -185,19 +131,13 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
     categoryId: number,
     isLoadMore = false
   ) => {
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return;
-
-    setLoadingCategories((prev) => [...prev, categoryId]);
 
     try {
       const cursor = isLoadMore ? categoryPages[categoryId] : null;
-      let url = `${API_BASE_URL}/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
+      let url = `/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
       if (cursor) url += `&cursor=${cursor}`;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await apiFetch(url);
 
       const result = await res.json();
 
@@ -257,7 +197,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
     location.pathname === "/" ||
     (location.pathname.startsWith("/editor/") && !isNewArticleActive);
   const isEnrollActive = location.pathname === "/enroll";
-
+  const isTagsActive = location.pathname === "/tags";
   const renderMenuItems = () => (
     <>
       <div className="sidebar-search-form">
@@ -324,6 +264,17 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
           className={isEnrollActive ? "active" : ""}
         >
           Enroll Users
+        </li>
+      )}
+      {currentUser && currentUser.role === "admin" && (
+        <li
+          onClick={() => {
+            navigate("/tags");
+            setMobileOpen(false);
+          }}
+          className={isTagsActive ? "active" : ""}
+        >
+          Tags
         </li>
       )}
     </>
@@ -419,7 +370,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   return (
     <>
       <div className="mobile-navbar">
-        <h2 onClick={() => navigate("/")}>Company Wiki</h2>
+        <h2 onClick={() => navigate("/docs")}>Company Wiki</h2>
         <button
           className="hamburger"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -429,7 +380,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
       </div>
 
       <aside className="sidebar desktop-only">
-        <h2 onClick={() => navigate("/")}>Company Wiki</h2>
+        <h2 onClick={() => navigate("/docs")}>Company Wiki</h2>
         <ul className="main-menu">{renderMenuItems()}</ul>
         {renderCategories()}
 

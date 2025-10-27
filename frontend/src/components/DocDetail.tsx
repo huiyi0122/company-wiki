@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
 import remarkGfm from "remark-gfm";
 import remarkGemoji from "remark-gemoji";
 import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
-import { API_BASE_URL } from "./CommonTypes";
+import Modal from "./Modal"; // ✅ 新增导入
 import type { User, DocItem } from "./CommonTypes";
+import { apiFetch } from "../utils/api";
 import "../styles/DocDetail.css";
 
 interface Tag {
@@ -31,118 +32,135 @@ export default function DocDetail({
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
   const [allTags, setAllTags] = useState<Tag[]>([]);
 
-  // ------------------- 加载分类 -------------------
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
+  // ✅ 新增：Modal state（跟 TagsManagement 一样）
+  interface ModalState {
+  isOpen: boolean;
+  title: string;
+  content: React.ReactNode; // ✅ 改这里
+  confirmText: string;
+  targetId: number;
+  targetName: string;
+  onConfirm: () => Promise<void>;
+}
 
-    fetch(`${API_BASE_URL}/categories`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && Array.isArray(result.data)) {
+const [modalState, setModalState] = useState<ModalState>({
+  isOpen: false,
+  title: "",
+  content: "", // 可以是 string 或 JSX
+  confirmText: "",
+  targetId: 0,
+  targetName: "",
+  onConfirm: async () => {},
+});
+  const closeModal = () => setModalState((prev) => ({ ...prev, isOpen: false }));
+
+  // ------------------- 1️⃣ 初始化加载：分类 + 标签 -------------------
+  useEffect(() => {
+    async function fetchInitialData() {
+      try {
+        const [catRes, tagRes] = await Promise.all([
+          apiFetch("/categories").then((res) => res.json()),
+          apiFetch("/tags").then((res) => res.json()),
+        ]);
+
+        if (catRes.success && Array.isArray(catRes.data)) {
           const map: Record<number, string> = {};
-          result.data.forEach((c: any) => (map[c.id] = c.name));
+          catRes.data.forEach((c: any) => (map[c.id] = c.name));
           setCategoryMap(map);
         }
-      })
-      .catch((err) => console.error("❌ Error loading categories:", err));
-  }, []);
 
-  // ------------------- 加载标签 -------------------
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    fetch(`${API_BASE_URL}/tags`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.success && Array.isArray(result.data)) {
-          setAllTags(result.data);
+        if (tagRes.success && Array.isArray(tagRes.data)) {
+          setAllTags(tagRes.data);
         }
-      })
-      .catch((err) => console.error("❌ Error loading tags:", err));
+      } catch (err) {
+        console.error("❌ Error loading initial data:", err);
+      }
+    }
+
+    fetchInitialData();
   }, []);
 
-  // ------------------- 加载文章 -------------------
+  // ------------------- 2️⃣ 加载单篇文章 -------------------
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token || !id) {
-      setLoading(false); // ✅ 避免无限 loading
+    if (!id) {
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
+    async function fetchArticle() {
+      try {
+        setLoading(true);
+        const res = await apiFetch(`/articles/${id}`);
+        const result = await res.json();
 
-    fetch(`${API_BASE_URL}/articles/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((result) => {
         if (result.success && result.data) {
           setDoc(result.data);
         } else {
           toast.error(result.message || "Failed to load document");
           setDoc(null);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("❌ Error fetching document:", err);
         toast.error("Error fetching document!");
         setDoc(null);
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchArticle();
   }, [id]);
 
-  // ------------------- 填充标签 -------------------
-  useEffect(() => {
-    if (!doc || allTags.length === 0) return;
-    if (!doc.tags && Array.isArray(doc.tag_ids)) {
-      setDoc((prev) =>
-        prev && {
-          ...prev,
-          tags: allTags.filter((t) => doc.tag_ids!.includes(t.id)),
-        }
-      );
-    }
+  const tagsToShow = useMemo(() => {
+    if (!doc) return [];
+    if (Array.isArray(doc.tags)) return doc.tags;
+    if (Array.isArray(doc.tag_ids))
+      return allTags.filter((t) => doc.tag_ids!.includes(t.id));
+    return [];
   }, [doc, allTags]);
 
-  // ------------------- 删除文章 -------------------
-  const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this document?"))
-      return;
+  // ------------------- 删除文章（改用 Modal） -------------------
+  const handleDelete = () => {
+    if (!doc) return;
 
-    const token = localStorage.getItem("accessToken");
-    if (!token || !id) return;
+    setModalState({
+      isOpen: true,
+      title: "🗑️ Confirm Deletion",
+      content: (
+        <p>
+          Are you sure you want to delete the document{" "}
+          <strong>{doc.title}</strong>?
+        </p>
+      ),
+      confirmText: "Delete",
+      targetId: Number(id),
+      targetName: doc.title,
+      onConfirm: async () => {
+        try {
+          const res = await apiFetch(`/articles/${id}`, { method: "DELETE" });
+          const result = await res.json();
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/articles/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
+          if (!result.success) throw new Error(result.message || "Delete failed");
 
-      if (!result.success) throw new Error(result.message || "Delete failed");
-
-      toast.success("Deleted successfully!");
-      navigate("/docs");
-    } catch (err) {
-      console.error("❌ Delete failed:", err);
-      toast.error("Delete failed!");
-    }
+          toast.success("Document deleted successfully!");
+          closeModal();
+          navigate("/docs");
+        } catch (err) {
+          console.error("❌ Soft delete failed:", err);
+          toast.error("Delete failed!");
+        }
+      },
+    });
   };
 
-  // ------------------- 权限判断 -------------------
+  // ------------------- 权限控制 -------------------
   const canEdit =
     currentUser &&
     (currentUser.role === "admin" ||
-      (currentUser.role === "editor" && doc?.author_id === currentUser.id));
+      (currentUser.role === "editor" && doc?.author === currentUser.username));
   const canDelete = canEdit;
 
-  // ------------------- 渲染 -------------------
+  // ------------------- 渲染逻辑 -------------------
   if (loading) {
     return (
       <div className="layout">
@@ -183,6 +201,7 @@ export default function DocDetail({
 
       <div className="main-content-with-sidebar">
         <div className="doc-detail-container">
+          {/* 面包屑导航 */}
           <nav className="breadcrumb">
             <button onClick={() => navigate("/docs")} className="breadcrumb-link">
               Articles
@@ -198,6 +217,7 @@ export default function DocDetail({
             <span className="breadcrumb-current">{doc.title}</span>
           </nav>
 
+          {/* 编辑与删除按钮 */}
           {(canEdit || canDelete) && (
             <div className="doc-actions">
               {canEdit && (
@@ -241,9 +261,10 @@ export default function DocDetail({
             </span>
           </div>
 
-          {Array.isArray(doc.tags) && doc.tags.length > 0 && (
+          {/* 标签 */}
+          {tagsToShow.length > 0 && (
             <div className="doc-tags">
-              {doc.tags.map((t: any, i) => (
+              {tagsToShow.map((t: any, i) => (
                 <span key={i} className="tag-badge">
                   #{typeof t === "string" ? t : t.name || "Untitled"}
                 </span>
@@ -253,6 +274,7 @@ export default function DocDetail({
 
           <hr className="doc-divider" />
 
+          {/* Markdown 内容 */}
           <div className="doc-content">
             <MDEditor.Markdown
               source={doc.content}
@@ -268,6 +290,21 @@ export default function DocDetail({
           </div>
         </div>
       </div>
+
+      {/* ✅ 加上 Modal（放在最外层 layout 内） */}
+      <Modal
+        isOpen={modalState.isOpen}
+        title={modalState.title}
+        onClose={closeModal}
+        onConfirm={modalState.onConfirm}
+        confirmText={modalState.confirmText}
+      >
+        <div className="modal-content-wrapper">
+          {typeof modalState.content === "string"
+            ? modalState.content
+            : modalState.content}
+        </div>
+      </Modal>
     </div>
   );
 }

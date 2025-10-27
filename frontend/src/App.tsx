@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { useState, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
+import "./styles/App.css"; // <-- 引入全局 CSS
 import type { User } from "./components/CommonTypes";
 import Login from "./components/Login";
 import Docs from "./components/Docs";
@@ -12,22 +12,18 @@ import Dashboard from "./components/Dashboard";
 import EnrollPage from "./components/EnrollPage";
 import ProfilePage from "./components/ProfilePage";
 import TagsManagement from "./components/TagsManagement";
+import LogDetailPage from './components/LogDetailPage';
+import { apiFetch } from "./utils/api";
 
-/* ===============================
-   ⏳ 加载屏幕组件
-================================ */
 const LoadingScreen = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50 font-sans">
-    <div className="text-center p-8 bg-white shadow-xl rounded-xl">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-      <p className="mt-4 text-lg text-gray-700">正在加载用户会话...</p>
+  <div className="loading-screen">
+    <div className="loading-box">
+      <div className="spinner"></div>
+      <p className="loading-text">Loading...</p>
     </div>
   </div>
 );
 
-/* ===============================
-   🔒 路由保护组件
-================================ */
 const ProtectedRoute = ({
   children,
   currentUser,
@@ -40,36 +36,56 @@ const ProtectedRoute = ({
   requiredRole?: "admin" | "editor";
 }) => {
   if (isLoadingUser) return <LoadingScreen />;
-
   if (!currentUser) return <Navigate to="/login" replace />;
-
   if (requiredRole && currentUser.role !== requiredRole && currentUser.role !== "admin") {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-red-50 font-sans">
-        <p className="text-xl text-red-700 p-8 border border-red-300 rounded-lg shadow-md">
-          访问受限。您需要 "{requiredRole}" 权限才能访问此页面。
+      <div className="restricted-access">
+        <p>
+          Access is restricted. You need "{requiredRole}" permissions to access this page.
         </p>
       </div>
     );
   }
-
   return <>{children}</>;
 };
 
-/* ===============================
-   🧠 主组件
-================================ */
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
-  // ✅ 恢复会话：从 localStorage 获取已登录用户
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setIsLoadingUser(false);
+    const checkUser = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+          setCurrentUser(null);
+          setIsLoadingUser(false);
+          return;
+        }
+
+        const res = await apiFetch("/me");
+        const data = await res.json();
+        const user = data.data?.user || data.user;
+
+        if (res.ok && data.success && user) {
+          setCurrentUser(user);
+          localStorage.setItem("user", JSON.stringify(user));
+        } else {
+          setCurrentUser(null);
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("user");
+        }
+      } catch (err) {
+        setCurrentUser(null);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    checkUser();
   }, []);
 
   const routeProps = { currentUser, setCurrentUser, isLoadingUser };
@@ -77,13 +93,8 @@ export default function App() {
   return (
     <Router>
       <Routes>
-        {/* 🏠 默认跳转登录 */}
         <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* 🔑 登录页 */}
         <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
-
-        {/* 📊 仪表盘 */}
         <Route
           path="/dashboard"
           element={
@@ -92,8 +103,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* 📚 文档列表 */}
         <Route
           path="/docs"
           element={
@@ -102,8 +111,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* 📄 文档详情 */}
         <Route
           path="/docs/:id"
           element={
@@ -112,8 +119,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* ✏️ 编辑器（仅 editor 或 admin） */}
         <Route
           path="/editor"
           element={
@@ -130,8 +135,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* 👥 用户注册（仅 admin） */}
         <Route
           path="/enroll"
           element={
@@ -140,8 +143,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* 🧍 用户资料 */}
         <Route
           path="/profile"
           element={
@@ -150,19 +151,20 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* 🏷️ 标签管理（仅 admin） */}
         <Route
-          path="/tags-management"
+          path="/tags"
           element={
             <ProtectedRoute {...routeProps} requiredRole="admin">
               <TagsManagement currentUser={currentUser} setCurrentUser={setCurrentUser} />
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/logs/:id"
+          element={<LogDetailPage currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+        />
       </Routes>
 
-      {/* ✅ Toast 全局提示容器 */}
       <ToastContainer position="top-right" autoClose={3000} />
     </Router>
   );

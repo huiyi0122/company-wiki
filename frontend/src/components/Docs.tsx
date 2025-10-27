@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import { API_BASE_URL } from "./CommonTypes";
 import type { User, DocItem } from "./CommonTypes";
+import { apiFetch } from "../utils/api";
 import "../styles/Docs.css";
-
-// ============================================================================
 
 interface DocsProps {
   currentUser: User | null;
@@ -14,112 +12,98 @@ interface DocsProps {
 
 export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   const [docs, setDocs] = useState<DocItem[]>([]);
-  const [search, setSearch] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "my">("all");
 
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalResults, setTotalResults] = useState<number>(0);
-  const [pageSize] = useState<number>(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [pageSize] = useState(5);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fetchCategories = async () => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${API_BASE_URL}/categories`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  // 直接从 URL 中计算搜索和分类，不需要 useEffect
+  const searchParams = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      search: params.get("q") || "",
+      category: params.get("category_id") || "",
+    };
+  }, [location.search]);
 
-      if (res.status === 401) {
-        console.warn("⚠️ Token expired or invalid, redirecting to login...");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        navigate("/login");
-        return;
-      }
+  // 在渲染前就检查 token（同步执行）
+  const token = localStorage.getItem("accessToken");
+  if (!token) navigate("/login");
 
-      const result = await res.json();
-      if (result.success && Array.isArray(result.data)) {
-        const map: Record<number, string> = {};
-        result.data.forEach((c: any) => (map[c.id] = c.name));
-        setCategoryMap(map);
-      } else {
-        console.error("❌ Unexpected categories response:", result);
-      }
-    } catch (err) {
-      console.error("❌ Error loading categories:", err);
-    }
-  };
-
-  const fetchDocs = useCallback(
-    async (page: number, searchQuery: string, categoryId: string) => {
-      setLoading(true);
-      setError(null);
-
+  // 加载分类（只执行一次）
+  useEffect(() => {
+    const loadCategories = async () => {
       try {
-        let token = localStorage.getItem("accessToken");
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!token) {
-          console.warn("⚠️ No token found, redirecting to login...");
+        const res = await apiFetch("/categories");
+        if (res.status === 401) {
           navigate("/login");
           return;
         }
 
+        const result = await res.json();
+        if (result.success && Array.isArray(result.data)) {
+          const map: Record<number, string> = {};
+          result.data.forEach((c: any) => (map[c.id] = c.name));
+          setCategoryMap(map);
+        } else {
+          console.error("Unexpected category response:", result);
+        }
+      } catch (err) {
+        console.error("Error loading categories:", err);
+      }
+    };
+
+    loadCategories();
+  }, [navigate]);
+
+  // ✅ fetchDocs（只在需要时被手动调用）
+  const fetchDocs = useCallback(
+    async (page = 1) => {
+      setLoading(true);
+      setError(null);
+      try {
         const params = new URLSearchParams();
         params.append("limit", pageSize.toString());
-        const hasFilters = searchQuery.trim() || categoryId;
-        let endpoint = hasFilters ? "/articles/search" : "/articles";
         params.append("page", page.toString());
+
+        // ✅ 传入搜索关键词（来自 Sidebar）
+        if (searchParams.search.trim()) {
+          params.append("q", searchParams.search.trim());
+        }
+
+        // ✅ 如果有分类，也传入
+        if (searchParams.category) {
+          params.append("category_id", searchParams.category);
+        }
+
+        // ✅ “我的文章”模式下加上 author_id
         if (activeTab === "my" && currentUser?.id) {
           params.append("author_id", currentUser.id.toString());
         }
 
-        const url = `${API_BASE_URL}${endpoint}?${params.toString()}`;
-        console.log(`📡 Fetching (page ${page}):`, url);
+        // ✅ 判断要用哪个 endpoint
+        const hasFilters =
+          searchParams.search.trim() || searchParams.category || activeTab === "my";
+        const endpoint = hasFilters ? "/articles/search" : "/articles";
 
-        let res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const url = `${endpoint}?${params.toString()}`;
 
-        // ✅ 如果 401，则尝试刷新 token
-        if (res.status === 401 && refreshToken) {
-          console.log("🔁 Access token expired, refreshing...");
-          const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken }),
-          });
-
-          if (refreshRes.ok) {
-            const refreshData = await refreshRes.json();
-            const newToken = refreshData.accessToken;
-            if (newToken) {
-              localStorage.setItem("accessToken", newToken);
-              token = newToken;
-              // 再次请求
-              res = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-            }
-          } else {
-            console.error("❌ Token refresh failed");
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
+        const res = await apiFetch(url);
+        if (!res.ok) {
+          if (res.status === 401) {
             navigate("/login");
             return;
           }
-        }
-
-        if (!res.ok)
           throw new Error(`Failed to fetch articles (${res.status})`);
+        }
 
         const result = await res.json();
         setDocs(result.data || []);
@@ -133,43 +117,35 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
         setLoading(false);
       }
     },
-    [activeTab, currentUser, pageSize, navigate]
+    [pageSize, activeTab, currentUser, searchParams, navigate]
   );
 
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      console.warn("⚠️ No access token, redirecting to login...");
-      navigate("/login");
-    }
-  }, [navigate]);
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  // 仅当 categoryMap 加载完成或参数变化时加载文档
+  //   useEffect(() => {
+  //   if (Object.keys(categoryMap).length > 0) {
+  //     fetchDocs(1);
+  //   }
+  // }, [categoryMap, fetchDocs, activeTab]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const cat = params.get("category_id") || "";
-    const searchQuery = params.get("q") || "";
-    setCategory(cat);
-    setSearch(searchQuery);
-  }, [location.search]);
-
+  // 搜索或分类变化时也应该触发搜索
   useEffect(() => {
     if (Object.keys(categoryMap).length > 0) {
-      setCurrentPage(1);
-      fetchDocs(1, search, category);
+      fetchDocs(1);
     }
-  }, [search, category, activeTab, categoryMap, fetchDocs]);
+  }, [categoryMap, searchParams.search, searchParams.category, activeTab]);
+  // 添加 searchParams.search 和 searchParams.category 作为依赖
 
+
+  // ✅ 分页处理
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages && !loading) {
-      fetchDocs(newPage, search, category);
+      fetchDocs(newPage);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
+  // ✅ 分页 UI 渲染
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
@@ -247,43 +223,42 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   return (
     <div className="layout">
       <Sidebar
-        setCategory={setCategory}
+        setCategory={(cat) => navigate(`/docs?category_id=${cat}`)}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
 
       <div className="main-content-with-sidebar">
         <div className="docs-page">
-          {/* Header Section */}
           <div className="page-header">
             <h1>Knowledge Base</h1>
             <p>Browse and search through all articles</p>
           </div>
 
-          {/* Category Filter Display */}
-          {category && (
+          {searchParams.category && (
             <div className="active-filters">
               <span>
-                Category: {categoryMap[parseInt(category)] || category}
+                Category:{" "}
+                {categoryMap[parseInt(searchParams.category)] ||
+                  searchParams.category}
               </span>
-              <button onClick={() => setCategory("")}>✕</button>
+              <button onClick={() => navigate("/docs")}>✕</button>
             </div>
           )}
 
-          {/* Tabs Section */}
           {currentUser && currentUser.role !== "viewer" && (
             <div className="tabs-section">
               <div className="tabs-container">
                 <button
-                  className={`tab-button ${
-                    activeTab === "all" ? "active" : ""
-                  }`}
+                  className={`tab-button ${activeTab === "all" ? "active" : ""
+                    }`}
                   onClick={() => setActiveTab("all")}
                 >
                   All Articles
                 </button>
                 <button
-                  className={`tab-button ${activeTab === "my" ? "active" : ""}`}
+                  className={`tab-button ${activeTab === "my" ? "active" : ""
+                    }`}
                   onClick={() => setActiveTab("my")}
                 >
                   My Articles
@@ -292,7 +267,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             </div>
           )}
 
-          {/* Results Count */}
           <div className="results-info">
             <p>
               {loading
@@ -301,41 +275,17 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             </p>
           </div>
 
-          {/* Content Section */}
           <div className="content-section">
-            {/* Loading State */}
-            {loading && (
-              <div className="loading-state">
-                <p>Loading articles...</p>
-              </div>
-            )}
+            {/* {loading && <p>Loading articles...</p>} */}
+            {error && <p>❌ {error}</p>}
 
-            {/* Error State */}
-            {error && (
-              <div className="error-state">
-                <p>❌ {error}</p>
-              </div>
-            )}
-
-            {/* Empty State */}
             {!loading && !error && docs.length === 0 && (
               <div className="empty-state">
                 <p>📭 No articles found.</p>
-                {(search || category) && (
-                  <button
-                    onClick={() => {
-                      setSearch("");
-                      setCategory("");
-                      navigate("/docs");
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                )}
+                <button onClick={() => navigate("/docs")}>Clear filters</button>
               </div>
             )}
 
-            {/* Articles List */}
             {!error && docs.length > 0 && (
               <>
                 <div className="articles-grid">
@@ -345,52 +295,37 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
                       className="article-card"
                       onClick={() => navigate(`/docs/${doc.id}`)}
                     >
-                      <div className="article-header">
-                        <h3 className="article-title">
-                          {doc.title || "Untitled"}
-                        </h3>
-                        <div className="article-meta">
-                          <span className="category-badge">
-                            {categoryMap[doc.category_id] || "Uncategorized"}
-                          </span>
+                      <h3 className="article-title">{doc.title || "Untitled"}</h3>
+                      <div className="article-meta">
+                        <span className="category-badge">
+                          {categoryMap[doc.category_id] || "Uncategorized"}
+                        </span>
+                      </div>
+                      <p className="article-author">
+                        By{" "}
+                        {doc.author_name ||
+                          doc.created_by_name ||
+                          `User ${doc.author_id}` ||
+                          "Unknown"}
+                      </p>
+                      {Array.isArray(doc.tags) && doc.tags.length > 0 && (
+                        <div className="article-tags">
+                          {doc.tags.map((tag: any, i: number) => (
+                            <span key={i} className="tag-pill-sm">
+                              #{typeof tag === "string" ? tag : tag.name || tag}
+                            </span>
+                          ))}
                         </div>
-                      </div>
+                      )}
 
-                      <div className="article-content">
-                        <p className="article-author">
-                          By{" "}
-                          {doc.author ||
-                            doc.created_by_name ||
-                            `User ${doc.author_id}` ||
-                            "Unknown"}
-                        </p>
-
-                        {/* Tags */}
-                        {doc.tags &&
-                          Array.isArray(doc.tags) &&
-                          doc.tags.length > 0 && (
-                            <div className="article-tags">
-                              {doc.tags.map((tag: any, idx: number) => (
-                                <span key={idx} className="tag-pill-sm">
-                                  {typeof tag === "string"
-                                    ? tag
-                                    : tag.name || tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                        <p className="article-date">
-                          {doc.created_at
-                            ? new Date(doc.created_at).toLocaleDateString()
-                            : "N/A"}
-                        </p>
-                      </div>
+                      <p className="article-date">
+                        {doc.created_at
+                          ? new Date(doc.created_at).toLocaleDateString()
+                          : "N/A"}
+                      </p>
                     </div>
                   ))}
                 </div>
-
-                {/* Page-based Pagination */}
                 {renderPagination()}
               </>
             )}

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "./CommonTypes";
+// import { API_BASE_URL } from "./CommonTypes";
 import type { User } from "./CommonTypes";
 import "../styles/Login.css";
+import { apiFetch } from "../utils/api";
+import { toast } from "react-toastify";
+
 
 interface LoginProps {
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
@@ -11,18 +14,20 @@ interface LoginProps {
 export default function Login({ setCurrentUser }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
     if (!username || !password) {
-      alert("Please fill all fields!");
+      toast.warn("Please fill all fields!");
       return;
     }
 
+    setLoading(true);
+
     try {
-      const res = await fetch(`${API_BASE_URL}/login`, {
+      const res = await apiFetch("/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
@@ -30,27 +35,38 @@ export default function Login({ setCurrentUser }: LoginProps) {
       console.log("Response:", data);
 
       if (!res.ok || !data.success) {
-        alert(data.message || "Invalid username or password!");
+        toast.warn(data.message || "Invalid username or password!");
         return;
       }
 
-      // 后端返回的结构是直接包含 accessToken / refreshToken / user
       const { accessToken, refreshToken, user } = data;
 
-      // 存储 token
+      // ✅ 存储 token + 用户信息
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("user", JSON.stringify(user));
 
-      // 更新当前用户状态
+      console.log("✅ Login successful, user:", user);
+      toast.success("Login successfully!")
+
       setCurrentUser(user);
-
-      // 跳转
-      navigate("/docs");
+      setTimeout(() => {
+        navigate("/docs", { replace: true });
+      }, 100);
     } catch (err) {
       console.error("Login failed:", err);
-      alert("Login request failed. Please check your connection or server.");
+      toast.error("Login request failed. Please check your connection or server.");
+    } finally {
+      setLoading(false);
     }
-  }; 
+  };
+
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleLogin();
+    }
+  };
 
   return (
     <div className="login-container">
@@ -63,14 +79,20 @@ export default function Login({ setCurrentUser }: LoginProps) {
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={loading}
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={loading}
           />
-          <button onClick={handleLogin}>Login</button>
+          <button onClick={handleLogin} disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
         </div>
       </div>
     </div>

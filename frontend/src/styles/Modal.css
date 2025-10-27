@@ -1,0 +1,26 @@
+/* styles/Modal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  width: 400px;
+  max-width: 90%;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.btn-cancel { background: #ccc; padding: 0.5rem 1rem; border-radius: 0.25rem; }
+.btn-confirm { background: #4caf50; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; }

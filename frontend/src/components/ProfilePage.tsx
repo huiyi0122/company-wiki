@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-import { API_BASE_URL } from "./CommonTypes";
+// import { API_BASE_URL } from "./CommonTypes";
+import { apiFetch } from "../utils/api";
+
 import type { User } from "./CommonTypes";
 import "../styles/ProfilePage.css";
 
@@ -30,7 +32,7 @@ export default function ProfilePage({
     setMessage("");
 
     try {
-      const token = localStorage.getItem("token");
+      // const token = localStorage.getItem("token");
 
       const body = {
         id: currentUser.id,
@@ -40,31 +42,37 @@ export default function ProfilePage({
         password: password || "", // 留空后端会忽略
       };
 
-      const res = await fetch(`${API_BASE_URL}/users/${currentUser.id}`, {
+      // const res = await apiFetch(`/users/${currentUser.id}`, {        method: "PUT",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     Authorization: `Bearer ${token}`,
+      //   },
+      //   body: JSON.stringify(body),
+      // });
+      const res = await apiFetch(`/users`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(body),
       });
+
 
       const result = await res.json();
       console.log("Profile update result:", result);
 
       if (result.success) {
-        setMessage("✅ Profile updated successfully.");
+        setMessage("✅ Profile updated successfully. Please log in again.");
 
-        // 同步前端用户资料
-        setCurrentUser({
-          ...currentUser,
-          username,
-        });
+        // 清除本地登录状态
+        localStorage.removeItem("token");
+        setCurrentUser(null);
 
-        setPassword("");
+        // 延迟 1.5 秒跳转
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1500);
       } else {
         setMessage(`❌ ${result.data?.message || "Update failed."}`);
       }
+
     } catch (err) {
       console.error(err);
       setMessage("❌ Server error.");

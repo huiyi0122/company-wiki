@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MDEditor from "@uiw/react-md-editor";
 import remarkGfm from "remark-gfm";
 import remarkGemoji from "remark-gemoji";
 import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
-import { API_BASE_URL } from "./CommonTypes";
 import type { User } from "./CommonTypes";
+import { apiFetch } from "../utils/api";
+import Modal from "./Modal"; // 假设 Modal 组件已导入
 import "../styles/EditorPage.css";
 
 interface EditorPageProps {
@@ -24,170 +25,177 @@ interface Tag {
   name: string;
 }
 
+interface Article {
+  id: number;
+  title: string;
+  content: string;
+  category_id?: number;
+  tags: Tag[];
+}
+
+// 假设 ModalProps 接口来自 Modal 组件的定义，用于状态管理
+interface ModalState {
+  isOpen: boolean;
+  title: string;
+  content: React.ReactNode;
+  confirmText: string;
+  onConfirm: () => void;
+  inputType?: "text" | "none";
+  inputValue?: string;
+  targetId?: number;
+  targetName?: string;
+}
+
 export default function EditorPage({
   currentUser,
   setCurrentUser,
 }: EditorPageProps) {
   const { id } = useParams<{ id: string }>();
-  const [title, setTitle] = useState<string>("");
-  const [content, setContent] = useState<string>("## Start writing your article...");
+  const navigate = useNavigate();
+
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("## Start writing your article...");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [allTags, setAllTags] = useState<Tag[]>([]); // 内存中所有标签
+
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [dropdownLocked, setDropdownLocked] = useState(false);
 
-  const navigate = useNavigate();
+  const [debouncedTagInput, setDebouncedTagInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  
+  // ---------------------- Modal State for Category ----------------------
+  const modalInputRef = useRef("");
 
-  // ---------------------- 初始化：获取分类、标签、加载文章 ----------------------
-useEffect(() => {
-  const loadData = async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
+  const [modalState, setModalState] = useState<ModalState>({
+    isOpen: false,
+    title: "",
+    content: "",
+    confirmText: "Confirm",
+    onConfirm: () => {},
+  });
 
-    setLoading(true);
-
-    try {
-      // 1. fetch categories
-      const catRes = await fetch(`${API_BASE_URL}/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const catData = await catRes.json();
-      if (catData.success && Array.isArray(catData.data)) setCategories(catData.data);
-
-      // 2. fetch all tags
-      const tagRes = await fetch(`${API_BASE_URL}/tags?limit=1000`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const tagData = await tagRes.json();
-      let tags: Tag[] = [];
-      if (tagData.success && Array.isArray(tagData.data)) tags = tagData.data;
-      setAllTags(tags);
-
-      // 3. fetch article if editing
-      if (id) {
-        const artRes = await fetch(`${API_BASE_URL}/articles/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const artData = await artRes.json();
-        if (artData.success && artData.data) {
-          const article = artData.data;
-          setTitle(article.title);
-          setContent(article.content);
-          setCategoryId(article.category_id || null);
-
-          // 匹配标签
-          if (article.tags && Array.isArray(article.tags)) {
-            const selectedTagIds = article.tags.map((t: any) => {
-              const existing = tags.find((tag) => tag.name.toLowerCase() === (t.name || t).toLowerCase());
-              return existing ? existing.id : t.id;
-            });
-            setSelectedTags(selectedTagIds);
-          }
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  const closeModal = () => {
+    setModalState({
+      isOpen: false,
+      title: "",
+      content: "",
+      confirmText: "Confirm",
+      onConfirm: () => {},
+      inputType: undefined,
+      inputValue: undefined,
+    });
+    modalInputRef.current = "";
   };
 
-  loadData();
-}, [id]);
+  // ---------------------- 初始化加载 (保留不变) ----------------------
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const catRes = await apiFetch("/categories");
+        const catData = await catRes.json();
+        if (catData.success && Array.isArray(catData.data)) {
+          setCategories(catData.data);
+        }
 
+        if (id) {
+          const artRes = await apiFetch(`/articles/${id}`);
+          const artData = await artRes.json();
+          if (artData.success && artData.data) {
+            const article: Article = artData.data; // <-- 给出类型
+            setTitle(article.title);
+            setContent(article.content);
+            setCategoryId(article.category_id || null);
 
-  // ---------------------- 实时搜索标签（客户端 + 服务端） ----------------------
-  const handleTagInputChange = async (value: string) => {
-    setTagInput(value);
+            if (Array.isArray(article.tags)) {
+              const tagObjs = article.tags.map((t) => ({
+                id: t.id,
+                name: t.name || String(t),
+              }));
+              setAllTags(tagObjs);
+              setSelectedTags(tagObjs.map((t) => t.id));
+            }
+          }
 
-    if (!value.trim()) {
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load editor data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id]);
+
+  // ---------------------- 输入防抖 (保留不变) ----------------------
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTagInput(tagInput.trim());
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [tagInput]);
+
+  // ---------------------- ES 搜索标签 (保留不变) ----------------------
+  useEffect(() => {
+    if (!debouncedTagInput) {
       setTagSuggestions([]);
       setShowTagDropdown(false);
       return;
     }
 
-    const trimmedValue = value.trim().toLowerCase();
-
-    // 1️⃣ 先从内存中的 allTags 搜索（前缀匹配 + 模糊匹配）
-    const filtered = allTags.filter((tag) => {
-      const tagNameLower = tag.name.toLowerCase();
-      // 前缀匹配或包含匹配
-      return (
-        tagNameLower.startsWith(trimmedValue) ||
-        tagNameLower.includes(trimmedValue)
-      );
-    });
-
-    // 去掉已选中的标签
-    const suggestions = filtered.filter(
-      (t) => !selectedTags.includes(t.id)
-    );
-
-    setTagSuggestions(suggestions);
-    setShowTagDropdown(true);
-
-    // 2️⃣ 同时从服务端搜索（异步，更新到 allTags）
-    const token = localStorage.getItem("token");
-    if (token) {
+    const searchTags = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/tags?search=${encodeURIComponent(trimmedValue)}&limit=20`,
-          { headers: { Authorization: `Bearer ${token}` } }
+        const res = await apiFetch(
+          `/tags?search=${encodeURIComponent(debouncedTagInput)}&limit=20`
         );
         const result = await res.json();
 
-        if (result.success && result.data) {
-          // 合并服务端返回的标签到 allTags
-          setAllTags((prev) => {
-            const existingIds = new Set(prev.map((t) => t.id));
-            const newTags = result.data.filter(
-              (t: Tag) => !existingIds.has(t.id)
-            );
-            return [...prev, ...newTags];
-          });
-
-          // 重新过滤建议
-          const combined = [
-            ...allTags,
-            ...result.data.filter(
-              (t: Tag) => !allTags.some((existing) => existing.id === t.id)
-            ),
-          ];
-
-          const refilteredSuggestions = combined.filter((tag) => {
-            const tagNameLower = tag.name.toLowerCase();
-            return (
-              (tagNameLower.startsWith(trimmedValue) ||
-                tagNameLower.includes(trimmedValue)) &&
-              !selectedTags.includes(tag.id)
-            );
-          });
-
-          setTagSuggestions(refilteredSuggestions);
+        if (result.success && Array.isArray(result.data)) {
+          const filtered = result.data.filter(
+            (tag: Tag) => !selectedTags.includes(tag.id)
+          );
+          setTagSuggestions(filtered);
+          setShowTagDropdown(true);
+        } else {
+          setTagSuggestions([]);
         }
       } catch (err) {
-        console.error("Tag search error:", err);
+        console.error("Tag search (ES) error:", err);
+        setTagSuggestions([]);
       }
-    }
+    };
+
+    searchTags();
+  }, [debouncedTagInput, selectedTags]);
+
+  // ---------------------- 标签交互 (保留不变) ----------------------
+
+  const handleTagInputChange = (value: string) => {
+    setTagInput(value);
   };
 
-  // ---------------------- 选择标签 ----------------------
   const handleTagSelect = (tag: Tag) => {
-    if (!selectedTags.includes(tag.id)) {
-      setSelectedTags([...selectedTags, tag.id]);
-    }
+    if (selectedTags.includes(tag.id)) return;
+
+    setSelectedTags((prev) => [...prev, tag.id]);
+    setAllTags((prev) => {
+      if (!prev.some((t) => t.id === tag.id)) {
+        return [...prev, tag];
+      }
+      return prev;
+    });
     setTagInput("");
     setTagSuggestions([]);
     setShowTagDropdown(false);
-    setDropdownLocked(false);
   };
 
-  // ---------------------- 创建新标签 ----------------------
   const handleCreateNewTag = async () => {
     const name = tagInput.trim();
     if (!name) {
@@ -195,54 +203,52 @@ useEffect(() => {
       return;
     }
 
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
     try {
-      const res = await fetch(`${API_BASE_URL}/tags`, {
+      const res = await apiFetch("/tags", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ name }),
       });
-
       const result = await res.json();
-      if (!result.success) {
-        throw new Error(result.message || "Failed to create tag");
+
+      // ✅ 情况 1：后端创建成功
+      if (result.success) {
+        const newTag: Tag = result.data || { id: result.id || Date.now(), name };
+        setAllTags((prev) => [...prev, newTag]);
+        setSelectedTags((prev) => [...prev, newTag.id]);
+        setTagInput("");
+        setTagSuggestions([]);
+        toast.success(`Tag "${name}" created successfully!`);
+        return;
       }
 
-      // 从响应中获取新标签的 ID
-      const newTagId = result.data?.id || result.tag?.id || Date.now();
-      const newTag: Tag = {
-        id: newTagId,
-        name,
-      };
+      // ✅ 情况 2：后端返回「已存在」
+      if (result.error === "Tag already exists") {
+        const searchRes = await apiFetch(
+          `/tags?search=${encodeURIComponent(name)}`
+        );
+        const searchData = await searchRes.json();
 
-      // ✅ 立即添加到 allTags 和 selectedTags
-      setAllTags((prev) => [...prev, newTag]);
-      setSelectedTags((prev) => [...prev, newTag.id]);
+        if (searchData.success && searchData.data.length > 0) {
+          const existingTag = searchData.data[0];
+          handleTagSelect(existingTag);
+          toast.info(`Tag "${name}" already exists, selected it.`);
+          return;
+        }
 
-      setTagInput("");
-      setTagSuggestions([]);
-      setShowTagDropdown(false);
-      toast.success(`Tag "${name}" created successfully!`);
+        toast.warning(`Tag "${name}" already exists but not found.`);
+        return;
+      }
+
+      console.error("Unexpected tag creation response:", result);
+      toast.error(result.error || "Failed to create tag.");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to create tag.");
+      console.error("handleCreateNewTag error:", err);
+      toast.error("Failed to create tag (network or server issue).");
     }
   };
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (tagSuggestions.length > 0) {
-        handleTagSelect(tagSuggestions[0]);
-      } else {
-        handleCreateNewTag();
-      }
-    } else if (e.key === ",") {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       if (tagSuggestions.length > 0) {
         handleTagSelect(tagSuggestions[0]);
@@ -256,81 +262,98 @@ useEffect(() => {
     setSelectedTags(selectedTags.filter((id) => id !== tagId));
   };
 
-  // ---------------------- 新增分类 ----------------------
-  const handleAddCategory = async () => {
-    const name = window.prompt("Enter new category name:");
-    if (!name?.trim()) {
-      toast.warning("Category name cannot be empty.");
-      return;
-    }
+  // ---------------------- 新增分类 (Refactored to use Modal) ----------------------
+  const handleAddCategory = () => {
+    modalInputRef.current = ""; // Reset ref
+    
+    setModalState({
+      isOpen: true,
+      title: "➕ Create New Category",
+      content: (
+        <>
+          <p>Enter name for new category:</p>
+        </>
+      ),
+      confirmText: "Create",
+      inputType: "text",
+      inputValue: "",
+      onConfirm: async () => {
+        const name = modalInputRef.current?.trim();
 
-    const token = localStorage.getItem("token");
-    if (!token) return;
+        if (!name) {
+          toast.warning("Category name cannot be empty.");
+          return;
+        }
+        
+        closeModal(); // Close modal immediately before async operation
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/categories`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+        try {
+          const res = await apiFetch("/categories", {
+            method: "POST",
+            body: JSON.stringify({ name }),
+          });
+          const result = await res.json();
 
-      const result = await res.json();
-      if (!result.success)
-        throw new Error(result.message || "Failed to add category");
+          if (result.success && (result.data || result.category)) {
+            const newCat = result.data || result.category;
+            setCategories((prev) => [...prev, newCat]);
+            setCategoryId(newCat.id);
+            toast.success(`Category "${name}" added successfully!`);
+            return;
+          }
 
-      toast.success(`Category "${name.trim()}" added successfully!`);
-      const newCatObj = { id: result.data?.id || Date.now(), name: name.trim() };
-      
-      // ✅ 立即添加到 categories 和设置为当前选择
-      setCategories((prev) => [...prev, newCatObj]);
-      setCategoryId(newCatObj.id);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to add category.");
-    }
+          if (result.error === "Category already exists") {
+            const searchRes = await apiFetch(
+              `/categories?search=${encodeURIComponent(name)}`
+            );
+            const searchData = await searchRes.json();
+
+            if (searchData.success && searchData.data.length > 0) {
+              const existingCat = searchData.data[0];
+              setCategoryId(existingCat.id);
+              toast.info(`Category "${name}" already exists, selected it.`);
+            } else {
+              toast.warning(`Category "${name}" already exists but not found.`);
+            }
+            return;
+          }
+
+          console.error("Unexpected category creation response:", result);
+          toast.error(result.error || "Failed to add category.");
+        } catch (err) {
+          console.error("handleAddCategory error:", err);
+          toast.error("Failed to add category (network or server issue).");
+        }
+      },
+    });
   };
 
-  // ---------------------- 保存文章 ----------------------
+  // ---------------------- 保存文章 (保留不变) ----------------------
   const handleSave = async () => {
-    if (!title || !content)
+    if (!title.trim() || !content.trim())
       return toast.warning("Title and content are required.");
 
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    const selectedTagNames = allTags
-      .filter((tag) => selectedTags.includes(tag.id))
-      .map((tag) => tag.name);
+    const selectedTagObjects = selectedTags.map((id) => {
+      const found = allTags.find((t) => t.id === id);
+      return found ? found.name : id;
+    });
 
     const payload = {
       title,
       content,
       category_id: categoryId,
-      tags: selectedTagNames,
+      tags: selectedTagObjects,
     };
-
-    console.log("✅ Final payload:", payload);
 
     try {
       setLoading(true);
-      const res = await fetch(
-        id ? `${API_BASE_URL}/articles/${id}` : `${API_BASE_URL}/articles`,
-        {
-          method: id ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
+      const res = await apiFetch(id ? `/articles/${id}` : "/articles", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
       const result = await res.json();
-      if (!result.success) throw new Error(result.message || "Save failed");
 
+      if (!result.success) throw new Error(result.message);
       toast.success("Article saved successfully!");
       navigate("/docs");
     } catch (err) {
@@ -341,7 +364,9 @@ useEffect(() => {
     }
   };
 
+  // ---------------------- 渲染 ----------------------
   if (loading) {
+    // ... loading state remains the same
     return (
       <div className="layout">
         <Sidebar
@@ -372,11 +397,7 @@ useEffect(() => {
         <div className="editor-page">
           <div className="page-header">
             <h1>{id ? "Edit Article" : "Create New Article"}</h1>
-            <p>
-              {id
-                ? "Update your existing article"
-                : "Write and publish a new article"}
-            </p>
+            <p>{id ? "Update your existing article" : "Write and publish a new article"}</p>
           </div>
 
           <div className="editor-card">
@@ -446,14 +467,10 @@ useEffect(() => {
                       onChange={(e) => handleTagInputChange(e.target.value)}
                       onKeyDown={handleTagInputKeyDown}
                       onFocus={() =>
-                        tagInput &&
-                        tagSuggestions.length > 0 &&
-                        setShowTagDropdown(true)
+                        tagInput && tagSuggestions.length > 0 && setShowTagDropdown(true)
                       }
                       onBlur={() => {
-                        if (!dropdownLocked) {
-                          setShowTagDropdown(false);
-                        }
+                        if (!dropdownLocked) setShowTagDropdown(false);
                       }}
                       placeholder="Type tag name (press Enter or comma)"
                       className="form-input"
@@ -465,22 +482,19 @@ useEffect(() => {
                         onMouseDown={() => setDropdownLocked(true)}
                         onMouseUp={() => setDropdownLocked(false)}
                       >
-                        {tagSuggestions.length > 0 ? (
-                          <>
-                            <div className="tag-suggestions">
-                              {tagSuggestions.map((tag) => (
-                                <div
-                                  key={tag.id}
-                                  className="tag-suggestion-item"
-                                  onClick={() => handleTagSelect(tag)}
-                                >
-                                  {tag.name}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="tag-divider"></div>
-                          </>
-                        ) : null}
+                        {tagSuggestions.length > 0 && (
+                          <div className="tag-suggestions">
+                            {tagSuggestions.map((tag) => (
+                              <div
+                                key={tag.id}
+                                className="tag-suggestion-item"
+                                onClick={() => handleTagSelect(tag)}
+                              >
+                                {tag.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="tag-create-btn"
@@ -502,9 +516,7 @@ useEffect(() => {
                     value={content}
                     onChange={(val) => setContent(val || "")}
                     height={400}
-                    previewOptions={{
-                      remarkPlugins: [remarkGfm, remarkGemoji],
-                    }}
+                    previewOptions={{ remarkPlugins: [remarkGfm, remarkGemoji] }}
                   />
                 </div>
               </div>
@@ -516,14 +528,7 @@ useEffect(() => {
                   onClick={handleSave}
                   disabled={loading}
                 >
-                  {loading ? (
-                    <>
-                      <span className="loading-spinner-small"></span>
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Article"
-                  )}
+                  {loading ? "Saving..." : "Save Article"}
                 </button>
                 <button
                   className="btn-secondary"
@@ -536,6 +541,35 @@ useEffect(() => {
           </div>
         </div>
       </div>
+      
+      {/* Modal for Category Creation/Editing (like TagsManagement) */}
+      <Modal
+        isOpen={modalState.isOpen}
+        title={modalState.title}
+        onClose={closeModal}
+        onConfirm={modalState.onConfirm}
+        confirmText={modalState.confirmText}
+      >
+        <div className="modal-content-wrapper">
+          {typeof modalState.content === "string" ? (
+            <p>{modalState.content}</p>
+          ) : (
+            modalState.content
+          )}
+
+          {modalState.inputType === "text" && (
+            <input
+              type="text"
+              className="modal-input"
+              defaultValue={modalState.inputValue}
+              onChange={(e) => {
+                modalInputRef.current = e.target.value;
+              }}
+              placeholder="Enter category name"
+            />
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
