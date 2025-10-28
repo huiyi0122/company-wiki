@@ -81,7 +81,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   }, [location.search, location.pathname]);
 
   // 🔥 获取分类列表（带 refresh-token 自动续签）
-  useEffect(() => { 
+  useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await apiFetch("/categories");

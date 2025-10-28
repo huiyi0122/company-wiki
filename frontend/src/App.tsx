@@ -50,8 +50,12 @@ const ProtectedRoute = ({
 };
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  const storedUser = localStorage.getItem("user");
+  return storedUser ? JSON.parse(storedUser) : null;
+});
+const [isLoadingUser, setIsLoadingUser] = useState(true);
+
 
   useEffect(() => {
     const checkUser = async () => {
@@ -160,7 +164,7 @@ export default function App() {
           }
         />
         <Route
-          path="/logs/:id"
+          path="/logs/:types/:id"
           element={<LogDetailPage currentUser={currentUser} setCurrentUser={setCurrentUser} />}
         />
       </Routes>

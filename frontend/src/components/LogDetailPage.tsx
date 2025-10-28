@@ -33,12 +33,12 @@ export default function LogDetailPage({
   currentUser,
   setCurrentUser,
 }: LogDetailPageProps) {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [log, setLog] = useState<LogRecord | null>(null);
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { type, id } = useParams<{ type: string; id: string }>(); // 获取 type 和 id
 
   // 安全地解析 JSON 数据
   const safeParseJSON = (data: any): any => {
@@ -64,64 +64,88 @@ export default function LogDetailPage({
   };
 
   useEffect(() => {
-    if (!id) {
-      setError("No log ID provided");
-      setLoading(false);
-      return;
-    }
+  if (!id) {
+    setError("No log ID provided");
+    setLoading(false);
+    return;
+  }
 
-    const fetchLogDetail = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchLogDetail = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("🔍 Fetching log detail for ID:", id);
+      console.log("   ID type:", typeof id);
+      
+      // 尝试使用单独的日志详情 API
+      const detailResponse = await apiFetch(`/logs/${type}/${id}`);
+      const detailResult = await detailResponse.json();
+      
+      console.log("📦 Full API Response:", JSON.stringify(detailResult, null, 2));
+      
+      if (detailResult.success && detailResult.data) {
+        const foundLog = detailResult.data;
         
-        // 尝试使用单独的日志详情 API
-        const detailResponse = await apiFetch(`/logs/${id}`);
-        const detailResult = await detailResponse.json();
+        console.log("✅ Found log:");
+        console.log("   Log ID:", foundLog.id);
+        console.log("   Target ID:", foundLog.target_id);
+        console.log("   Type:", foundLog.type);
+        console.log("   Action:", foundLog.action);
+        console.log("   Changed by:", foundLog.changed_by_name);
         
-        if (detailResult.success && detailResult.data) {
-          const foundLog = detailResult.data;
-          setLog(foundLog);
+        setLog(foundLog);
+        
+        // 安全地解析数据
+        const oldData = safeParseJSON(foundLog.old_data);
+        const newData = safeParseJSON(foundLog.new_data);
+        
+        console.log("📝 Parsed old_data:", oldData);
+        console.log("📝 Parsed new_data:", newData);
+        
+        setParsedData({ oldData, newData });
+      } else {
+        console.log("⚠️ Single API failed or returned no data");
+        console.log("   Response:", detailResult);
+        
+        // 如果单独 API 失败，尝试从所有日志中查找
+        const allLogsResponse = await apiFetch('/logs?limit=1000');
+        const allLogsResult = await allLogsResponse.json();
+        
+        if (allLogsResult.success && Array.isArray(allLogsResult.data)) {
+          const targetId = parseInt(id!);
+          console.log("🔎 Searching for log with ID:", targetId);
+          console.log("   Available log IDs:", allLogsResult.data.map((l: LogRecord) => l.id).join(', '));
           
-          // 安全地解析数据
-          const oldData = safeParseJSON(foundLog.old_data);
-          const newData = safeParseJSON(foundLog.new_data);
+          const foundLog = allLogsResult.data.find((log: LogRecord) => log.id === targetId);
           
-          console.log("Parsed old_data:", oldData);
-          console.log("Parsed new_data:", newData);
-          
-          setParsedData({ oldData, newData });
-        } else {
-          // 如果单独 API 失败，尝试从所有日志中查找
-          const allLogsResponse = await apiFetch('/logs?limit=1000');
-          const allLogsResult = await allLogsResponse.json();
-          
-          if (allLogsResult.success && Array.isArray(allLogsResult.data)) {
-            const foundLog = allLogsResult.data.find((log: LogRecord) => log.id === parseInt(id!));
-            if (foundLog) {
-              setLog(foundLog);
-              
-              const oldData = safeParseJSON(foundLog.old_data);
-              const newData = safeParseJSON(foundLog.new_data);
-              
-              setParsedData({ oldData, newData });
-            } else {
-              setError("Log not found");
-            }
+          if (foundLog) {
+            console.log("✅ Found log in all logs:", foundLog);
+            setLog(foundLog);
+            
+            const oldData = safeParseJSON(foundLog.old_data);
+            const newData = safeParseJSON(foundLog.new_data);
+            
+            setParsedData({ oldData, newData });
           } else {
-            setError("Failed to load logs");
+            console.error("❌ Log not found in all logs");
+            setError("Log not found");
           }
+        } else {
+          console.error("❌ Failed to load all logs");
+          setError("Failed to load logs");
         }
-      } catch (err) {
-        console.error("Error fetching logs:", err);
-        setError("Failed to connect to server");
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error("❌ Error fetching logs:", err);
+      setError("Failed to connect to server");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchLogDetail();
-  }, [id]);
+  fetchLogDetail();
+}, [id]);
 
   const getActionIcon = (action: string) => {
     switch (action.toUpperCase()) {
@@ -246,8 +270,8 @@ export default function LogDetailPage({
     );
   }
 
-  const oldMarkdown = parsedData?.oldData ? jsonToMarkdown(parsedData.oldData, 'Old Data') : '';
-  const newMarkdown = parsedData?.newData ? jsonToMarkdown(parsedData.newData, 'New Data') : '';
+  const oldMarkdown = parsedData?.oldData ? jsonToMarkdown(parsedData.oldData, '') : '';
+  const newMarkdown = parsedData?.newData ? jsonToMarkdown(parsedData.newData, '') : '';
 
   return (
     <div className="layout">

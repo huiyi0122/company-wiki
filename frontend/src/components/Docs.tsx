@@ -308,15 +308,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
                           `User ${doc.author_id}` ||
                           "Unknown"}
                       </p>
-                      {Array.isArray(doc.tags) && doc.tags.length > 0 && (
-                        <div className="article-tags">
-                          {doc.tags.map((tag: any, i: number) => (
-                            <span key={i} className="tag-pill-sm">
-                              #{typeof tag === "string" ? tag : tag.name || tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
 
                       <p className="article-date">
                         {doc.created_at

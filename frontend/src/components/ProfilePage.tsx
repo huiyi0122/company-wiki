@@ -1,8 +1,6 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-// import { API_BASE_URL } from "./CommonTypes";
 import { apiFetch } from "../utils/api";
-
 import type { User } from "./CommonTypes";
 import "../styles/ProfilePage.css";
 
@@ -17,11 +15,37 @@ export default function ProfilePage({
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
+  // ✅ 如果用户未登录
   if (!currentUser) {
     return <div className="not-allowed">Please login first.</div>;
   }
 
+  const safeUser = currentUser;
+
+  // ✅ 仅在资料不完整时自动获取详细资料（无 useEffect）
+  if (!safeUser.username && !fetching) {
+    setFetching(true);
+    (async () => {
+      try {
+        const res = await apiFetch(`/users/${safeUser.id}`);
+        const result = await res.json();
+        if (result.success && result.data) {
+          setCurrentUser(result.data);
+          setUsername(result.data.username);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user details:", err);
+      } finally {
+        setFetching(false);
+      }
+    })();
+  }
+
+  
+
+  // ✅ 更新资料逻辑
   const handleUpdateProfile = async () => {
     if (!username && !password) {
       setMessage("⚠️ Please enter at least one field to update.");
@@ -32,28 +56,18 @@ export default function ProfilePage({
     setMessage("");
 
     try {
-      // const token = localStorage.getItem("token");
-
       const body = {
-        id: currentUser.id,
-        username: username || currentUser.username,
-        email: currentUser.email,
-        role: currentUser.role,
-        password: password || "", // 留空后端会忽略
+        id: safeUser.id,
+        username: username || safeUser.username,
+        email: safeUser.email,
+        role: safeUser.role,
+        password: password || "", // 空密码则后端忽略更新
       };
 
-      // const res = await apiFetch(`/users/${currentUser.id}`, {        method: "PUT",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     Authorization: `Bearer ${token}`,
-      //   },
-      //   body: JSON.stringify(body),
-      // });
       const res = await apiFetch(`/users`, {
         method: "PUT",
         body: JSON.stringify(body),
       });
-
 
       const result = await res.json();
       console.log("Profile update result:", result);
@@ -61,18 +75,16 @@ export default function ProfilePage({
       if (result.success) {
         setMessage("✅ Profile updated successfully. Please log in again.");
 
-        // 清除本地登录状态
+        // 清除登录状态
         localStorage.removeItem("token");
         setCurrentUser(null);
 
-        // 延迟 1.5 秒跳转
         setTimeout(() => {
           window.location.href = "/login";
         }, 1500);
       } else {
         setMessage(`❌ ${result.data?.message || "Update failed."}`);
       }
-
     } catch (err) {
       console.error(err);
       setMessage("❌ Server error.");
@@ -99,24 +111,22 @@ export default function ProfilePage({
 
           {/* Profile Card */}
           <div className="profile-card">
-            <div className="card-header">
-              <h2>Account Information</h2>
-            </div>
-            
             <div className="profile-form">
               {/* Current Info Display */}
               <div className="current-info">
                 <div className="info-item">
-                  <span className="info-label">User ID:</span>
-                  <span className="info-value">{currentUser.id}</span>
+                  <span className="info-label">User ID: </span>
+                  <span className="info-value">{safeUser.id}</span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Email:</span>
-                  <span className="info-value">{currentUser.email}</span>
+                  <span className="info-label">Email: </span>
+                  <span className="info-value">{safeUser.email}</span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Role:</span>
-                  <span className="info-value role-badge">{currentUser.role}</span>
+                  <span className="info-label">Role: </span>
+                  <span className="info-value role-badge">
+                    {safeUser.role}
+                  </span>
                 </div>
               </div>
 
@@ -142,11 +152,14 @@ export default function ProfilePage({
                 <span className="input-hint">Minimum 6 characters</span>
               </div>
 
-              <button onClick={handleUpdateProfile} disabled={loading} className="update-btn">
+              <button
+                onClick={handleUpdateProfile}
+                disabled={loading}
+                className="update-btn"
+              >
                 {loading ? (
                   <>
-                    <span className="loading-spinner"></span>
-                    Updating...
+                    <span className="loading-spinner"></span> Updating...
                   </>
                 ) : (
                   "Update Profile"
@@ -154,7 +167,11 @@ export default function ProfilePage({
               </button>
 
               {message && (
-                <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+                <div
+                  className={`message ${
+                    message.includes("✅") ? "success" : "error"
+                  }`}
+                >
                   {message}
                 </div>
               )}

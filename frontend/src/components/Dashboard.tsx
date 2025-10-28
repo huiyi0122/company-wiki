@@ -54,6 +54,7 @@ interface Article {
 interface LogRecord {
   id: number;
   type: 'article' | 'tag' | 'category';
+
   target_id: number;
   action: string;
   changed_by: number;
@@ -93,7 +94,7 @@ const fetchStats = async () => {
     try {
       const usersRes = await apiFetch("/users");
       const usersResult = await usersRes.json();
-      
+
       if (usersResult.success && Array.isArray(usersResult.data)) {
         totalUsers = usersResult.data.length; // 直接计算数组长度
       }
@@ -237,7 +238,7 @@ export default function Dashboard({
       const list = parseListData(result);
 
       setCategories(list);
-      
+
     } catch (err) {
       console.error("Category fetch error:", err);
       toast.error("❌ Failed to connect to server.");
@@ -602,42 +603,13 @@ export default function Dashboard({
 
   // ===== 渲染日志详情 =====
   const renderLogDetails = (log: LogRecord) => {
-    const getActionIcon = (action: string) => {
-      switch (action.toUpperCase()) {
-        case 'CREATE': return '➕';
-        case 'UPDATE': return '✏️';
-        case 'DELETE': case 'SOFT_DELETE': return '🗑️';
-        case 'RESTORE': return '♻️';
-        default: return '📝';
-      }
-    };
-
-    const getActionColor = (action: string) => {
-      switch (action.toUpperCase()) {
-        case 'CREATE': return '#10b981';
-        case 'UPDATE': return '#3b82f6';
-        case 'DELETE': case 'SOFT_DELETE': return '#ef4444';
-        case 'RESTORE': return '#8b5cf6';
-        default: return '#6b7280';
-      }
-    };
-
     const handleViewDetails = () => {
-      navigate(`/logs/${log.id}`);
+      // 使用新的路由格式：/logs/:type/:id
+      navigate(`/logs/${log.type}/${log.id}`);
     };
 
     return (
       <div style={{ fontSize: '0.9em' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '1.2em' }}>{getActionIcon(log.action)}</span>
-          <strong style={{ color: getActionColor(log.action) }}>
-            {log.action}
-          </strong>
-          <span style={{ color: '#6b7280' }}>
-            {log.type} #{log.target_id}
-          </span>
-        </div>
-
         <button
           onClick={handleViewDetails}
           className="btn-view-details"
@@ -863,45 +835,99 @@ export default function Dashboard({
                   <table className="management-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '80px' }}>ID</th>
-                        <th style={{ width: '100px' }}>Type</th>
-                        <th style={{ width: '120px' }}>Action</th>
-                        <th style={{ width: '150px' }}>Changed By</th>
-                        <th style={{ width: '180px' }}>Date</th>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Action</th>
+                        <th>Changed By</th>
+                        <th>Date</th>
                         <th>Details</th>
                       </tr>
                     </thead>
                     <tbody>
                       {logs.length > 0 ? (
-                        logs.map((log) => (
-                          <tr key={`${log.type}-${log.id}`}>
-                            <td>#{log.target_id}</td>
-                            <td>
-                              <span className="status-badge active">
-                                {log.type}
-                              </span>
-                            </td>
-                            <td>
-                              <strong>{log.action}</strong>
-                            </td>
-                            <td>{log.changed_by_name}</td>
-                            <td>
-                              {new Date(log.changed_at).toLocaleString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </td>
-                            <td>
-                              {renderLogDetails(log)}
-                            </td>
-                          </tr>
-                        ))
+                        logs.map((log) => {
+                          // 提取名称/标题
+                          const getDisplayName = (log: LogRecord): string => {
+                            try {
+                              // 优先从 new_data 获取（CREATE/UPDATE 操作）
+                              if (log.new_data) {
+                                const newData = typeof log.new_data === 'string' 
+                                  ? JSON.parse(log.new_data) 
+                                  : log.new_data;
+                                
+                                if (log.type === 'article' && newData.title) {
+                                  return newData.title;
+                                }
+                                if ((log.type === 'tag' || log.type === 'category') && newData.name) {
+                                  return newData.name;
+                                }
+                              }
+                              
+                              // 如果 new_data 没有，从 old_data 获取（DELETE/SOFT_DELETE 操作）
+                              if (log.old_data) {
+                                const oldData = typeof log.old_data === 'string' 
+                                  ? JSON.parse(log.old_data) 
+                                  : log.old_data;
+                                
+                                if (log.type === 'article' && oldData.title) {
+                                  return oldData.title;
+                                }
+                                if ((log.type === 'tag' || log.type === 'category') && oldData.name) {
+                                  return oldData.name;
+                                }
+                              }
+                              
+                              return '-';
+                            } catch (e) {
+                              console.error('Error parsing log data:', e);
+                              return '-';
+                            }
+                          };
+
+                          const displayName = getDisplayName(log);
+
+                          return (
+                            <tr key={log.id}>
+                              <td>#{log.target_id}</td>
+                              <td>
+                                <span className="status-badge active">
+                                  {log.type}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ 
+                                  maxWidth: '200px', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  whiteSpace: 'nowrap',
+                                  fontWeight: '500'
+                                }} title={displayName}>
+                                  {displayName}
+                                </div>
+                              </td>
+                              <td>
+                                <strong>{log.action}</strong>
+                              </td>
+                              <td>{log.changed_by_name}</td>
+                              <td>
+                                {new Date(log.changed_at).toLocaleString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </td>
+                              <td>
+                                {renderLogDetails(log)}
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
-                          <td colSpan={6} className="no-data">
+                          <td colSpan={7} className="no-data">
                             {logLoading ? "Loading logs..." : "No activity logs found."}
                           </td>
                         </tr>
@@ -1214,7 +1240,7 @@ export default function Dashboard({
                 description: `${log.changed_by_name} performed ${log.action} on ${log.type} #${log.target_id}`,
                 timestamp: log.changed_at,
               }))} /> */}
-              <RecentActivity activities={logs.slice(0,3).map((log, index) => ({
+              <RecentActivity activities={logs.slice(0, 3).map((log, index) => ({
                 id: index, // Use index as fallback
                 type: log.type,
                 description: `${log.changed_by_name} performed ${log.action} on ${log.type} #${log.target_id}`,

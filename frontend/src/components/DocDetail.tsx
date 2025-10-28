@@ -217,7 +217,8 @@ const [modalState, setModalState] = useState<ModalState>({
             <span className="breadcrumb-current">{doc.title}</span>
           </nav>
 
-          {/* 编辑与删除按钮 */}
+          {/* 编辑与删除按钮 */} 
+          <div>
           {(canEdit || canDelete) && (
             <div className="doc-actions">
               {canEdit && (
@@ -251,8 +252,8 @@ const [modalState, setModalState] = useState<ModalState>({
             <span className="meta-separator">•</span>
             <span className="meta-item">
               <span className="meta-icon">📅</span>
-              {doc.created_at
-                ? new Date(doc.created_at).toLocaleDateString("en-US", {
+              {doc.create_at
+                ? new Date(doc.create_at).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -289,6 +290,7 @@ const [modalState, setModalState] = useState<ModalState>({
             </button>
           </div>
         </div>
+      </div>
       </div>
 
       {/* ✅ 加上 Modal（放在最外层 layout 内） */}
