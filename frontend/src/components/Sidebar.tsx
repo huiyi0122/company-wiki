@@ -128,45 +128,47 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   };
 
   const fetchCategoryArticles = async (
-    categoryId: number,
-    isLoadMore = false
-  ) => {
+  categoryId: number,
+  isLoadMore = false
+) => {
+  try {
+    const currentPage = isLoadMore ? (categoryPages[categoryId] || 1) + 1 : 1;
+    let url = `/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}&page=${currentPage}`;
 
-    try {
-      const cursor = isLoadMore ? categoryPages[categoryId] : null;
-      let url = `/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}`;
-      if (cursor) url += `&cursor=${cursor}`;
+    const res = await apiFetch(url);
+    const result = await res.json();
 
-      const res = await apiFetch(url);
+    if (result.success && Array.isArray(result.data)) {
+      const newArticles = result.data.map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        category_id: a.category_id,
+      }));
 
-      const result = await res.json();
+      setCategoryArticles((prev) => {
+        const existing = isLoadMore ? prev[categoryId] || [] : [];
+        const updated = [...existing, ...newArticles];
+        return { ...prev, [categoryId]: updated };
+      });
 
-      if (result.success && Array.isArray(result.data)) {
-        const newArticles = result.data.map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          category_id: a.category_id,
-        }));
+      // 🔥 根据 page 和 totalPages 判断是否有更多
+      const total = result.meta?.total || 0;
+      const currentPageNum = result.meta?.page || 1;
+      const totalPages = result.meta?.totalPages || 1;
 
-        setCategoryArticles((prev) => {
-          const existing = isLoadMore ? prev[categoryId] || [] : [];
-          const updated = [...existing, ...newArticles];
-          return { ...prev, [categoryId]: updated };
-        });
-
-        const total = result.meta?.total || 0;
-        const nextCursor = result.meta?.nextCursor || null;
-
-        setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
-        setCategoryPages((prev) => ({ ...prev, [categoryId]: nextCursor }));
-        setCategoryHasMore((prev) => ({ ...prev, [categoryId]: !!nextCursor }));
-      }
-    } catch (err) {
-      console.error(`Error fetching articles for category ${categoryId}:`, err);
-    } finally {
-      setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
+      setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
+      setCategoryPages((prev) => ({ ...prev, [categoryId]: currentPageNum }));
+      setCategoryHasMore((prev) => ({ 
+        ...prev, 
+        [categoryId]: currentPageNum < totalPages 
+      }));
     }
-  };
+  } catch (err) {
+    console.error(`Error fetching articles for category ${categoryId}:`, err);
+  } finally {
+    setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
+  }
+};
 
   const handleLoadMore = (categoryId: number) => {
     fetchCategoryArticles(categoryId, true);
