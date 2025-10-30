@@ -19,11 +19,12 @@
 
 ## 2. ⚒️ Tech Stack
 
-- **Express.js** (TypeScript) – Backend framework
+- **Express.js (TypeScript)** – Backend framework
 - **MySQL** – Relational database
+- **Elasticsearch** – Full-text search engine
 - **JWT Authentication** – Secure login and role-based access
-- **Node.js** (v18+)
-- **npm** (v8+)
+- **Node.js (v18+)**
+- **npm (v8+)**
 
 ---
 
@@ -37,9 +38,10 @@
 │   ├── routes/           # API endpoints
 │   ├── services/         # Database and service logic
 │   ├── utils/            # Helper functions
+│   ├── seeder.ts         # Auto database seeding
 │   └── app.ts            # Express app entry point
 ├── .env                  # Environment variables
-├── package.json          # Project dependencies and scripts
+├── package.json          # Dependencies and scripts
 └── tsconfig.json         # TypeScript configuration
 ```
 
@@ -51,7 +53,8 @@
 
 - Node.js v18+
 - npm v8+
-- MySQL database
+- MySQL
+- Elasticsearch
 
 ### Environment Setup
 
@@ -65,15 +68,16 @@ cd company-wiki-backend
 2. Copy `.env.example` to `.env` and configure:
 
 ```
-DB_HOST – Database host (usually `localhost`)
-DB_USER – Database username
-DB_PASSWORD – Database password
-DB_NAME – Database name
-JWT_SECRET – Secret key used to sign access tokens
-REFRESH_SECRET – Secret key used to sign refresh tokens
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=root
+DB_NAME=company_wiki
+JWT_SECRET=supersecretkey123
+REFRESH_SECRET=anotherSuperSecret456
+ELASTICSEARCH_HOST=http://localhost:9200
 ```
 
-### Install Dependencies
+3. Install dependencies:
 
 ```bash
 npm install
@@ -89,7 +93,7 @@ Start the backend server:
 npm run dev
 ```
 
-- Runs Express backend at [http://localhost:3000](http://localhost:3000)
+Backend runs at [http://localhost:3000](http://localhost:3000)
 
 ---
 
@@ -107,24 +111,24 @@ npm run dev
 - `GET /articles` — Get list of articles
 - `POST /articles` — Create new articles
 - `PUT /articles/:id` — Update articles
-- `DELETE /articles/:id` — Delete articles
-- `GET articles/search?q=...` — Search articles by title/content/category_id/tags
+- `DELETE /articles/:id` — Soft delete article
+- `GET /articles/search?q=...` — Search articles
 
 ### Categories Endpoints
 
 - `GET /categories` — Get list of categories
 - `POST /categories` — Create new categories
 - `PUT /categories/:id` — Update categories
-- `DELETE /categories/:id` — SOFT_DELETE categories
-- `PATCH /categories/:id` — Restore categories
+- `DELETE /categories/:id` — Soft delete
+- `PATCH /categories/:id` — Restore deleted category
 
-### Tags Endpoint
+### Tags Endpoints
 
 - `GET /tags` — Get list of tags
 - `POST /tags` — Create new tags
 - `PUT /tags/:id` — Update tags
-- `DELETE /tags/:id` — SOFT_DELETE tags
-- `PATCH /tags/:id` — Restore tags
+- `DELETE /tags/:id` — Soft delete
+- `PATCH /tags/:id` — Restore deleted tag
 
 **Headers:**
 
@@ -134,36 +138,36 @@ Authorization: Bearer <token>
 
 ---
 
-## 7. 🛠️ Troubleshooting
+## 7. 🌱 Database Seeder
 
-- **JWT errors**: Ensure `JWT_SECRET` matches your environment
-- **Database connection issues**: Check `DB_URI` and ensure DB is running
-- **Port conflicts**: Change `PORT` in `.env`
+The project includes a **database seeder** that runs automatically when the backend container is built or started.
+
+### What It Does
+
+- ✅ Creates an **admin account**
+- ✅ Adds default **categories** (e.g. `Company Policy`)
+- ✅ Adds default **tags** (e.g. `General`, `article`, `markdown`)
+
+### Default Admin Account
+
+| Field        | Value               |
+| ------------ | ------------------- |
+| **Username** | `admin`             |
+| **Email**    | `admin@example.com` |
+| **Password** | `admin123`          |
+
+> ⚠️ Please change the default password after first login.
 
 ---
 
-## 8. ✏️ Contributing
+## 8. 🐳 Docker Setup
 
-1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m "Add feature"`
-4. Push branch: `git push origin feature/your-feature`
-5. Open a Pull Request
-
-## 9. 🐳 Docker Setup
-
-This project uses Docker to run the backend, MySQL database, and Elasticsearch. Follow the steps below to get started.
+This project uses Docker to run the backend, MySQL database, and Elasticsearch.
 
 ### Prerequisites
 
 - Docker
 - Docker Compose
-
-### Services
-
-- **backend**: Node.js API server
-- **db**: MySQL 8 database
-- **elasticsearch**: Elasticsearch 8.15
 
 ### Docker Compose Configuration
 
@@ -191,7 +195,24 @@ services:
       - elasticsearch
     volumes:
       - .:/app
-    command: npx ts-node-dev --respawn src/server.ts
+      - /app/node_modules
+    command: sh -c "npx wait-port db:3306 && npx ts-node src/seeder.ts && npx ts-node-dev --respawn src/server.ts"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: company-wiki-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:3000
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
 
   db:
     image: mysql:8
@@ -229,11 +250,7 @@ docker-compose up --build
 
 This will:
 
-1. Build the backend image.
-2. Start MySQL and Elasticsearch containers.
-3. Run the backend server on [http://localhost:3000](http://localhost:3000).
-
-### Notes
-
-- To reindex Elasticsearch after resetting or updating the schema, run your `resetArticlesIndex.ts` script inside the backend container.
-- Database data and Elasticsearch data are persisted in Docker volum
+1. Build the backend image
+2. Start MySQL and Elasticsearch containers
+3. Automatically run the seeder
+4. Start the backend server on [http://localhost:3000](http://localhost:3000)

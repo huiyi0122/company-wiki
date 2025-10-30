@@ -124,6 +124,15 @@ async function createTables() {
   console.log("Tables created successfully!");
 }
 
+function generateSlug(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, "-") // 把空格变成 -
+    .replace(/[^\w\-]+/g, "") // 去掉符号
+    .replace(/\-\-+/g, "-") // 多个 - 合并
+    .replace(/^-+|-+$/g, ""); // 去掉开头和结尾的 -
+}
+
 async function seedData() {
   console.log("Starting database seeding...");
 
@@ -149,11 +158,12 @@ async function seedData() {
       [cat.name]
     );
     if ((rows as any[]).length === 0) {
+      const slug = generateSlug(cat.name);
       await database.query(
-        "INSERT INTO categories (name, created_by) VALUES (?, ?)",
-        [cat.name, cat.created_by]
+        "INSERT INTO categories (name, slug, created_by) VALUES (?, ?, ?)",
+        [cat.name, slug, cat.created_by]
       );
-      console.log(`Created category: ${cat.name}`);
+      console.log(`Created category: ${cat.name} (${slug})`);
     }
   }
 
@@ -164,11 +174,12 @@ async function seedData() {
       tagName,
     ]);
     if ((rows as any[]).length === 0) {
+      const slug = generateSlug(tagName);
       await database.query(
-        "INSERT INTO tags (name, created_by) VALUES (?, ?)",
-        [tagName, 1]
+        "INSERT INTO tags (name, slug, created_by) VALUES (?, ?, ?)",
+        [tagName, slug, 1]
       );
-      console.log(`Created tag: ${tagName}`);
+      console.log(`Created tag: ${tagName} (${slug})`);
     }
   }
 

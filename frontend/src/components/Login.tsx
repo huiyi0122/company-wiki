@@ -6,7 +6,6 @@ import "../styles/Login.css";
 import { apiFetch } from "../utils/api";
 import { toast } from "react-toastify";
 
-
 interface LoginProps {
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
@@ -42,13 +41,12 @@ export default function Login({ setCurrentUser }: LoginProps) {
 
       const { accessToken, refreshToken, user } = data;
 
-      // ✅ 存储 token + 用户信息
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("user", JSON.stringify(user));
 
       console.log("✅ Login successful, user:", user);
-      toast.success("Login successfully!")
+      toast.success("Login successfully!");
 
       setCurrentUser(user);
       setTimeout(() => {
@@ -56,12 +54,13 @@ export default function Login({ setCurrentUser }: LoginProps) {
       }, 100);
     } catch (err) {
       console.error("Login failed:", err);
-      toast.error("Login request failed. Please check your connection or server.");
+      toast.error(
+        "Login request failed. Please check your connection or server."
+      );
     } finally {
       setLoading(false);
     }
   };
-
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {

@@ -52,7 +52,7 @@
   padding: 15px;
   font-size: 16px;
   border-radius: 8px;
-  margin: 20px 0 0 0; 
+  margin: 20px 0 0 0;
 }
 
 .login-box button:hover {
@@ -77,7 +77,7 @@
 
 .login-image {
   flex: 1;
-  background-image: url("../assets/1637216404193.jpg"); /* ✅ Replace with your actual image path */
+  background-image: url("../assets/1637216404193.jpg");
   background-size: cover;
   background-position: center;
 }
