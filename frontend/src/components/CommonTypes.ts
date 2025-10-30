@@ -1,4 +1,3 @@
-// CommonTypes.ts
 export type Role = "admin" | "editor" | "viewer";
 
 export interface User {
@@ -30,6 +29,7 @@ export interface DocItem {
   created_at?: string;
   updated_at?: string;
 
+
   // ✅ 支持标签显示
   tags?: { id: number; name: string }[];
   tag_ids?: number[];
@@ -41,24 +41,15 @@ export interface DocItem {
 
 // ===== 权限定义 =====
 export const PERMISSIONS: Record<Role, string[]> = {
-  admin: [
-    "deleteAll",
-    "view",
-    "addCategory",
-    "edit",
-    "save",
-    "category_create",
-  ],
-  editor: ["edit", "save", "deleteOwn", "view", "category_create"],
-  viewer: ["view"],
+  admin: ["edit"],
+  editor: ["edit"],
+  viewer: [],
 };
 
-// ===== 默认分类 =====
-// const DEFAULT_CATEGORIES = ["HR", "Tech", "Onboarding"];
-
-// export function getCategories(): string[] {
-//   return DEFAULT_CATEGORIES;
-// }
 
 // 后端地址
-export const API_BASE_URL = "http://192.168.0.233:3000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  console.warn("⚠️ The VITE_API_BASE_URL environment variable is not set. Please check your .env file! Use the default value /api");
+}
