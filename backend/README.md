@@ -254,13 +254,3 @@ This will:
 2. Start MySQL and Elasticsearch containers
 3. Automatically run the seeder
 4. Start the backend server on [http://localhost:3000](http://localhost:3000)
-
-### Default Admin Account
-
-| Field        | Value               |
-| ------------ | ------------------- |
-| **Username** | `admin`             |
-| **Email**    | `admin@example.com` |
-| **Password** | `admin123`          |
-
-> ⚠️ For security reasons, please change the default password after first login.
