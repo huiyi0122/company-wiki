@@ -34,6 +34,7 @@ interface Tag {
   updated_by?: string | null;           // 用户ID
   updated_by_name?: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
 }
 
 interface Article {
@@ -108,7 +109,7 @@ const fetchStats = async () => {
       totalUsers, // 改为 totalUsers
     };
   } catch (err) {
-    console.error("❌ Failed to fetch stats:", err);
+    console.error("Failed to fetch stats:", err);
     return {
       totalArticles: 0,
       deletedArticles: 0,
@@ -241,7 +242,7 @@ export default function Dashboard({
 
     } catch (err) {
       console.error("Category fetch error:", err);
-      toast.error("❌ Failed to connect to server.");
+      toast.error("Failed to connect to server.");
     } finally {
       setCatLoading(false);
     }
@@ -261,7 +262,27 @@ export default function Dashboard({
         return;
       }
 
-      const list = parseListData(result);
+      let list = parseListData(result);
+      list = list.sort((a:Tag, b:Tag) => {
+        // 处理时间的辅助函数
+        const getTime = (tag: Tag) => {
+          // 优先使用 updated_at
+          if (tag.updated_at && tag.updated_at !== "-" && tag.updated_at !== null) {
+            return new Date(tag.updated_at).getTime();
+          }
+          // 如果没有 updated_at，使用 created_at
+          if (tag.created_at && tag.created_at !== "-" && tag.created_at !== null) {
+            return new Date(tag.created_at).getTime();
+          }
+          // 都没有则返回 0（排在最后）
+          return 0;
+        };
+
+        const dateA = getTime(a);
+        const dateB = getTime(b);
+
+        return dateB - dateA; // 降序：最新的在前
+      });
       const total = result.meta?.total ?? list.length;
 
       setTags(list);
@@ -272,7 +293,7 @@ export default function Dashboard({
       });
     } catch (err) {
       console.error("Tag fetch error:", err);
-      toast.error("❌ Failed to connect to server.");
+      toast.error("Failed to connect to server.");
     } finally {
       setTagLoading(false);
     }
@@ -304,7 +325,7 @@ export default function Dashboard({
       });
     } catch (err) {
       console.error("Article fetch error:", err);
-      toast.error("❌ Failed to connect to server.");
+      toast.error("Failed to connect to server.");
     } finally {
       setArticleLoading(false);
     }
