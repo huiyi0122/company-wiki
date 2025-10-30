@@ -533,6 +533,7 @@
     padding: 30px 40px;
   }
 
+<<<<<<< Updated upstream
   .doc-detail-container {
     max-width: 100%;
   }
@@ -600,6 +601,11 @@
   .doc-detail-wrapper::after:hover {
     transform: scale(1.1);
     box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+=======
+  .doc-actions {
+    top: 60px;
+    right: 40px;
+>>>>>>> Stashed changes
   }
 }
 

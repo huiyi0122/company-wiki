@@ -29,9 +29,9 @@ interface Tag {
   id: number;
   name: string;
   is_active?: number | boolean;
-  created_by?: string | null;           // 用户ID
-  created_by_name?: string | null;      // 用户名
-  updated_by?: string | null;           // 用户ID
+  created_by?: string | null;
+  created_by_name?: string | null;
+  updated_by?: string | null;
   updated_by_name?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
@@ -55,7 +55,6 @@ interface Article {
 interface LogRecord {
   id: number;
   type: 'article' | 'tag' | 'category';
-
   target_id: number;
   action: string;
   changed_by: number;
@@ -113,7 +112,7 @@ const fetchStats = async () => {
     return {
       totalArticles: 0,
       deletedArticles: 0,
-      totalUsers: 0, // 改为 totalUsers
+      totalUsers: 0,
     };
   }
 };
@@ -236,9 +235,7 @@ export default function Dashboard({
         return;
       }
 
-      const list = parseListData(result);
-
-      setCategories(list);
+      setCategories(result.data);
 
     } catch (err) {
       console.error("Category fetch error:", err);
@@ -262,9 +259,9 @@ export default function Dashboard({
         return;
       }
 
-      let list = parseListData(result);
-      list = list.sort((a:Tag, b:Tag) => {
-        // 处理时间的辅助函数
+      let list = result.data;
+      list = list.sort((a: Tag, b: Tag) => {
+
         const getTime = (tag: Tag) => {
           // 优先使用 updated_at
           if (tag.updated_at && tag.updated_at !== "-" && tag.updated_at !== null) {
@@ -873,10 +870,10 @@ export default function Dashboard({
                             try {
                               // 优先从 new_data 获取（CREATE/UPDATE 操作）
                               if (log.new_data) {
-                                const newData = typeof log.new_data === 'string' 
-                                  ? JSON.parse(log.new_data) 
+                                const newData = typeof log.new_data === 'string'
+                                  ? JSON.parse(log.new_data)
                                   : log.new_data;
-                                
+
                                 if (log.type === 'article' && newData.title) {
                                   return newData.title;
                                 }
@@ -884,13 +881,13 @@ export default function Dashboard({
                                   return newData.name;
                                 }
                               }
-                              
+
                               // 如果 new_data 没有，从 old_data 获取（DELETE/SOFT_DELETE 操作）
                               if (log.old_data) {
-                                const oldData = typeof log.old_data === 'string' 
-                                  ? JSON.parse(log.old_data) 
+                                const oldData = typeof log.old_data === 'string'
+                                  ? JSON.parse(log.old_data)
                                   : log.old_data;
-                                
+
                                 if (log.type === 'article' && oldData.title) {
                                   return oldData.title;
                                 }
@@ -898,7 +895,7 @@ export default function Dashboard({
                                   return oldData.name;
                                 }
                               }
-                              
+
                               return '-';
                             } catch (e) {
                               console.error('Error parsing log data:', e);
@@ -917,10 +914,10 @@ export default function Dashboard({
                                 </span>
                               </td>
                               <td>
-                                <div style={{ 
-                                  maxWidth: '200px', 
-                                  overflow: 'hidden', 
-                                  textOverflow: 'ellipsis', 
+                                <div style={{
+                                  maxWidth: '200px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
                                   fontWeight: '500'
                                 }} title={displayName}>

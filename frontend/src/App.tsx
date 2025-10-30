@@ -8,7 +8,7 @@ import Login from "./components/Login";
 import Docs from "./components/Docs";
 import DocDetail from "./components/DocDetail";
 import EditorPage from "./components/EditorPage";
-import Dashboard from "./components/Dashboard";
+import Dashboard from "./components/dashboard/Dashboard";
 import EnrollPage from "./components/EnrollPage";
 import ProfilePage from "./components/ProfilePage";
 import TagsManagement from "./components/TagsManagement";

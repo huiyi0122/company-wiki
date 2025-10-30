@@ -3,6 +3,7 @@ import Sidebar from "./Sidebar";
 import { apiFetch } from "../utils/api";
 import type { User } from "./CommonTypes";
 import "../styles/ProfilePage.css";
+import { toast } from "react-toastify";
 
 export default function ProfilePage({
   currentUser,
@@ -43,12 +44,10 @@ export default function ProfilePage({
     })();
   }
 
-  
-
   // ✅ 更新资料逻辑
   const handleUpdateProfile = async () => {
     if (!username && !password) {
-      setMessage("⚠️ Please enter at least one field to update.");
+      toast.warn("Please enter at least one field to update.");
       return;
     }
 
@@ -73,7 +72,7 @@ export default function ProfilePage({
       console.log("Profile update result:", result);
 
       if (result.success) {
-        setMessage("✅ Profile updated successfully. Please log in again.");
+        toast.success("Profile updated successfully. Please log in again.");
 
         // 清除登录状态
         localStorage.removeItem("token");
@@ -83,11 +82,11 @@ export default function ProfilePage({
           window.location.href = "/login";
         }, 1500);
       } else {
-        setMessage(`❌ ${result.data?.message || "Update failed."}`);
+        toast.error(`${result.data?.message || "Update failed."}`);
       }
     } catch (err) {
       console.error(err);
-      setMessage("❌ Server error.");
+      toast.error("Server error.");
     } finally {
       setLoading(false);
     }
@@ -96,7 +95,7 @@ export default function ProfilePage({
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => {}}
+        setCategory={() => { }}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
@@ -168,9 +167,8 @@ export default function ProfilePage({
 
               {message && (
                 <div
-                  className={`message ${
-                    message.includes("✅") ? "success" : "error"
-                  }`}
+                  className={`message ${message.includes("✅") ? "success" : "error"
+                    }`}
                 >
                   {message}
                 </div>

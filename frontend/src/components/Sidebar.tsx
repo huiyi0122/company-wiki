@@ -49,14 +49,12 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
 
   // 🔍 防抖搜索
   useEffect(() => {
-    const isDocsPage =
-      location.pathname === "/docs" || location.pathname === "/";
-    if (!isDocsPage) return;
-
     const timer = setTimeout(() => {
+      const isDocsPage =
+        location.pathname === "/docs" || location.pathname === "/";
       if (searchTerm.trim()) {
         navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
-      } else {
+      } else if (isDocsPage) {
         navigate("/docs");
       }
     }, 3000);
@@ -128,47 +126,47 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   };
 
   const fetchCategoryArticles = async (
-  categoryId: number,
-  isLoadMore = false
-) => {
-  try {
-    const currentPage = isLoadMore ? (categoryPages[categoryId] || 1) + 1 : 1;
-    let url = `/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}&page=${currentPage}`;
+    categoryId: number,
+    isLoadMore = false
+  ) => {
+    try {
+      const currentPage = isLoadMore ? (categoryPages[categoryId] || 1) + 1 : 1;
+      let url = `/articles/search?category_id=${categoryId}&limit=${PAGE_SIZE}&page=${currentPage}`;
 
-    const res = await apiFetch(url);
-    const result = await res.json();
+      const res = await apiFetch(url);
+      const result = await res.json();
 
-    if (result.success && Array.isArray(result.data)) {
-      const newArticles = result.data.map((a: any) => ({
-        id: a.id,
-        title: a.title,
-        category_id: a.category_id,
-      }));
+      if (result.success && Array.isArray(result.data)) {
+        const newArticles = result.data.map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          category_id: a.category_id,
+        }));
 
-      setCategoryArticles((prev) => {
-        const existing = isLoadMore ? prev[categoryId] || [] : [];
-        const updated = [...existing, ...newArticles];
-        return { ...prev, [categoryId]: updated };
-      });
+        setCategoryArticles((prev) => {
+          const existing = isLoadMore ? prev[categoryId] || [] : [];
+          const updated = [...existing, ...newArticles];
+          return { ...prev, [categoryId]: updated };
+        });
 
-      // 🔥 根据 page 和 totalPages 判断是否有更多
-      const total = result.meta?.total || 0;
-      const currentPageNum = result.meta?.page || 1;
-      const totalPages = result.meta?.totalPages || 1;
+        // 🔥 根据 page 和 totalPages 判断是否有更多
+        const total = result.meta?.total || 0;
+        const currentPageNum = result.meta?.page || 1;
+        const totalPages = result.meta?.totalPages || 1;
 
-      setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
-      setCategoryPages((prev) => ({ ...prev, [categoryId]: currentPageNum }));
-      setCategoryHasMore((prev) => ({ 
-        ...prev, 
-        [categoryId]: currentPageNum < totalPages 
-      }));
+        setCategoryTotals((prev) => ({ ...prev, [categoryId]: total }));
+        setCategoryPages((prev) => ({ ...prev, [categoryId]: currentPageNum }));
+        setCategoryHasMore((prev) => ({
+          ...prev,
+          [categoryId]: currentPageNum < totalPages
+        }));
+      }
+    } catch (err) {
+      console.error(`Error fetching articles for category ${categoryId}:`, err);
+    } finally {
+      setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
     }
-  } catch (err) {
-    console.error(`Error fetching articles for category ${categoryId}:`, err);
-  } finally {
-    setLoadingCategories((prev) => prev.filter((id) => id !== categoryId));
-  }
-};
+  };
 
   const handleLoadMore = (categoryId: number) => {
     fetchCategoryArticles(categoryId, true);

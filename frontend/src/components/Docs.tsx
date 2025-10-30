@@ -16,16 +16,13 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "my">("all");
-
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [pageSize] = useState(5);
-
   const navigate = useNavigate();
   const location = useLocation();
-
-  // 直接从 URL 中计算搜索和分类，不需要 useEffect
+    
   const searchParams = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return {
@@ -111,7 +108,7 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
         setTotalPages(result.meta?.totalPages || 1);
         setCurrentPage(page);
       } catch (err: any) {
-        console.error("❌ Fetch error:", err);
+        console.error("Fetch error:", err);
         setError(err.message || "Failed to load documents.");
       } finally {
         setLoading(false);
@@ -234,17 +231,6 @@ export default function Docs({ currentUser, setCurrentUser }: DocsProps) {
             <h1>Knowledge Base</h1>
             <p>Browse and search through all articles</p>
           </div>
-
-          {searchParams.category && (
-            <div className="active-filters">
-              <span>
-                Category:{" "}
-                {categoryMap[parseInt(searchParams.category)] ||
-                  searchParams.category}
-              </span>
-              <button onClick={() => navigate("/docs")}>✕</button>
-            </div>
-          )}
 
           {currentUser && currentUser.role !== "viewer" && (
             <div className="tabs-section">

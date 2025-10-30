@@ -32,11 +32,10 @@ export default function DocDetail({
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
   const [allTags, setAllTags] = useState<Tag[]>([]);
 
-  // ✅ 新增：Modal state（跟 TagsManagement 一样）
   interface ModalState {
     isOpen: boolean;
     title: string;
-    content: React.ReactNode; // ✅ 改这里
+    content: React.ReactNode; 
     confirmText: string;
     targetId: number;
     targetName: string;
@@ -243,7 +242,7 @@ export default function DocDetail({
     return (
       <div className="layout">
         <Sidebar
-          setCategory={() => {}}
+          setCategory={() => { }}
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
         />
@@ -258,7 +257,7 @@ export default function DocDetail({
     return (
       <div className="layout">
         <Sidebar
-          setCategory={() => {}}
+          setCategory={() => { }}
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
         />
@@ -272,7 +271,7 @@ export default function DocDetail({
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => {}}
+        setCategory={() => { }}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />

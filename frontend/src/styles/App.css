@@ -7,7 +7,10 @@
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.6;
+<<<<<<< Updated upstream
   background: #fff;
+=======
+>>>>>>> Stashed changes
   min-height: 100vh;
 }
 
@@ -44,8 +47,8 @@ button {
 }
 
 button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  /* transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
 }
 
 button.edit {

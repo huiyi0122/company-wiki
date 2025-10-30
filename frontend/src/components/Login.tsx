@@ -18,6 +18,7 @@ export default function Login({ setCurrentUser }: LoginProps) {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
+    
     if (!username || !password) {
       toast.warn("Please fill all fields!");
       return;

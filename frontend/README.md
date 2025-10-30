@@ -113,7 +113,6 @@ This section lists frequent frontend issues, their causes, and solutions during 
 |-------|----------------|-----------|
 | **Port 5173 already in use** | Port occupied by another process | Change `VITE_APP_PORT` in `.env` or stop conflicting process |
 | **Cannot access via IP** | Missing `host` config | Set `server.host` to `'0.0.0.0'` |
-| **CORS error** | Backend lacks CORS headers | Ensure Vite `proxy` is correctly configured |
 | **Blank screen** | Routing or `base` misconfiguration | Verify `vite.config.ts` and `BrowserRouter` setup |
 | **HMR not updating** | Cache or dependency conflict | Delete `.vite` and `node_modules`, reinstall |
 | **Toast not showing** | Missing Toast container | Add `<ToastContainer />` in `App.tsx` |
