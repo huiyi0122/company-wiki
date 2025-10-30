@@ -7,7 +7,7 @@ import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
 import type { User } from "./CommonTypes";
 import { apiFetch } from "../utils/api";
-import Modal from "./Modal"; // 假设 Modal 组件已导入
+import Modal from "./Modal";
 import "../styles/EditorPage.css";
 
 interface EditorPageProps {
@@ -33,7 +33,6 @@ interface Article {
   tags: string[];
 }
 
-// 假设 ModalProps 接口来自 Modal 组件的定义，用于状态管理
 interface ModalState {
   isOpen: boolean;
   title: string;
@@ -68,7 +67,6 @@ export default function EditorPage({
   const [debouncedTagInput, setDebouncedTagInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ---------------------- Modal State for Category ----------------------
   const modalInputRef = useRef("");
 
   const [modalState, setModalState] = useState<ModalState>({
@@ -92,7 +90,6 @@ export default function EditorPage({
     modalInputRef.current = "";
   };
 
-  // ---------------------- 初始化加载 (保留不变) ----------------------
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -107,7 +104,7 @@ export default function EditorPage({
           const artRes = await apiFetch(`/articles/${id}`);
           const artData = await artRes.json();
           if (artData.success && artData.data) {
-            const article: Article = artData.data; // <-- 给出类型
+            const article: Article = artData.data;
             setTitle(article.title);
             setContent(article.content);
             setCategoryId(article.category_id || null);
@@ -175,8 +172,6 @@ export default function EditorPage({
     searchTags();
   }, [debouncedTagInput, selectedTags]);
 
-  // ---------------------- 标签交互 (保留不变) ----------------------
-
   const handleTagInputChange = (value: string) => {
     setTagInput(value);
   };
@@ -210,7 +205,6 @@ export default function EditorPage({
       });
       const result = await res.json();
 
-      // ✅ 情况 1：后端创建成功
       if (result.success) {
         const newTag: Tag = result.data || {
           id: result.id || Date.now(),
@@ -224,7 +218,6 @@ export default function EditorPage({
         return;
       }
 
-      // ✅ 情况 2：后端返回「已存在」
       if (result.error === "Tag already exists") {
         const searchRes = await apiFetch(
           `/tags?search=${encodeURIComponent(name)}`
@@ -265,9 +258,8 @@ export default function EditorPage({
     setSelectedTags(selectedTags.filter((t) => t !== tagName));
   };
 
-  // ---------------------- 新增分类 (Refactored to use Modal) ----------------------
   const handleAddCategory = () => {
-    modalInputRef.current = ""; // Reset ref
+    modalInputRef.current = "";
 
     setModalState({
       isOpen: true,
@@ -288,7 +280,7 @@ export default function EditorPage({
           return;
         }
 
-        closeModal(); // Close modal immediately before async operation
+        closeModal();
 
         try {
           const res = await apiFetch("/categories", {
@@ -331,7 +323,6 @@ export default function EditorPage({
     });
   };
 
-  // ---------------------- 保存文章 (保留不变) ----------------------
   const handleSave = async () => {
     if (!title.trim() || !content.trim())
       return toast.warning("Title and content are required.");
@@ -362,9 +353,7 @@ export default function EditorPage({
     }
   };
 
-  // ---------------------- 渲染 ----------------------
   if (loading) {
-    // ... loading state remains the same
     return (
       <div className="layout">
         <Sidebar
@@ -420,92 +409,95 @@ export default function EditorPage({
                 />
               </div>
 
-              {/* Category */}
-              <div className="form-group">
-                <label>Category</label>
-                <div className="select-with-button">
-                  <select
-                    value={categoryId || ""}
-                    onChange={(e) => setCategoryId(Number(e.target.value))}
-                    className="form-select"
-                  >
-                    <option value="">Select a category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn-add" onClick={handleAddCategory}>
-                    + New
-                  </button>
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div className="form-group">
-                <label>Tags</label>
-                <div className="tag-input-section">
-                  <div className="selected-tags">
-                    {selectedTags.map((tagName) => (
-                      <span key={tagName} className="tag-chip">
-                        {tagName}
-                        <button
-                          className="remove-tag"
-                          onClick={() => removeTag(tagName)}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
+              {/* Category and Tags Row */}
+              <div className="category-tags-row">
+                {/* Category */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Category</label>
+                  <div className="select-with-button">
+                    <select
+                      value={categoryId || ""}
+                      onChange={(e) => setCategoryId(Number(e.target.value))}
+                      className="form-select"
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="btn-add" onClick={handleAddCategory}>
+                      + New
+                    </button>
                   </div>
+                </div>
 
-                  <div className="tag-input-wrapper">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => handleTagInputChange(e.target.value)}
-                      onKeyDown={handleTagInputKeyDown}
-                      onFocus={() =>
-                        tagInput &&
-                        tagSuggestions.length > 0 &&
-                        setShowTagDropdown(true)
-                      }
-                      onBlur={() => {
-                        if (!dropdownLocked) setShowTagDropdown(false);
-                      }}
-                      placeholder="Type tag name (press Enter or comma)"
-                      className="form-input"
-                    />
+                {/* Tags */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Tags</label>
+                  <div className="tag-input-section">
+                    <div className="selected-tags">
+                      {selectedTags.map((tagName) => (
+                        <span key={tagName} className="tag-chip">
+                          {tagName}
+                          <button
+                            className="remove-tag"
+                            onClick={() => removeTag(tagName)}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
 
-                    {showTagDropdown && tagInput && (
-                      <div
-                        className="tag-dropdown"
-                        onMouseDown={() => setDropdownLocked(true)}
-                        onMouseUp={() => setDropdownLocked(false)}
-                      >
-                        {tagSuggestions.length > 0 && (
-                          <div className="tag-suggestions">
-                            {tagSuggestions.map((tag) => (
-                              <div
-                                key={tag.id}
-                                className="tag-suggestion-item"
-                                onClick={() => handleTagSelect(tag)}
-                              >
-                                {tag.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className="tag-create-btn"
-                          onClick={handleCreateNewTag}
+                    <div className="tag-input-wrapper">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => handleTagInputChange(e.target.value)}
+                        onKeyDown={handleTagInputKeyDown}
+                        onFocus={() =>
+                          tagInput &&
+                          tagSuggestions.length > 0 &&
+                          setShowTagDropdown(true)
+                        }
+                        onBlur={() => {
+                          if (!dropdownLocked) setShowTagDropdown(false);
+                        }}
+                        placeholder="Type tag name (press Enter or comma)"
+                        className="form-input"
+                      />
+
+                      {showTagDropdown && tagInput && (
+                        <div
+                          className="tag-dropdown"
+                          onMouseDown={() => setDropdownLocked(true)}
+                          onMouseUp={() => setDropdownLocked(false)}
                         >
-                          + Create "{tagInput}"
-                        </button>
-                      </div>
-                    )}
+                          {tagSuggestions.length > 0 && (
+                            <div className="tag-suggestions">
+                              {tagSuggestions.map((tag) => (
+                                <div
+                                  key={tag.id}
+                                  className="tag-suggestion-item"
+                                  onClick={() => handleTagSelect(tag)}
+                                >
+                                  {tag.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="tag-create-btn"
+                            onClick={handleCreateNewTag}
+                          >
+                            Create "{tagInput}"
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -546,7 +538,6 @@ export default function EditorPage({
         </div>
       </div>
 
-      {/* Modal for Category Creation/Editing (like TagsManagement) */}
       <Modal
         isOpen={modalState.isOpen}
         title={modalState.title}
