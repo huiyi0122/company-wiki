@@ -30,7 +30,7 @@ interface Article {
   title: string;
   content: string;
   category_id?: number;
-  tags: Tag[];
+  tags: string[];
 }
 
 // 假设 ModalProps 接口来自 Modal 组件的定义，用于状态管理
@@ -58,8 +58,8 @@ export default function EditorPage({
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [_allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
@@ -67,7 +67,7 @@ export default function EditorPage({
 
   const [debouncedTagInput, setDebouncedTagInput] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   // ---------------------- Modal State for Category ----------------------
   const modalInputRef = useRef("");
 
@@ -76,7 +76,7 @@ export default function EditorPage({
     title: "",
     content: "",
     confirmText: "Confirm",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   const closeModal = () => {
@@ -85,7 +85,7 @@ export default function EditorPage({
       title: "",
       content: "",
       confirmText: "Confirm",
-      onConfirm: () => {},
+      onConfirm: () => { },
       inputType: undefined,
       inputValue: undefined,
     });
@@ -113,13 +113,18 @@ export default function EditorPage({
             setCategoryId(article.category_id || null);
 
             if (Array.isArray(article.tags)) {
-              const tagObjs = article.tags.map((t) => ({
-                id: t.id,
-                name: t.name || String(t),
+              const tagObjs = article.tags.map((name, i) => ({
+                id: i + 1,
+                name,
               }));
               setAllTags(tagObjs);
-              setSelectedTags(tagObjs.map((t) => t.id));
+              setSelectedTags(article.tags);
+            } else {
+              setAllTags([]);
+              setSelectedTags([]);
             }
+
+
           }
 
         }
@@ -134,15 +139,13 @@ export default function EditorPage({
     loadData();
   }, [id]);
 
-  // ---------------------- 输入防抖 (保留不变) ----------------------
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedTagInput(tagInput.trim());
-    }, 1000);
+    }, 500);
     return () => clearTimeout(timer);
   }, [tagInput]);
 
-  // ---------------------- ES 搜索标签 (保留不变) ----------------------
   useEffect(() => {
     if (!debouncedTagInput) {
       setTagSuggestions([]);
@@ -153,13 +156,13 @@ export default function EditorPage({
     const searchTags = async () => {
       try {
         const res = await apiFetch(
-          `/tags?search=${encodeURIComponent(debouncedTagInput)}&limit=20`
+          `/tags?search=${encodeURIComponent(debouncedTagInput)}&limit`
         );
         const result = await res.json();
 
         if (result.success && Array.isArray(result.data)) {
           const filtered = result.data.filter(
-            (tag: Tag) => !selectedTags.includes(tag.id)
+            (tag: Tag) => !selectedTags.includes(tag.name)
           );
           setTagSuggestions(filtered);
           setShowTagDropdown(true);
@@ -182,11 +185,11 @@ export default function EditorPage({
   };
 
   const handleTagSelect = (tag: Tag) => {
-    if (selectedTags.includes(tag.id)) return;
+    if (selectedTags.includes(tag.name)) return;
 
-    setSelectedTags((prev) => [...prev, tag.id]);
+    setSelectedTags((prev) => [...prev, tag.name]);
     setAllTags((prev) => {
-      if (!prev.some((t) => t.id === tag.id)) {
+      if (!prev.some((t) => t.name === tag.name)) {
         return [...prev, tag];
       }
       return prev;
@@ -195,6 +198,7 @@ export default function EditorPage({
     setTagSuggestions([]);
     setShowTagDropdown(false);
   };
+
 
   const handleCreateNewTag = async () => {
     const name = tagInput.trim();
@@ -214,7 +218,7 @@ export default function EditorPage({
       if (result.success) {
         const newTag: Tag = result.data || { id: result.id || Date.now(), name };
         setAllTags((prev) => [...prev, newTag]);
-        setSelectedTags((prev) => [...prev, newTag.id]);
+        setSelectedTags((prev) => [...prev, newTag.name]);
         setTagInput("");
         setTagSuggestions([]);
         toast.success(`Tag "${name}" created successfully!`);
@@ -258,14 +262,14 @@ export default function EditorPage({
     }
   };
 
-  const removeTag = (tagId: number) => {
-    setSelectedTags(selectedTags.filter((id) => id !== tagId));
+  const removeTag = (tagName: string) => {
+    setSelectedTags(selectedTags.filter((t) => t !== tagName));
   };
 
   // ---------------------- 新增分类 (Refactored to use Modal) ----------------------
   const handleAddCategory = () => {
     modalInputRef.current = ""; // Reset ref
-    
+
     setModalState({
       isOpen: true,
       title: "➕ Create New Category",
@@ -284,7 +288,7 @@ export default function EditorPage({
           toast.warning("Category name cannot be empty.");
           return;
         }
-        
+
         closeModal(); // Close modal immediately before async operation
 
         try {
@@ -333,16 +337,11 @@ export default function EditorPage({
     if (!title.trim() || !content.trim())
       return toast.warning("Title and content are required.");
 
-    const selectedTagObjects = selectedTags.map((id) => {
-      const found = allTags.find((t) => t.id === id);
-      return found ? found.name : id;
-    });
-
     const payload = {
       title,
       content,
       category_id: categoryId,
-      tags: selectedTagObjects,
+      tags: selectedTags,
     };
 
     try {
@@ -370,7 +369,7 @@ export default function EditorPage({
     return (
       <div className="layout">
         <Sidebar
-          setCategory={() => {}}
+          setCategory={() => { }}
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
         />
@@ -389,7 +388,7 @@ export default function EditorPage({
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => {}}
+        setCategory={() => { }}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
@@ -445,20 +444,19 @@ export default function EditorPage({
                 <label>Tags</label>
                 <div className="tag-input-section">
                   <div className="selected-tags">
-                    {allTags
-                      .filter((tag) => selectedTags.includes(tag.id))
-                      .map((tag) => (
-                        <span key={tag.id} className="tag-chip">
-                          {tag.name}
-                          <button
-                            className="remove-tag"
-                            onClick={() => removeTag(tag.id)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                    {selectedTags.map((tagName) => (
+                      <span key={tagName} className="tag-chip">
+                        {tagName}
+                        <button
+                          className="remove-tag"
+                          onClick={() => removeTag(tagName)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
                   </div>
+
 
                   <div className="tag-input-wrapper">
                     <input
@@ -541,7 +539,7 @@ export default function EditorPage({
           </div>
         </div>
       </div>
-      
+
       {/* Modal for Category Creation/Editing (like TagsManagement) */}
       <Modal
         isOpen={modalState.isOpen}
