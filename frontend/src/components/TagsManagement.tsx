@@ -93,7 +93,7 @@ export default function TagsManagement({
   const fetchTags = async (page = 1) => {
     try {
       setLoading(true);
-      const url = `/tags?page=${page}&limit=${pagination.limit}&include_inactive=true`;
+      const url = `/tags?page=${page}&limit=${pagination.limit}&include_inactive=true&sort=updated_at&order=desc`;
 
       const res = await apiFetch(url);
       const result = await res.json();
@@ -103,7 +103,30 @@ export default function TagsManagement({
         return;
       }
 
-      const list = parseListData(result);
+      let list = parseListData(result);
+
+      // 🔧 前端排序：按 updated_at 降序，如果没有 updated_at 则使用 created_at
+      list = list.sort((a:Tag, b:Tag) => {
+        // 处理时间的辅助函数
+        const getTime = (tag: Tag) => {
+          // 优先使用 updated_at
+          if (tag.updated_at && tag.updated_at !== "-" && tag.updated_at !== null) {
+            return new Date(tag.updated_at).getTime();
+          }
+          // 如果没有 updated_at，使用 created_at
+          if (tag.created_at && tag.created_at !== "-" && tag.created_at !== null) {
+            return new Date(tag.created_at).getTime();
+          }
+          // 都没有则返回 0（排在最后）
+          return 0;
+        };
+
+        const dateA = getTime(a);
+        const dateB = getTime(b);
+
+        return dateB - dateA; // 降序：最新的在前
+      });
+
       const total = result.meta?.total ?? list.length;
       const totalPages =
         result.meta?.totalPages ?? Math.ceil(total / pagination.limit);
@@ -159,8 +182,8 @@ export default function TagsManagement({
 
           if (result.success) {
             setMessage(`✅ Tag updated to "${newName}"`);
-            fetchTags(pagination.page);
             closeModal();
+            fetchTags(1); // 跳转到第1页并重新获取
           } else {
             const errorMsg =
               result.error || result.message || "Failed to update tag.";
@@ -206,8 +229,8 @@ export default function TagsManagement({
 
           if (result.success) {
             setMessage(`✅ Tag "${newName}" created successfully`);
-            fetchTags(1);
             closeModal();
+            fetchTags(1); // 跳转到第1页并重新获取
           } else {
             const errorMsg =
               result.error || result.message || "Failed to create tag.";
@@ -244,14 +267,8 @@ export default function TagsManagement({
           const result = await res.json();
 
           if (result.success) {
-            setMessage(
-              `✅ ${
-                result.data?.message ||
-                result.message ||
-                "Tag soft-deleted successfully."
-              }`
-            );
-            fetchTags(pagination.page);
+            setMessage(`✅ Tag "${name}" soft-deleted successfully`);
+            fetchTags(1); // 跳转到第1页并重新获取
           } else {
             const errorMsg =
               result.error || result.message || "Failed to delete tag";
@@ -279,7 +296,7 @@ export default function TagsManagement({
             result.data?.message || result.message || "Tag restored successfully."
           }`
         );
-        fetchTags(pagination.page);
+        fetchTags(1); // 跳转到第1页并重新获取
       } else {
         setMessage(`❌ ${result.error || result.message || "Failed to restore"}`);
       }
@@ -296,7 +313,11 @@ export default function TagsManagement({
   }, [canManage]);
 
   if (!currentUser) {
-    return <div className="dashboard-container">Please login to view tags management.</div>;
+    return (
+      <div className="dashboard-container">
+        Please login to view tags management.
+      </div>
+    );
   }
 
   if (!canManage) {
@@ -339,7 +360,10 @@ export default function TagsManagement({
           {/* Header Section */}
           <div className="page-header">
             <h1>Tags Management</h1>
-            <p>Manage all tags in the system. You can create, edit, delete, and restore tags.</p>
+            <p>
+              Manage all tags in the system. You can create, edit, delete, and
+              restore tags.
+            </p>
           </div>
 
           {/* Message Display */}
