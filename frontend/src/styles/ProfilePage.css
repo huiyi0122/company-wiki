@@ -171,8 +171,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Messages */
@@ -245,7 +249,7 @@
 .main-content-with-sidebar {
   margin-left: 280px;
   min-height: 100vh;
-  background: #f7fafc;
+  background: #fff;
 }
 
 /* Responsive Design */

@@ -403,16 +403,16 @@
   transform: translateY(-1px);
 }
 
-.btn-restore{
-    border-radius: 4px;
-    border: none;
-    padding: 6px 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: border-color 0.25s;
-    border-color: #1a1a1a;
+.btn-restore {
+  border-radius: 4px;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s;
+  border-color: #1a1a1a;
 }
 /* Responsive Design */
 @media (max-width: 768px) {

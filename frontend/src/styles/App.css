@@ -7,7 +7,7 @@
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.6;
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  background: #fff;
   min-height: 100vh;
 }
 
@@ -19,7 +19,7 @@ body {
 
 .main-content {
   flex: 1;
-  background: #f7fafc;
+  background: #fff;
   padding: 30px;
   overflow-y: auto;
   min-height: 100vh;
@@ -120,8 +120,12 @@ button.view {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-text {
@@ -140,7 +144,6 @@ button.view {
   color: #b91c1c;
   text-align: center;
 }
-
 
 /* ===== 动画效果和滚动条 (保留全局效果) ===== */
 @keyframes fadeIn {

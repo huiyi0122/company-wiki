@@ -189,7 +189,7 @@
   flex: 1;
 }
 
-.article-meta{
+.article-meta {
   display: flex;
   justify-content: flex-end;
 }

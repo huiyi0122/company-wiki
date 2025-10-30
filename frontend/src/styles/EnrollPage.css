@@ -122,7 +122,7 @@
 }
 
 .password-value {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-weight: 600;
   color: #22543d;
   font-size: 0.9rem;
@@ -258,7 +258,7 @@
 
 /* User ID */
 .user-id {
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-weight: 600;
   color: #718096;
   font-size: 0.85rem;
@@ -340,35 +340,35 @@
   .enroll-page {
     padding: 15px;
   }
-  
+
   .page-header h1 {
     font-size: 1.5rem;
   }
-  
+
   .enroll-form {
     padding: 20px;
   }
-  
+
   .users-table {
     font-size: 0.8rem;
   }
-  
+
   .users-table th,
   .users-table td {
     padding: 12px 8px;
   }
-  
+
   .actions {
     flex-direction: column;
     gap: 4px;
   }
-  
+
   .btn-save,
   .btn-delete {
     padding: 4px 8px;
     font-size: 0.75rem;
   }
-  
+
   .pagination {
     flex-direction: column;
     gap: 10px;
@@ -379,7 +379,7 @@
 .main-content-with-sidebar {
   margin-left: 280px;
   min-height: 100vh;
-  background: #f7fafc;
+  background: #fff;
 }
 
 @media (max-width: 768px) {
