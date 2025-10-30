@@ -67,7 +67,7 @@ export async function deleteArticle(articleId: number, user: User) {
         refresh: true,
       });
     } catch (esErr) {
-      console.error("⚠️ Elasticsearch sync failed:", esErr);
+      console.error("Elasticsearch sync failed:", esErr);
     }
 
     await connection.commit();

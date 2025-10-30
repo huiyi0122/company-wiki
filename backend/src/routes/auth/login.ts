@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { RowDataPacket } from "mysql2";
 import database from "../../db";
@@ -42,6 +41,7 @@ router.post("/login", async (req: Request, res: Response<ApiResponse<any>>) => {
         user: {
           id: user.id,
           username: user.username,
+          email: user.email,
           role: user.role,
         },
       })

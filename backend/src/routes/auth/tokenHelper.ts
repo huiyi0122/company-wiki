@@ -6,20 +6,32 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
 export function generateAccessToken(user: User): string {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+    },
     ACCESS_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: "1h" }
   );
 }
 
 export function generateRefreshToken(user: User): string {
-  return jwt.sign({ id: user.id, username: user.username }, REFRESH_SECRET, {
-    expiresIn: "7d",
-  });
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+    },
+    REFRESH_SECRET,
+    { expiresIn: "7d" }
+  );
 }
 
 export interface TokenPayload {
   id: number;
   username: string;
+  email: string;
   role?: string;
 }

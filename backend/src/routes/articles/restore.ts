@@ -4,11 +4,11 @@ import { authorize } from "../../middleware/authorize";
 import { PERMISSIONS } from "../../constants/permission";
 import { successResponse, errorResponse } from "../../utils/response";
 import { restoreArticle } from "../../services/articles";
-import { AuthenticatedRequest, Article, ApiResponse } from "../../types";
+import { AuthenticatedRequest } from "../../types";
 
 const router = Router();
 
-router.post(
+router.patch(
   "/restore/:id",
   authenticate,
   authorize(PERMISSIONS.ARTICLE_UPDATE),

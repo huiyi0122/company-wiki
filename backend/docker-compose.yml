@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   backend:
     build:
@@ -19,7 +21,24 @@ services:
       - elasticsearch
     volumes:
       - .:/app
-    command: npx ts-node-dev --respawn src/server.ts
+      - /app/node_modules
+    command: sh -c "npx wait-port db:3306 && npx ts-node src/seeder.ts && npx ts-node-dev --respawn src/server.ts"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: company-wiki-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:3000
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
 
   db:
     image: mysql:8

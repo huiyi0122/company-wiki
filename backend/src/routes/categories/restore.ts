@@ -4,7 +4,7 @@ import { authorize } from "../../middleware/authorize";
 import { PERMISSIONS } from "../../constants/permission";
 import { successResponse, errorResponse } from "../../utils/response";
 import { restoreCategory } from "../../services/categories";
-import { AuthenticatedRequest, DatabaseError } from "../../types";
+import { AuthenticatedRequest } from "../../types";
 
 const router = Router();
 

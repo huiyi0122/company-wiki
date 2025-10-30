@@ -13,7 +13,12 @@ router.get(
     res.json(
       successResponse({
         user: user
-          ? { id: user.id, username: user.username, role: user.role }
+          ? {
+              id: user.id,
+              username: user.username,
+              role: user.role,
+              email: user.email,
+            }
           : undefined,
       })
     );

@@ -1,11 +1,9 @@
 import { Router, Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import database from "../../db";
 import { authenticate } from "../../middleware/auth";
 import { authorize } from "../../middleware/authorize";
 import { successResponse, errorResponse } from "../../utils/response";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../../constants/permission";
+import { PERMISSIONS } from "../../constants/permission";
 import { User } from "../../types";
 import { RowDataPacket } from "mysql2";
 type QueryResult<T> = (T & RowDataPacket)[];

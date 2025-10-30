@@ -76,7 +76,7 @@ export default function EditorPage({
     title: "",
     content: "",
     confirmText: "Confirm",
-    onConfirm: () => { },
+    onConfirm: () => {},
   });
 
   const closeModal = () => {
@@ -85,7 +85,7 @@ export default function EditorPage({
       title: "",
       content: "",
       confirmText: "Confirm",
-      onConfirm: () => { },
+      onConfirm: () => {},
       inputType: undefined,
       inputValue: undefined,
     });
@@ -123,10 +123,7 @@ export default function EditorPage({
               setAllTags([]);
               setSelectedTags([]);
             }
-
-
           }
-
         }
       } catch (err) {
         console.error(err);
@@ -199,7 +196,6 @@ export default function EditorPage({
     setShowTagDropdown(false);
   };
 
-
   const handleCreateNewTag = async () => {
     const name = tagInput.trim();
     if (!name) {
@@ -216,7 +212,10 @@ export default function EditorPage({
 
       // ✅ 情况 1：后端创建成功
       if (result.success) {
-        const newTag: Tag = result.data || { id: result.id || Date.now(), name };
+        const newTag: Tag = result.data || {
+          id: result.id || Date.now(),
+          name,
+        };
         setAllTags((prev) => [...prev, newTag]);
         setSelectedTags((prev) => [...prev, newTag.name]);
         setTagInput("");
@@ -369,7 +368,7 @@ export default function EditorPage({
     return (
       <div className="layout">
         <Sidebar
-          setCategory={() => { }}
+          setCategory={() => {}}
           currentUser={currentUser}
           setCurrentUser={setCurrentUser}
         />
@@ -388,7 +387,7 @@ export default function EditorPage({
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => { }}
+        setCategory={() => {}}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
@@ -396,7 +395,11 @@ export default function EditorPage({
         <div className="editor-page">
           <div className="page-header">
             <h1>{id ? "Edit Article" : "Create New Article"}</h1>
-            <p>{id ? "Update your existing article" : "Write and publish a new article"}</p>
+            <p>
+              {id
+                ? "Update your existing article"
+                : "Write and publish a new article"}
+            </p>
           </div>
 
           <div className="editor-card">
@@ -457,7 +460,6 @@ export default function EditorPage({
                     ))}
                   </div>
 
-
                   <div className="tag-input-wrapper">
                     <input
                       type="text"
@@ -465,7 +467,9 @@ export default function EditorPage({
                       onChange={(e) => handleTagInputChange(e.target.value)}
                       onKeyDown={handleTagInputKeyDown}
                       onFocus={() =>
-                        tagInput && tagSuggestions.length > 0 && setShowTagDropdown(true)
+                        tagInput &&
+                        tagSuggestions.length > 0 &&
+                        setShowTagDropdown(true)
                       }
                       onBlur={() => {
                         if (!dropdownLocked) setShowTagDropdown(false);
@@ -514,7 +518,9 @@ export default function EditorPage({
                     value={content}
                     onChange={(val) => setContent(val || "")}
                     height={400}
-                    previewOptions={{ remarkPlugins: [remarkGfm, remarkGemoji] }}
+                    previewOptions={{
+                      remarkPlugins: [remarkGfm, remarkGemoji],
+                    }}
                   />
                 </div>
               </div>

@@ -1,11 +1,10 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import database from "../../db";
 import { authenticate } from "../../middleware/auth";
 import { authorize } from "../../middleware/authorize";
 import { successResponse, errorResponse } from "../../utils/response";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../../constants/permission";
+import { PERMISSIONS } from "../../constants/permission";
 import {
   User,
   AuthenticatedRequest,
@@ -20,9 +19,6 @@ import { RowDataPacket } from "mysql2";
 type QueryResult<T> = (T & RowDataPacket)[];
 
 const router = Router();
-
-const ACCESS_SECRET = process.env.JWT_SECRET as string;
-const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
 router.post(
   "/enroll",

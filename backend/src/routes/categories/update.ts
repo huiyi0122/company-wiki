@@ -5,7 +5,7 @@ import { PERMISSIONS } from "../../constants/permission";
 import { errorResponse } from "../../utils/response";
 import { User } from "../../types";
 import { updateCategory } from "../../services/categories";
-import { AuthenticatedRequest, DatabaseError } from "../../types";
+import { AuthenticatedRequest } from "../../types";
 
 const router = Router();
 router.put(

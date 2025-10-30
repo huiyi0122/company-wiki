@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import { Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 import { errorResponse } from "../utils/response";
 import { AuthenticatedRequest } from "../types";
 export const authenticate = (
@@ -10,7 +10,7 @@ export const authenticate = (
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.warn("❌ Missing or invalid Authorization header");
+    console.warn("Missing or invalid Authorization header");
     res.status(401).json(errorResponse("Missing token"));
     return;
   }
@@ -26,7 +26,7 @@ export const authenticate = (
     req.user = decoded;
     next();
   } catch (err) {
-    console.error("❌ Token verification failed:", (err as Error).message);
+    console.error("Token verification failed:", (err as Error).message);
     res.status(403).json(errorResponse("Token invalid or expired"));
   }
 };

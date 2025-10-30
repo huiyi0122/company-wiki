@@ -112,7 +112,12 @@ export const REFRESH_SECRET = process.env.REFRESH_SECRET as string;
 
 export function generateAccessToken(user: User): string {
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+    },
     ACCESS_SECRET,
     { expiresIn: "1h" }
   );

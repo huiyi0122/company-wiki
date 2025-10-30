@@ -22,6 +22,8 @@ export async function createArticlesIndex() {
             is_active: { type: "boolean" },
             created_at: { type: "date" },
             updated_at: { type: "date" },
+            created_by: { type: "keyword" },
+            updated_by: { type: "keyword" },
           },
         },
       });
@@ -36,14 +38,16 @@ export async function createArticlesIndex() {
 
 export async function syncArticlesToES() {
   const [rows]: any = await database.query(`
-    SELECT 
-      a.id, a.title, a.content, a.category_id, a.author_id, a.is_active, a.created_at, a.updated_at,
-      GROUP_CONCAT(t.name) AS tags
-    FROM articles a
-    LEFT JOIN article_tags at ON a.id = at.article_id
-    LEFT JOIN tags t ON at.tag_id = t.id
-    GROUP BY a.id
-  `);
+      SELECT 
+  a.id, a.title, a.content, a.category_id, a.author_id, u.username AS author_name,
+  a.is_active, a.created_at, a.updated_at,
+  GROUP_CONCAT(t.name) AS tags
+FROM articles a
+LEFT JOIN users u ON a.author_id = u.id
+LEFT JOIN article_tags at ON a.id = at.article_id
+LEFT JOIN tags t ON at.tag_id = t.id
+GROUP BY a.id;
+    `);
 
   for (const article of rows) {
     await esClient.index({
@@ -55,6 +59,7 @@ export async function syncArticlesToES() {
         content: article.content,
         category_id: article.category_id,
         author_id: article.author_id,
+        author_name: article.author_name,
         tags: article.tags ? article.tags.split(",") : [],
         is_active: !!article.is_active,
         created_at: article.created_at,

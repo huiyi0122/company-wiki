@@ -15,7 +15,7 @@ export async function updateArticle(
   body: UpdateArticleBody,
   user: User
 ) {
-  const { title, content, category_id, tags } = body;
+  const { title, content, category_id, tags, is_active } = body;
 
   const connection = await database.getConnection();
   await connection.beginTransaction();
@@ -61,8 +61,18 @@ export async function updateArticle(
           ? null
           : category_id
         : original.category_id;
+    const updatedIsActive =
+      typeof is_active !== "undefined"
+        ? Boolean(is_active)
+        : Boolean(original.is_active);
 
-    const allowedFields = ["title", "content", "category_id", "tags"];
+    const allowedFields = [
+      "title",
+      "content",
+      "category_id",
+      "tags",
+      "is_active",
+    ];
     const invalidFields = Object.keys(body).filter(
       (key) => !allowedFields.includes(key)
     );
@@ -86,12 +96,10 @@ export async function updateArticle(
         finalTagObjects = ensured;
 
         const articleTagValues = finalTagObjects.map((t) => [id, t.id]);
-        if (articleTagValues.length > 0) {
-          await connection.query(
-            "INSERT INTO article_tags (article_id, tag_id) VALUES ?",
-            [articleTagValues]
-          );
-        }
+        await connection.query(
+          "INSERT INTO article_tags (article_id, tag_id) VALUES ?",
+          [articleTagValues]
+        );
       } else {
         finalTagObjects = [];
       }
@@ -111,6 +119,10 @@ export async function updateArticle(
     if (typeof category_id !== "undefined") {
       fields.push("category_id = ?");
       params.push(updatedCategory);
+    }
+    if (typeof is_active !== "undefined") {
+      fields.push("is_active = ?");
+      params.push(updatedIsActive ? 1 : 0);
     }
 
     fields.push("updated_by = ?");
@@ -132,12 +144,14 @@ export async function updateArticle(
           title: original.title,
           content: original.content,
           category_id: original.category_id,
+          is_active: original.is_active,
         }),
         JSON.stringify({
           title,
           content,
           category_id,
           tags: finalTagObjects.map((t) => t.id),
+          is_active,
         }),
       ]
     );
@@ -153,16 +167,19 @@ export async function updateArticle(
           category_id: updatedCategory,
           author_id: original.author_id,
           tags: finalTagObjects.map((t) => t.name),
-          is_active: !!original.is_active,
-          created_by: createdBy,
-          updated_by: updatedBy,
+          is_active: updatedIsActive,
+          created_by: original.created_by,
+          updated_by: user.id,
+          created_by_name: createdBy,
+          updated_by_name: user.username,
           created_at: original.created_at,
           updated_at: new Date().toISOString(),
         },
       });
-      console.log("✅ Elasticsearch updated");
+
+      console.log("Elasticsearch updated");
     } catch (esErr) {
-      console.error("❌ Elasticsearch update failed:", esErr);
+      console.error("Elasticsearch update failed:", esErr);
     }
 
     await connection.commit();
@@ -177,7 +194,7 @@ export async function updateArticle(
       author: user.username,
       created_by: createdBy,
       updated_by: updatedBy,
-      is_active: original.is_active,
+      is_active: updatedIsActive,
     };
   } catch (err) {
     await connection.rollback();

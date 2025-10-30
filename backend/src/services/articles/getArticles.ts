@@ -102,6 +102,8 @@ export async function getArticleById(id: number, user: User) {
       a.category_id,
       a.is_active,
       a.author_id,
+      a.created_at, 
+      a.updated_at,
       u_author.username AS author_name,
       u_created.username AS created_by_name,
       u_updated.username AS updated_by_name,
@@ -150,6 +152,8 @@ export async function getArticleById(id: number, user: User) {
     author: article.author_name || "Unknown",
     created_by: article.created_by_name,
     updated_by: article.updated_by_name,
+    create_at: article.created_at,
+    update_at: article.updated_at,
     is_active: Boolean(article.is_active),
   };
 }

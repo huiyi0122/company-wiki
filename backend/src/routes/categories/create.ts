@@ -3,7 +3,6 @@ import { authenticate } from "../../middleware/auth";
 import { authorize } from "../../middleware/authorize";
 import { PERMISSIONS } from "../../constants/permission";
 import { successResponse, errorResponse } from "../../utils/response";
-import { User } from "../../types";
 import { createCategory } from "../../services/categories";
 import { AuthenticatedRequest, DatabaseError } from "../../types";
 

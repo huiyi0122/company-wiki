@@ -17,6 +17,7 @@ export interface CreateArticleBody {
   content: string;
   category_id?: number | null;
   tags?: string[];
+  is_active: boolean;
   page?: string;
   limit?: string;
 }

@@ -4,7 +4,7 @@ import { authorize } from "../../middleware/authorize";
 import { PERMISSIONS } from "../../constants/permission";
 import { successResponse, errorResponse } from "../../utils/response";
 import { restoreTag } from "../../services/tags";
-import { AuthenticatedRequest, User, Tag, DatabaseError } from "../../types";
+import { AuthenticatedRequest, User } from "../../types";
 
 const router = Router();
 
