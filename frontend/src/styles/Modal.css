@@ -15,12 +15,16 @@
   border-radius: 0.5rem;
   width: 400px;
   max-width: 90%;
+  color: #000;
 }
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 1rem;
+}
+modal-input{
+  color: #000;
 }
 .btn-cancel { background: #ccc; padding: 0.5rem 1rem; border-radius: 0.25rem; }
 .btn-confirm { background: #4caf50; color: white; padding: 0.5rem 1rem; border-radius: 0.25rem; }

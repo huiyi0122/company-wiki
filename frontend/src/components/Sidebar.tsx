@@ -50,13 +50,13 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   // 🔍 防抖搜索
   useEffect(() => {
     const timer = setTimeout(() => {
-      const isDocsPage =
-        location.pathname === "/docs" || location.pathname === "/";
+      // const isDocsPage =
+      //   location.pathname === "/docs" || location.pathname === "/";
       if (searchTerm.trim()) {
         navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
-      } else if (isDocsPage) {
-        navigate("/docs");
-      }
+      }// else if (isDocsPage) {
+      //   navigate("/docs");
+      // }
     }, 3000);
 
     return () => clearTimeout(timer);

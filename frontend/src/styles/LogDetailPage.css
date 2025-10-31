@@ -200,6 +200,10 @@
   border-color: #bfdbfe;
 }
 
+  .data-comparison-grid {
+    color: #000;
+  }
+
 /* Footer */
 .log-footer {
   display: flex;
