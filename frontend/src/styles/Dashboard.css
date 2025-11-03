@@ -3,7 +3,6 @@
   padding: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  background: #fff;
   min-height: 100vh;
 }
 
@@ -13,14 +12,12 @@
 }
 
 .page-header h1 {
-  color: #1a202c;
   font-size: 2rem;
   font-weight: 700;
   margin: 0 0 8px 0;
 }
 
 .page-header p {
-  color: #718096;
   font-size: 1rem;
   margin: 0;
 }
@@ -38,7 +35,6 @@
 }
 
 .stat-card {
-  background: #ffffff;
   border-radius: 12px;
   padding: 24px;
   display: flex;
@@ -61,7 +57,6 @@
 
 .stat-content h3 {
   margin: 0 0 8px 0;
-  color: #718096;
   font-size: 0.9rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -71,7 +66,6 @@
 .stat-value {
   font-size: 2.2em;
   font-weight: 700;
-  color: #2d3748;
   margin: 0;
 }
 
@@ -99,7 +93,6 @@
 
 /* Management Cards */
 .management-card {
-  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   margin-bottom: 30px;
@@ -108,7 +101,6 @@
 }
 
 .management-card .card-header {
-  background: #f7fafc;
   padding: 20px 24px;
   display: flex;
   justify-content: space-between;
@@ -120,7 +112,6 @@
   margin: 0;
   font-size: 1.3rem;
   font-weight: 600;
-  color: #2d3748;
 }
 
 .refresh-btn {
@@ -139,7 +130,6 @@
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background: #edf2f7;
   border-color: #a0aec0;
 }
 
@@ -159,11 +149,9 @@
 }
 
 .management-table th {
-  background: #f7fafc;
   padding: 16px 20px;
   text-align: left;
   font-weight: 600;
-  color: #4a5568;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -173,26 +161,19 @@
 .management-table td {
   padding: 16px 20px;
   border-bottom: 1px solid #e2e8f0;
-  color: #4a5568;
 }
 
 .management-table tr:last-child td {
   border-bottom: none;
 }
 
-.management-table tr:hover {
-  background: #f7fafc;
-}
-
 .id-cell {
   font-family: "Monaco", "Consolas", monospace;
   font-weight: 600;
-  color: #718096;
 }
 
 .name-cell {
   font-weight: 500;
-  color: #2d3748;
 }
 
 .status-badge {
@@ -254,14 +235,12 @@
 /* No Data State */
 .no-data {
   text-align: center;
-  color: #a0aec0;
   font-style: italic;
   padding: 40px 20px !important;
 }
 
 /* Activity Card */
 .activity-card {
-  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   padding: 24px;
@@ -272,7 +251,6 @@
   margin: 0 0 20px 0;
   font-size: 1.3rem;
   font-weight: 600;
-  color: #2d3748;
 }
 
 .activity-list {
@@ -286,7 +264,6 @@
   align-items: flex-start;
   gap: 16px;
   padding: 16px;
-  background: #f7fafc;
   border-radius: 8px;
   border-left: 4px solid #4299e1;
 }
@@ -298,18 +275,15 @@
 
 .activity-content p {
   margin: 0 0 4px 0;
-  color: #2d3748;
   font-weight: 500;
 }
 
 .activity-time {
-  color: #718096;
   font-size: 0.85rem;
 }
 
 /* Loading States */
 .loading-card {
-  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   padding: 60px 40px;
@@ -347,7 +321,6 @@
 
 /* Access Denied */
 .access-denied-card {
-  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   padding: 60px 40px;
@@ -363,23 +336,18 @@
 }
 
 .access-denied-card p {
-  color: #4a5568;
   margin-bottom: 8px;
 }
 
 .user-role span {
-  background: #f7fafc;
   padding: 4px 12px;
   border-radius: 6px;
   font-family: "Monaco", "Consolas", monospace;
-  color: #2d3748;
 }
 
 /* Main content adjustment for sidebar */
 .main-content-with-sidebar {
-  margin-left: 280px;
   min-height: 100vh;
-  background: #fff;
 }
 
 .loadmore-container {

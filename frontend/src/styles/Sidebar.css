@@ -1,7 +1,5 @@
 .sidebar {
-  width: 273px;
-  background: #fff;
-  color: #37352f;
+  width: 203px;
   padding: 0;
   height: 100vh;
   position: fixed;
@@ -16,7 +14,6 @@
 }
 
 .sidebar h2 {
-  color: #37352f;
   margin: 0;
   padding: 16px 14px;
   font-size: 14px;
@@ -63,12 +60,10 @@
 }
 
 .main-menu li:hover {
-  background: rgba(55, 53, 47, 0.06);
   color: #37352f;
 }
 
 .main-menu li.active {
-  background: rgba(35, 131, 226, 0.08);
   color: #2383e2;
   font-weight: 500;
 }
@@ -149,6 +144,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  position: relative;
 }
 
 .category-header {
@@ -163,6 +159,8 @@
   font-weight: 500;
   border-radius: 6px;
   user-select: none;
+  position: relative; /* 确保定位正确 */
+  width: auto;
 }
 
 .category-header:hover {
@@ -217,12 +215,16 @@
 .articles-container {
   margin: 0;
   padding: 0;
+  width: 100%; /* 确保宽度100% */
+  position: relative; /* 相对定位 */
 }
 
 .articles-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  width: 100%; 
+  position: relative;
 }
 
 .article-item {
@@ -238,6 +240,8 @@
   align-items: center;
   gap: 6px;
   line-height: 1.5;
+  width: calc(100% - 16px); /* 确保宽度正确计算 */
+  box-sizing: border-box; /* 包含padding在宽度内 */
 }
 
 .article-bullet {
@@ -269,6 +273,18 @@
 
 .articles-loading {
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* 确保展开的内容正确显示 */
+.category-item > .articles-list,
+.category-item > .articles-loading,
+.category-item > .articles-empty,
+.category-item > .show-more-container {
+  display: block;
+  width: 100%;
+  position: relative;
+  left: 0;
+  right: 0;
 }
 
 @keyframes pulse {
@@ -644,14 +660,6 @@
     display: none;
   }
 
-  .show-more-container {
-    padding: 4px 12px 8px 36px;
-  }
-
-  .article-item {
-    padding: 6px 12px 6px 36px;
-  }
-
   .articles-loading,
   .articles-empty {
     padding: 8px 12px 8px 36px;
@@ -660,6 +668,16 @@
   .category-header {
     margin: 1px 6px;
     padding: 6px 8px 6px 4px;
+  }
+  
+  .article-item {
+    padding: 6px 12px 6px 36px;
+    width: calc(100% - 12px);
+  }
+  
+  .show-more-container {
+    padding: 4px 12px 8px 36px;
+    width: calc(100% - 12px);
   }
 }
 

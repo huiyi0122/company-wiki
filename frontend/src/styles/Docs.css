@@ -3,7 +3,6 @@
   padding: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  background: #fff;
   min-height: 100vh;
 }
 
@@ -13,7 +12,6 @@
 }
 
 .page-header h1 {
-  color: #1a202c;
   font-size: 2rem;
   font-weight: 700;
   margin: 0 0 8px 0;
@@ -37,8 +35,6 @@
   border: 1px solid #cbd5e0;
   border-radius: 8px;
   font-size: 1rem;
-  background: white;
-  color: #2d3748;
   transition: all 0.2s ease;
 }
 
@@ -59,7 +55,6 @@
 
 .tabs-container {
   display: flex;
-  background: white;
   border-radius: 8px;
   padding: 4px;
   border: 1px solid #e2e8f0;
@@ -102,7 +97,6 @@
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  background: white;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
@@ -127,7 +121,6 @@
 }
 
 .loading-state p {
-  color: #718096;
   margin: 0;
 }
 
@@ -143,12 +136,10 @@
 
 /* Empty State */
 .empty-state {
-  background: white;
   padding: 60px 20px;
   border-radius: 12px;
   text-align: center;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  color: #718096;
 }
 
 /* Articles Grid */
@@ -159,7 +150,6 @@
 }
 
 .article-card {
-  background: white;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
@@ -182,7 +172,6 @@
 }
 
 .article-title {
-  color: #2d3748;
   font-size: 1.2rem;
   font-weight: 600;
   margin: 0;
@@ -194,7 +183,6 @@
   justify-content: flex-end;
 }
 .category-badge {
-  background: #e6fffa;
   color: #234e52;
   padding: 4px 12px;
   border-radius: 20px;
@@ -210,13 +198,11 @@
 }
 
 .article-author {
-  color: #4a5568;
   margin: 0;
   font-size: 0.9rem;
 }
 
 .article-date {
-  color: #718096;
   margin: 0;
   font-size: 0.85rem;
 }
@@ -229,7 +215,6 @@
   gap: 16px;
   margin-top: 40px;
   padding: 20px;
-  background: white;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
@@ -258,15 +243,7 @@
 }
 
 .page-info {
-  color: #4a5568;
   font-weight: 500;
-}
-
-/* Main content adjustment for sidebar */
-.main-content-with-sidebar {
-  margin-left: 280px;
-  min-height: 100vh;
-  background: #fff;
 }
 
 .pagination {
@@ -353,7 +330,6 @@
   }
 
   .main-content-with-sidebar {
-    margin-left: 0;
     padding-top: 60px;
   }
 }

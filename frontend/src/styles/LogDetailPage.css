@@ -13,11 +13,9 @@
   gap: 8px;
   margin-bottom: 24px;
   font-size: 0.9em;
-  color: #6b7280;
 }
 
 .breadcrumb-link {
-  background: none;
   border: none;
   color: #3b82f6;
   cursor: pointer;
@@ -33,18 +31,15 @@
 }
 
 .breadcrumb-separator {
-  color: #d1d5db;
   user-select: none;
 }
 
 .breadcrumb-current {
-  color: #111827;
   font-weight: 500;
 }
 
 /* Header */
 .log-header {
-  background: white;
   border-radius: 12px;
   padding: 32px;
   margin-bottom: 24px;
@@ -73,12 +68,10 @@
 
 .log-header p {
   margin: 0;
-  color: #6b7280;
   font-size: 0.95em;
 }
 
 .log-header strong {
-  color: #374151;
   font-weight: 600;
 }
 
@@ -98,7 +91,6 @@
 
 /* Data Column */
 .data-column {
-  background: white;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -118,7 +110,6 @@
   justify-content: space-between;
   padding: 20px 24px;
   border-bottom: 2px solid #e5e7eb;
-  background: #f9fafb;
   gap: 16px;
 }
 
@@ -162,7 +153,6 @@
 
 /* Old Data Styling */
 .data-column.old-data .data-column-header {
-  background: #fef2f2;
   border-bottom-color: #fecaca;
 }
 
@@ -172,7 +162,6 @@
 
 /* New Data Styling */
 .data-column.new-data .data-column-header {
-  background: #f0fdf4;
   border-bottom-color: #bbf7d0;
 }
 
@@ -182,7 +171,6 @@
 
 /* Single Data Styling */
 .data-column.single-data .data-column-header {
-  background: #f0f9ff;
   border-bottom-color: #bfdbfe;
 }
 
@@ -195,7 +183,6 @@
   padding: 0;
   overflow: auto;
   flex: 1;
-  background: #ffffff;
 }
 
 /* Raw Markdown Display */
@@ -206,20 +193,18 @@
 .data-column-content.markdown-raw pre {
   margin: 0;
   padding: 24px;
-  background: #f9fafb;
   border: none;
   border-radius: 0;
   overflow-x: auto;
   font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
   font-size: 0.875em;
   line-height: 1.6;
-  color: #1f2937;
   white-space: pre-wrap;
   word-wrap: break-word;
   height: 100%;
 }
 
-.data-column.old-data .data-column-content.markdown-raw pre {
+/* .data-column.old-data .data-column-content.markdown-raw pre {
   background: #fef2f2;
 }
 
@@ -229,7 +214,7 @@
 
 .data-column.single-data .data-column-content.markdown-raw pre {
   background: #f0f9ff;
-}
+} */
 
 /* Footer */
 .log-footer {
@@ -272,7 +257,6 @@
   align-items: center;
   min-height: 400px;
   font-size: 1.1em;
-  color: #6b7280;
 }
 
 /* Not Found State */
