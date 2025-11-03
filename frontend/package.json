@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/react-syntax-highlighter": "^15.5.11",
     "@uiw/react-markdown-preview": "^5.1.5",
     "@uiw/react-md-editor": "^4.0.8",
     "axios": "^1.12.2",
@@ -25,6 +26,7 @@
     "react-markdown": "^10.1.0",
     "react-modal": "^3.16.3",
     "react-router-dom": "^7.9.3",
+    "react-syntax-highlighter": "^15.5.0",
     "react-toastify": "^11.0.5",
     "remark-gemoji": "^8.0.0",
     "remark-gfm": "^4.0.1",
