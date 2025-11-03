@@ -21,15 +21,15 @@ export async function updateArticle(
   await connection.beginTransaction();
 
   try {
+    // 1️⃣ 取原始文章
     const [originalRows] = await connection.query<ArticleRow[]>(
       "SELECT * FROM articles WHERE id = ?",
       [id]
     );
-    if (originalRows.length === 0) {
-      throw new Error("Article not found");
-    }
+    if (originalRows.length === 0) throw new Error("Article not found");
     const original = originalRows[0];
 
+    // 2️⃣ 原本标签
     const [origTagRows] = await connection.query<TagRow[]>(
       "SELECT t.id, t.name FROM tags t JOIN article_tags at ON t.id = at.tag_id WHERE at.article_id = ?",
       [id]
@@ -39,6 +39,14 @@ export async function updateArticle(
       name: t.name,
     }));
 
+    // 3️⃣ 原始作者名字
+    const [authorRows] = await connection.query<UserRow[]>(
+      "SELECT username FROM users WHERE id = ?",
+      [original.author_id]
+    );
+    const authorName = authorRows[0]?.username || "";
+
+    // 4️⃣ 创建者 & 更新者名字
     const [userRows] = await connection.query<UserRow[]>(
       `SELECT 
         u_created.username AS created_by_name,
@@ -48,10 +56,10 @@ export async function updateArticle(
       WHERE u_created.id = ? AND u_updated.id = ?`,
       [original.created_by, original.updated_by]
     );
-
     const createdBy = userRows[0]?.created_by_name || "";
     const updatedBy = userRows[0]?.updated_by_name || "";
 
+    // 5️⃣ 更新字段逻辑（保持不变）
     const updatedTitle = typeof title !== "undefined" ? title : original.title;
     const updatedContent =
       typeof content !== "undefined" ? content : original.content;
@@ -66,6 +74,7 @@ export async function updateArticle(
         ? Boolean(is_active)
         : Boolean(original.is_active);
 
+    // 6️⃣ 验证字段
     const allowedFields = [
       "title",
       "content",
@@ -80,12 +89,10 @@ export async function updateArticle(
       throw new Error(`Invalid fields: ${invalidFields.join(", ")}`);
     }
 
+    // 7️⃣ 处理标签
     let finalTagObjects: TagObject[] = originalTagObjects;
-
     if (typeof tags !== "undefined") {
-      if (!Array.isArray(tags)) {
-        throw new Error("Tags must be an array");
-      }
+      if (!Array.isArray(tags)) throw new Error("Tags must be an array");
 
       await connection.query("DELETE FROM article_tags WHERE article_id = ?", [
         id,
@@ -105,6 +112,7 @@ export async function updateArticle(
       }
     }
 
+    // 8️⃣ 构建 UPDATE SQL
     const fields: string[] = [];
     const params: (string | number | null)[] = [];
 
@@ -135,6 +143,7 @@ export async function updateArticle(
       await connection.query(sql, params);
     }
 
+    // 9️⃣ 写日志
     await connection.query(
       "INSERT INTO article_logs (article_id, action, changed_by, old_data, new_data) VALUES (?, 'UPDATE', ?, ?, ?)",
       [
@@ -156,6 +165,7 @@ export async function updateArticle(
       ]
     );
 
+    // 🔟 更新 Elasticsearch，加入 author_name
     try {
       await esClient.index({
         index: "articles",
@@ -166,6 +176,7 @@ export async function updateArticle(
           content: updatedContent,
           category_id: updatedCategory,
           author_id: original.author_id,
+          author_name: authorName, // ✅ 这里加上作者名字
           tags: finalTagObjects.map((t) => t.name),
           is_active: updatedIsActive,
           created_by: original.created_by,
@@ -191,7 +202,7 @@ export async function updateArticle(
       content: updatedContent,
       category_id: updatedCategory,
       tags: finalTagObjects.map((t) => t.name),
-      author: user.username,
+      author: authorName, // ✅ 返回作者名字
       created_by: createdBy,
       updated_by: updatedBy,
       is_active: updatedIsActive,

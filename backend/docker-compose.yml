@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build:
@@ -43,7 +41,6 @@ services:
   db:
     image: mysql:8
     container_name: company-wiki-db
-    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: company_wiki
