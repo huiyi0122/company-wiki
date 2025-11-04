@@ -17,9 +17,9 @@ interface Category {
   id: number;
   name: string;
   is_active?: number;
-  created_by?: string | null;           // 用户ID
-  created_by_name?: string | null;      // 用户名
-  updated_by?: string | null;           // 用户ID
+  created_by?: string | null; // 用户ID
+  created_by_name?: string | null; // 用户名
+  updated_by?: string | null; // 用户ID
   updated_by_name?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -54,7 +54,7 @@ interface Article {
 
 interface LogRecord {
   id: number;
-  type: 'article' | 'tag' | 'category';
+  type: "article" | "tag" | "category";
   target_id: number;
   action: string;
   changed_by: number;
@@ -144,7 +144,6 @@ export default function Dashboard({
   const [logStartDate, setLogStartDate] = useState<string>("");
   const [logEndDate, setLogEndDate] = useState<string>("");
 
-
   const [tagPagination, setTagPagination] = useState<Pagination>({
     page: 1,
     limit: 10,
@@ -171,7 +170,7 @@ export default function Dashboard({
     content: React.ReactNode;
     confirmText: string;
     onConfirm: () => void;
-    inputType?: 'text' | 'none';
+    inputType?: "text" | "none";
     inputValue?: string;
     targetId?: number;
     targetName?: string;
@@ -181,7 +180,7 @@ export default function Dashboard({
     title: "",
     content: "",
     confirmText: "Confirm",
-    onConfirm: () => { },
+    onConfirm: () => {},
   });
 
   const closeModal = () => {
@@ -190,7 +189,7 @@ export default function Dashboard({
       title: "",
       content: "",
       confirmText: "Confirm",
-      onConfirm: () => { },
+      onConfirm: () => {},
       inputType: undefined,
       inputValue: undefined,
       targetId: undefined,
@@ -201,7 +200,8 @@ export default function Dashboard({
     modalInputRef.current = "";
   };
 
-  const canManage = currentUser && PERMISSIONS[currentUser.role].includes("edit");
+  const canManage =
+    currentUser && PERMISSIONS[currentUser.role].includes("edit");
 
   useEffect(() => {
     if (canManage) {
@@ -236,7 +236,6 @@ export default function Dashboard({
       }
 
       setCategories(result.data);
-
     } catch (err) {
       console.error("Category fetch error:", err);
       toast.error("Failed to connect to server.");
@@ -261,14 +260,21 @@ export default function Dashboard({
 
       let list = result.data;
       list = list.sort((a: Tag, b: Tag) => {
-
         const getTime = (tag: Tag) => {
           // 优先使用 updated_at
-          if (tag.updated_at && tag.updated_at !== "-" && tag.updated_at !== null) {
+          if (
+            tag.updated_at &&
+            tag.updated_at !== "-" &&
+            tag.updated_at !== null
+          ) {
             return new Date(tag.updated_at).getTime();
           }
           // 如果没有 updated_at，使用 created_at
-          if (tag.created_at && tag.created_at !== "-" && tag.created_at !== null) {
+          if (
+            tag.created_at &&
+            tag.created_at !== "-" &&
+            tag.created_at !== null
+          ) {
             return new Date(tag.created_at).getTime();
           }
           // 都没有则返回 0（排在最后）
@@ -311,7 +317,9 @@ export default function Dashboard({
       }
 
       const list = parseListData(result);
-      const inactiveArticles = list.filter((article: Article) => !article.is_active);
+      const inactiveArticles = list.filter(
+        (article: Article) => !article.is_active
+      );
       const total = inactiveArticles.length;
 
       setDeletedArticles(inactiveArticles);
@@ -350,7 +358,9 @@ export default function Dashboard({
       } else if (dateFilter === "week") {
         const today = new Date();
         const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        url += `&startDate=${weekAgo.toISOString().split("T")[0]}&endDate=${today.toISOString().split("T")[0]}`;
+        url += `&startDate=${weekAgo.toISOString().split("T")[0]}&endDate=${
+          today.toISOString().split("T")[0]
+        }`;
       } else if (dateFilter === "month") {
         const today = new Date();
         const year = today.getFullYear();
@@ -410,15 +420,24 @@ export default function Dashboard({
   };
 
   // ===== 分类操作 =====
-  const handleEditCategory = (id: number, oldName: string, oldStatus: boolean, createdBy?: string) => {
+  const handleEditCategory = (
+    id: number,
+    oldName: string,
+    oldStatus: boolean,
+    createdBy?: string
+  ) => {
     modalInputRef.current = oldName;
 
     setModalState({
       isOpen: true,
       title: "✏️ Edit Category Name",
-      content: <p>Enter new name for category #{id} (Current: {oldName})</p>,
+      content: (
+        <p>
+          Enter new name for category #{id} (Current: {oldName})
+        </p>
+      ),
       confirmText: "Save",
-      inputType: 'text',
+      inputType: "text",
       inputValue: oldName,
       targetId: id,
       targetName: oldName,
@@ -437,7 +456,7 @@ export default function Dashboard({
             body: JSON.stringify({
               name: newName,
               is_active: oldStatus,
-              created_by: createdBy  // 保留原有的 created_by
+              created_by: createdBy, // 保留原有的 created_by
             }),
           });
           const result = await res.json();
@@ -448,7 +467,8 @@ export default function Dashboard({
             fetchLogs(1);
             closeModal();
           } else {
-            const errorMsg = result.error || result.message || "Failed to update category.";
+            const errorMsg =
+              result.error || result.message || "Failed to update category.";
             toast.error(`${errorMsg}`);
           }
         } catch (err) {
@@ -475,16 +495,23 @@ export default function Dashboard({
         closeModal();
         try {
           const res = await apiFetch(`/categories/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
           });
           const result = await res.json();
 
           if (result.success) {
-            toast.success(`${result.data?.message || result.message || "Category soft-deleted successfully."}`);
+            toast.success(
+              `${
+                result.data?.message ||
+                result.message ||
+                "Category soft-deleted successfully."
+              }`
+            );
             fetchCategories();
             fetchLogs(1);
           } else {
-            const errorMsg = result.error || result.message || "Failed to delete category";
+            const errorMsg =
+              result.error || result.message || "Failed to delete category";
             toast.error(`${errorMsg}`);
           }
         } catch (err) {
@@ -498,12 +525,18 @@ export default function Dashboard({
   const handleRestoreCategory = async (id: number) => {
     try {
       const res = await apiFetch(`/categories/restore/${id}`, {
-        method: "PATCH"
+        method: "PATCH",
       });
       const result = await res.json();
 
       if (result.success) {
-        toast.success(`${result.data?.message || result.message || "Category restored successfully."}`);
+        toast.success(
+          `${
+            result.data?.message ||
+            result.message ||
+            "Category restored successfully."
+          }`
+        );
         fetchCategories();
         fetchLogs(1);
       } else {
@@ -522,9 +555,13 @@ export default function Dashboard({
     setModalState({
       isOpen: true,
       title: "✏️ Edit Tag Name",
-      content: <p>Enter new name for tag #{id} (Current: {oldName})</p>,
+      content: (
+        <p>
+          Enter new name for tag #{id} (Current: {oldName})
+        </p>
+      ),
       confirmText: "Save",
-      inputType: 'text',
+      inputType: "text",
       inputValue: oldName,
       targetId: id,
       targetName: oldName,
@@ -541,7 +578,7 @@ export default function Dashboard({
             method: "PUT",
             body: JSON.stringify({
               name: newName,
-              created_by: createdBy  // 保留原有的 created_by
+              created_by: createdBy, // 保留原有的 created_by
             }),
           });
           const result = await res.json();
@@ -552,7 +589,8 @@ export default function Dashboard({
             fetchLogs(1);
             closeModal();
           } else {
-            const errorMsg = result.error || result.message || "Failed to update tag.";
+            const errorMsg =
+              result.error || result.message || "Failed to update tag.";
             toast.error(`${errorMsg}`);
           }
         } catch (err) {
@@ -579,16 +617,23 @@ export default function Dashboard({
         closeModal();
         try {
           const res = await apiFetch(`/tags/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
           });
           const result = await res.json();
 
           if (result.success) {
-            setMessage(`✅ ${result.data?.message || result.message || "Tag soft-deleted successfully."}`);
+            setMessage(
+              `✅ ${
+                result.data?.message ||
+                result.message ||
+                "Tag soft-deleted successfully."
+              }`
+            );
             fetchTags(tagPagination.page);
             fetchLogs(1);
           } else {
-            const errorMsg = result.error || result.message || "Failed to delete tag";
+            const errorMsg =
+              result.error || result.message || "Failed to delete tag";
             toast.error(`${errorMsg}`);
           }
         } catch (err) {
@@ -602,12 +647,18 @@ export default function Dashboard({
   const handleRestoreTag = async (id: number) => {
     try {
       const res = await apiFetch(`/tags/restore/${id}`, {
-        method: "PATCH"
+        method: "PATCH",
       });
       const result = await res.json();
 
       if (result.success) {
-        toast.success(`${result.data?.message || result.message || "Tag restored successfully."}`);
+        toast.success(
+          `${
+            result.data?.message ||
+            result.message ||
+            "Tag restored successfully."
+          }`
+        );
         fetchTags(tagPagination.page);
         fetchLogs(1);
       } else {
@@ -627,21 +678,21 @@ export default function Dashboard({
     };
 
     return (
-      <div style={{ fontSize: '0.9em' }}>
+      <div style={{ fontSize: "0.9em" }}>
         <button
           onClick={handleViewDetails}
           className="btn-view-details"
           style={{
-            padding: '4px 12px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '0.8em',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
+            padding: "4px 12px",
+            background: "#3b82f6",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "0.8em",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
           }}
           title="View change details"
         >
@@ -683,9 +734,13 @@ export default function Dashboard({
             activities.map((act) => (
               <div key={act.id} className="activity-item">
                 <div className="activity-icon">
-                  {act.type === "article" ? "📄" :
-                    act.type === "category" ? "📂" :
-                      act.type === "tag" ? "🏷️" : "✅"}
+                  {act.type === "article"
+                    ? "📄"
+                    : act.type === "category"
+                    ? "📂"
+                    : act.type === "tag"
+                    ? "🏷️"
+                    : "✅"}
                 </div>
                 <div className="activity-content">
                   <p>{act.description}</p>
@@ -704,13 +759,15 @@ export default function Dashboard({
   };
 
   const totalTagPages = Math.ceil(tagPagination.total / tagPagination.limit);
-  const totalArticlePages = Math.ceil(articlePagination.total / articlePagination.limit);
+  const totalArticlePages = Math.ceil(
+    articlePagination.total / articlePagination.limit
+  );
   const totalLogPages = Math.ceil(logPagination.total / logPagination.limit);
 
   return (
     <div className="layout">
       <Sidebar
-        setCategory={() => { }}
+        setCategory={() => {}}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
       />
@@ -720,7 +777,8 @@ export default function Dashboard({
           <div className="page-header">
             <h1>Dashboard</h1>
             <p>
-              Welcome back, {currentUser.username}! Here's your workspace overview.
+              Welcome back, {currentUser.username}! Here's your workspace
+              overview.
             </p>
           </div>
 
@@ -753,7 +811,9 @@ export default function Dashboard({
 
           {message && (
             <div
-              className={`message ${message.includes("❌") ? "error" : "success"}`}
+              className={`message ${
+                message.includes("❌") ? "error" : "success"
+              }`}
             >
               {message}
             </div>
@@ -763,18 +823,25 @@ export default function Dashboard({
           {currentUser.role === "admin" && (
             <div className="admin-sections">
               {/* History Logs Section */}
-              <div className="management-card" style={{ gridColumn: '1 / -1' }}>
+              <div className="management-card" style={{ gridColumn: "1 / -1" }}>
                 <div className="card-header">
                   <h2>📜 Activity History</h2>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <select
                       value={logTypeFilter}
                       onChange={(e) => setLogTypeFilter(e.target.value)}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #d1d5db',
-                        fontSize: '14px'
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
                       }}
                     >
                       <option value="all">All Types</option>
@@ -787,10 +854,10 @@ export default function Dashboard({
                       value={logDateFilter}
                       onChange={(e) => setLogDateFilter(e.target.value)}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #d1d5db',
-                        fontSize: '14px'
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        border: "1px solid #d1d5db",
+                        fontSize: "14px",
                       }}
                     >
                       <option value="all">All Time</option>
@@ -801,29 +868,29 @@ export default function Dashboard({
                       <option value="custom">Custom Range</option>
                     </select>
 
-                    {logDateFilter === 'custom' && (
+                    {logDateFilter === "custom" && (
                       <>
                         <input
                           type="date"
                           value={logStartDate}
                           onChange={(e) => setLogStartDate(e.target.value)}
                           style={{
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '14px'
+                            padding: "6px 12px",
+                            borderRadius: "4px",
+                            border: "1px solid #d1d5db",
+                            fontSize: "14px",
                           }}
                         />
-                        <span style={{ color: '#6b7280' }}>to</span>
+                        <span style={{ color: "#6b7280" }}>to</span>
                         <input
                           type="date"
                           value={logEndDate}
                           onChange={(e) => setLogEndDate(e.target.value)}
                           style={{
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '14px'
+                            padding: "6px 12px",
+                            borderRadius: "4px",
+                            border: "1px solid #d1d5db",
+                            fontSize: "14px",
                           }}
                         />
                         <button
@@ -831,12 +898,11 @@ export default function Dashboard({
                           onClick={() => fetchLogs(1, logTypeFilter, "custom")}
                           disabled={logLoading || !logStartDate || !logEndDate}
                           style={{
-                            opacity: (!logStartDate || !logEndDate) ? 0.5 : 1
+                            opacity: !logStartDate || !logEndDate ? 0.5 : 1,
                           }}
                         >
                           Apply
                         </button>
-
                       </>
                     )}
 
@@ -870,36 +936,46 @@ export default function Dashboard({
                             try {
                               // 优先从 new_data 获取（CREATE/UPDATE 操作）
                               if (log.new_data) {
-                                const newData = typeof log.new_data === 'string'
-                                  ? JSON.parse(log.new_data)
-                                  : log.new_data;
+                                const newData =
+                                  typeof log.new_data === "string"
+                                    ? JSON.parse(log.new_data)
+                                    : log.new_data;
 
-                                if (log.type === 'article' && newData.title) {
+                                if (log.type === "article" && newData.title) {
                                   return newData.title;
                                 }
-                                if ((log.type === 'tag' || log.type === 'category') && newData.name) {
+                                if (
+                                  (log.type === "tag" ||
+                                    log.type === "category") &&
+                                  newData.name
+                                ) {
                                   return newData.name;
                                 }
                               }
 
                               // 如果 new_data 没有，从 old_data 获取（DELETE/SOFT_DELETE 操作）
                               if (log.old_data) {
-                                const oldData = typeof log.old_data === 'string'
-                                  ? JSON.parse(log.old_data)
-                                  : log.old_data;
+                                const oldData =
+                                  typeof log.old_data === "string"
+                                    ? JSON.parse(log.old_data)
+                                    : log.old_data;
 
-                                if (log.type === 'article' && oldData.title) {
+                                if (log.type === "article" && oldData.title) {
                                   return oldData.title;
                                 }
-                                if ((log.type === 'tag' || log.type === 'category') && oldData.name) {
+                                if (
+                                  (log.type === "tag" ||
+                                    log.type === "category") &&
+                                  oldData.name
+                                ) {
                                   return oldData.name;
                                 }
                               }
 
-                              return '-';
+                              return "-";
                             } catch (e) {
-                              console.error('Error parsing log data:', e);
-                              return '-';
+                              console.error("Error parsing log data:", e);
+                              return "-";
                             }
                           };
 
@@ -914,13 +990,16 @@ export default function Dashboard({
                                 </span>
                               </td>
                               <td>
-                                <div style={{
-                                  maxWidth: '200px',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  fontWeight: '500'
-                                }} title={displayName}>
+                                <div
+                                  style={{
+                                    maxWidth: "200px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    fontWeight: "500",
+                                  }}
+                                  title={displayName}
+                                >
                                   {displayName}
                                 </div>
                               </td>
@@ -929,24 +1008,27 @@ export default function Dashboard({
                               </td>
                               <td>{log.changed_by_name}</td>
                               <td>
-                                {new Date(log.changed_at).toLocaleString('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                                {new Date(log.changed_at).toLocaleString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
                               </td>
-                              <td>
-                                {renderLogDetails(log)}
-                              </td>
+                              <td>{renderLogDetails(log)}</td>
                             </tr>
                           );
                         })
                       ) : (
                         <tr>
                           <td colSpan={7} className="no-data">
-                            {logLoading ? "Loading logs..." : "No activity logs found."}
+                            {logLoading
+                              ? "Loading logs..."
+                              : "No activity logs found."}
                           </td>
                         </tr>
                       )}
@@ -967,7 +1049,9 @@ export default function Dashboard({
                       </span>
                       <button
                         className="btn-page"
-                        disabled={logPagination.page >= totalLogPages || logLoading}
+                        disabled={
+                          logPagination.page >= totalLogPages || logLoading
+                        }
                         onClick={() => fetchLogs(logPagination.page + 1)}
                       >
                         Next →
@@ -1006,14 +1090,23 @@ export default function Dashboard({
                           <tr key={article.id}>
                             <td>#{article.id}</td>
                             <td>
-                              <div style={{ maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <div
+                                style={{
+                                  maxWidth: "300px",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
                                 {article.title}
                               </div>
                             </td>
                             <td>{article.author || "-"}</td>
                             <td>
                               {article.updated_at
-                                ? new Date(article.updated_at).toLocaleDateString()
+                                ? new Date(
+                                    article.updated_at
+                                  ).toLocaleDateString()
                                 : "-"}
                             </td>
                             <td>
@@ -1026,7 +1119,12 @@ export default function Dashboard({
                               </button>
                               <button
                                 className="btn-restore"
-                                onClick={() => handleRestoreArticle(article.id, article.title)}
+                                onClick={() =>
+                                  handleRestoreArticle(
+                                    article.id,
+                                    article.title
+                                  )
+                                }
                                 title="Restore article"
                               >
                                 ♻️
@@ -1048,8 +1146,12 @@ export default function Dashboard({
                     <div className="pagination-container">
                       <button
                         className="btn-page"
-                        disabled={articlePagination.page === 1 || articleLoading}
-                        onClick={() => fetchDeletedArticles(articlePagination.page - 1)}
+                        disabled={
+                          articlePagination.page === 1 || articleLoading
+                        }
+                        onClick={() =>
+                          fetchDeletedArticles(articlePagination.page - 1)
+                        }
                       >
                         ← Prev
                       </button>
@@ -1058,8 +1160,13 @@ export default function Dashboard({
                       </span>
                       <button
                         className="btn-page"
-                        disabled={articlePagination.page >= totalArticlePages || articleLoading}
-                        onClick={() => fetchDeletedArticles(articlePagination.page + 1)}
+                        disabled={
+                          articlePagination.page >= totalArticlePages ||
+                          articleLoading
+                        }
+                        onClick={() =>
+                          fetchDeletedArticles(articlePagination.page + 1)
+                        }
                       >
                         Next →
                       </button>
@@ -1100,25 +1207,40 @@ export default function Dashboard({
                             <td>{cat.name}</td>
                             <td>
                               <span
-                                className={`status-badge ${cat.is_active ? "active" : "inactive"}`}
+                                className={`status-badge ${
+                                  cat.is_active ? "active" : "inactive"
+                                }`}
                               >
                                 {cat.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
-                            <td>{cat.created_by_name || cat.created_by || "-"}</td>
-                            <td>{cat.updated_by_name || cat.updated_by || "-"}</td>
+                            <td>
+                              {cat.created_by_name || cat.created_by || "-"}
+                            </td>
+                            <td>
+                              {cat.updated_by_name || cat.updated_by || "-"}
+                            </td>
                             <td>
                               {cat.is_active ? (
                                 <>
                                   <button
                                     className="btn-edit"
-                                    onClick={() => handleEditCategory(cat.id, cat.name, !!cat.is_active, cat.created_by || undefined)}
+                                    onClick={() =>
+                                      handleEditCategory(
+                                        cat.id,
+                                        cat.name,
+                                        !!cat.is_active,
+                                        cat.created_by || undefined
+                                      )
+                                    }
                                   >
                                     ✏️
                                   </button>
                                   <button
                                     className="btn-delete"
-                                    onClick={() => handleSoftDeleteCategory(cat.id, cat.name)}
+                                    onClick={() =>
+                                      handleSoftDeleteCategory(cat.id, cat.name)
+                                    }
                                   >
                                     🗑️
                                   </button>
@@ -1173,9 +1295,10 @@ export default function Dashboard({
                     <tbody>
                       {tags.length > 0 ? (
                         tags.map((tag) => {
-                          const isActive = typeof tag.is_active === 'boolean'
-                            ? tag.is_active
-                            : !!tag.is_active;
+                          const isActive =
+                            typeof tag.is_active === "boolean"
+                              ? tag.is_active
+                              : !!tag.is_active;
 
                           return (
                             <tr key={tag.id}>
@@ -1183,25 +1306,39 @@ export default function Dashboard({
                               <td>{tag.name}</td>
                               <td>
                                 <span
-                                  className={`status-badge ${isActive ? "active" : "inactive"}`}
+                                  className={`status-badge ${
+                                    isActive ? "active" : "inactive"
+                                  }`}
                                 >
                                   {isActive ? "Active" : "Inactive"}
                                 </span>
                               </td>
-                              <td>{tag.created_by_name || tag.created_by || "-"}</td>
-                              <td>{tag.updated_by_name || tag.updated_by || "-"}</td>
+                              <td>
+                                {tag.created_by_name || tag.created_by || "-"}
+                              </td>
+                              <td>
+                                {tag.updated_by_name || tag.updated_by || "-"}
+                              </td>
                               <td>
                                 {isActive ? (
                                   <>
                                     <button
                                       className="btn-edit"
-                                      onClick={() => handleEditTag(tag.id, tag.name, tag.created_by || undefined)}
+                                      onClick={() =>
+                                        handleEditTag(
+                                          tag.id,
+                                          tag.name,
+                                          tag.created_by || undefined
+                                        )
+                                      }
                                     >
                                       ✏️
                                     </button>
                                     <button
                                       className="btn-delete"
-                                      onClick={() => handleSoftDeleteTag(tag.id, tag.name)}
+                                      onClick={() =>
+                                        handleSoftDeleteTag(tag.id, tag.name)
+                                      }
                                     >
                                       🗑️
                                     </button>
@@ -1242,7 +1379,9 @@ export default function Dashboard({
                       </span>
                       <button
                         className="btn-page"
-                        disabled={tagPagination.page >= totalTagPages || tagLoading}
+                        disabled={
+                          tagPagination.page >= totalTagPages || tagLoading
+                        }
                         onClick={() => fetchTags(tagPagination.page + 1)}
                       >
                         Next →
@@ -1258,12 +1397,14 @@ export default function Dashboard({
                 description: `${log.changed_by_name} performed ${log.action} on ${log.type} #${log.target_id}`,
                 timestamp: log.changed_at,
               }))} /> */}
-              <RecentActivity activities={logs.slice(0, 3).map((log, index) => ({
-                id: index, // Use index as fallback
-                type: log.type,
-                description: `${log.changed_by_name} performed ${log.action} on ${log.type} #${log.target_id}`,
-                timestamp: log.changed_at,
-              }))} />
+              <RecentActivity
+                activities={logs.slice(0, 3).map((log, index) => ({
+                  id: index, // Use index as fallback
+                  type: log.type,
+                  description: `${log.changed_by_name} performed ${log.action} on ${log.type} #${log.target_id}`,
+                  timestamp: log.changed_at,
+                }))}
+              />
             </div>
           )}
         </div>
@@ -1278,9 +1419,13 @@ export default function Dashboard({
         confirmText={modalState.confirmText}
       >
         <div className="modal-content-wrapper">
-          {typeof modalState.content === 'string' ? <p>{modalState.content}</p> : modalState.content}
+          {typeof modalState.content === "string" ? (
+            <p>{modalState.content}</p>
+          ) : (
+            modalState.content
+          )}
 
-          {modalState.inputType === 'text' && (
+          {modalState.inputType === "text" && (
             <input
               type="text"
               className="modal-input"

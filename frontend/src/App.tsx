@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useState, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -8,11 +13,11 @@ import Login from "./components/Login";
 import Docs from "./components/Docs";
 import DocDetail from "./components/DocDetail";
 import EditorPage from "./components/EditorPage";
-import Dashboard from "./components/dashboard/Dashboard";
+import Dashboard from "./components/Dashboard";
 import EnrollPage from "./components/EnrollPage";
 import ProfilePage from "./components/ProfilePage";
 import TagsManagement from "./components/TagsManagement";
-import LogDetailPage from './components/LogDetailPage';
+import LogDetailPage from "./components/LogDetailPage";
 import { apiFetch } from "./utils/api";
 
 const LoadingScreen = () => (
@@ -37,11 +42,16 @@ const ProtectedRoute = ({
 }) => {
   if (isLoadingUser) return <LoadingScreen />;
   if (!currentUser) return <Navigate to="/login" replace />;
-  if (requiredRole && currentUser.role !== requiredRole && currentUser.role !== "admin") {
+  if (
+    requiredRole &&
+    currentUser.role !== requiredRole &&
+    currentUser.role !== "admin"
+  ) {
     return (
       <div className="restricted-access">
         <p>
-          Access is restricted. You need "{requiredRole}" permissions to access this page.
+          Access is restricted. You need "{requiredRole}" permissions to access
+          this page.
         </p>
       </div>
     );
@@ -51,11 +61,10 @@ const ProtectedRoute = ({
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-  const storedUser = localStorage.getItem("user");
-  return storedUser ? JSON.parse(storedUser) : null;
-});
-const [isLoadingUser, setIsLoadingUser] = useState(true);
-
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -98,12 +107,18 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
     <Router>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login setCurrentUser={setCurrentUser} />} />
+        <Route
+          path="/login"
+          element={<Login setCurrentUser={setCurrentUser} />}
+        />
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute {...routeProps}>
-              <Dashboard currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <Dashboard
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -119,7 +134,10 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/docs/:id"
           element={
             <ProtectedRoute {...routeProps}>
-              <DocDetail currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <DocDetail
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -127,7 +145,10 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/editor"
           element={
             <ProtectedRoute {...routeProps} requiredRole="editor">
-              <EditorPage currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <EditorPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -135,7 +156,10 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/editor/:id"
           element={
             <ProtectedRoute {...routeProps} requiredRole="editor">
-              <EditorPage currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <EditorPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -143,7 +167,10 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/enroll"
           element={
             <ProtectedRoute {...routeProps} requiredRole="admin">
-              <EnrollPage currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <EnrollPage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -151,7 +178,10 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/profile"
           element={
             <ProtectedRoute {...routeProps}>
-              <ProfilePage currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <ProfilePage
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
@@ -159,13 +189,21 @@ const [isLoadingUser, setIsLoadingUser] = useState(true);
           path="/tags"
           element={
             <ProtectedRoute {...routeProps} requiredRole="admin">
-              <TagsManagement currentUser={currentUser} setCurrentUser={setCurrentUser} />
+              <TagsManagement
+                currentUser={currentUser}
+                setCurrentUser={setCurrentUser}
+              />
             </ProtectedRoute>
           }
         />
         <Route
           path="/logs/:types/:id"
-          element={<LogDetailPage currentUser={currentUser} setCurrentUser={setCurrentUser} />}
+          element={
+            <LogDetailPage
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+            />
+          }
         />
       </Routes>
 
