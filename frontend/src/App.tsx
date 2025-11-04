@@ -7,7 +7,7 @@ import {
 import { useState, useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import "./styles/App.css"; // <-- 引入全局 CSS
+import "./styles/App.css";
 import type { User } from "./components/CommonTypes";
 import Login from "./components/Login";
 import Docs from "./components/Docs";
@@ -66,6 +66,7 @@ export default function App() {
   });
   const [isLoadingUser, setIsLoadingUser] = useState(true);
 
+  // 初始化时验证用户登录状态
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -76,20 +77,24 @@ export default function App() {
           return;
         }
 
+        console.log("🔍 Checking user authentication...");
         const res = await apiFetch("/me");
         const data = await res.json();
         const user = data.data?.user || data.user;
 
         if (res.ok && data.success && user) {
+          console.log("✅ User authenticated:", user);
           setCurrentUser(user);
           localStorage.setItem("user", JSON.stringify(user));
         } else {
+          console.log("❌ User authentication failed");
           setCurrentUser(null);
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
           localStorage.removeItem("user");
         }
       } catch (err) {
+        console.error("❌ Error checking user:", err);
         setCurrentUser(null);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
@@ -99,6 +104,37 @@ export default function App() {
       }
     };
     checkUser();
+  }, []);
+
+  // 可选：主动检查token过期时间并提前刷新
+  useEffect(() => {
+    const checkTokenExpiry = () => {
+      const token = localStorage.getItem("accessToken");
+      if (!token) return;
+
+      try {
+        // 解析JWT payload
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const expiryTime = payload.exp * 1000; // 转换为毫秒
+        const currentTime = Date.now();
+        const timeUntilExpiry = expiryTime - currentTime;
+
+        // 如果token在5分钟内过期，主动刷新
+        if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+          console.log("⏰ Token expiring soon, triggering proactive refresh");
+          // 调用一个轻量级API来触发token刷新
+          apiFetch("/me").catch(() => {
+            // 静默失败，让用户下次操作时自动刷新
+          });
+        }
+      } catch (err) {
+        // 解析失败，忽略
+      }
+    };
+
+    // 每分钟检查一次
+    const interval = setInterval(checkTokenExpiry, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const routeProps = { currentUser, setCurrentUser, isLoadingUser };

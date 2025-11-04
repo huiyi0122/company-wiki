@@ -31,15 +31,22 @@ export default function Login({ setCurrentUser }: LoginProps) {
       });
 
       const data = await res.json();
-      console.log("Response:", data);
+      console.log("📥 Login response:", data);
 
       if (!res.ok || !data.success) {
         toast.warn(data.message || "Invalid username or password!");
         return;
       }
 
+      // 根据后端返回格式提取数据
       const { accessToken, refreshToken, user } = data;
 
+      if (!accessToken || !refreshToken || !user) {
+        toast.error("Invalid login response format");
+        return;
+      }
+
+      // 保存token和用户信息
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
       localStorage.setItem("user", JSON.stringify(user));
@@ -47,12 +54,15 @@ export default function Login({ setCurrentUser }: LoginProps) {
       console.log("✅ Login successful, user:", user);
       toast.success("Login successfully!");
 
+      // 更新用户状态
       setCurrentUser(user);
+
+      // 短暂延迟后跳转，确保状态已更新
       setTimeout(() => {
         navigate("/docs", { replace: true });
       }, 100);
     } catch (err) {
-      console.error("Login failed:", err);
+      console.error("❌ Login failed:", err);
       toast.error(
         "Login request failed. Please check your connection or server."
       );
@@ -99,6 +109,7 @@ export default function Login({ setCurrentUser }: LoginProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyPress={handleKeyPress}
                   disabled={loading}
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -114,6 +125,7 @@ export default function Login({ setCurrentUser }: LoginProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyPress={handleKeyPress}
                   disabled={loading}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
