@@ -685,21 +685,7 @@
   }
 }
 
-@media (max-width: 1024px) {
-  .toc-floating-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
 
-  .toc-overlay {
-    display: block;
-  }
-
-  .toc-sidebar.toc-open ~ .toc-floating-btn {
-    display: none;
-  }
-}
 
 /* 响应式设计 */
 @media (max-width: 1024px) {
@@ -711,49 +697,11 @@
     grid-template-columns: 1fr;
   }
 
-  /* 小屏幕目录样式 */
-  .toc-sidebar {
-    position: fixed;
-    top: 0;
-    right: -320px;
-    width: 300px;
-    max-height: 100vh;
-    height: 100vh;
-    z-index: 1000;
-    background: white;
-    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
-    transition: right 0.3s ease;
-    overflow-y: auto;
-  }
-
-  .toc-sidebar.toc-open {
-    right: 0;
-  }
-
-  .toc-container {
-    background: white;
-    border: none;
-    border-radius: 0;
-    height: 100%;
-    padding: 20px;
-  }
-
-  .toc-toggle-btn {
-    display: flex;
-  }
-
-  .toc-header {
-    position: sticky;
-    top: 0;
-    background: white;
-    z-index: 10;
-    padding-bottom: 12px;
-    margin-bottom: 16px;
-  }
+  
 }
 
 /* 🌙 Dark Mode 小屏幕目录 */
-@media (max-width: 1024px) and (prefers-color-scheme: dark) {
+@media (max-width: 1374px) and (prefers-color-scheme: dark) {
   .toc-sidebar {
     background: #1e293b;
     box-shadow: -4px 0 12px rgba(0, 0, 0, 0.4);
@@ -766,6 +714,51 @@
   .toc-header {
     background: #1e293b;
   }
+  .toc-floating-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toc-overlay {
+    display: block;
+  }
+
+  .toc-sidebar.toc-open ~ .toc-floating-btn {
+    display: none;
+  }/* 小屏幕目录样式 */
+  .toc-sidebar {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 300px;
+    max-height: 100vh;
+    height: 100vh;
+    z-index: 1000;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+    transition: right 0.3s ease;
+    overflow-y: auto;
+  }
+.toc-sidebar {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+  .toc-sidebar.toc-open {
+    right: 0;
+  }
+
+  .toc-toggle-btn {
+    display: flex;
+  }
+
+  .toc-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  
 }
 
 @media (max-width: 768px) {
