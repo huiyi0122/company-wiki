@@ -215,11 +215,7 @@ export default function Dashboard({
     }
   }, [canManage]);
 
-  const parseListData = (result: any) => {
-    if (Array.isArray(result.data)) return result.data;
-    if (Array.isArray(result.data?.data)) return result.data.data;
-    return [];
-  };
+
 
   // ===== 获取分类 =====
   const fetchCategories = async () => {
@@ -263,11 +259,10 @@ export default function Dashboard({
       list = list.sort((a: Tag, b: Tag) => {
 
         const getTime = (tag: Tag) => {
-          // 优先使用 updated_at
+
           if (tag.updated_at && tag.updated_at !== "-" && tag.updated_at !== null) {
             return new Date(tag.updated_at).getTime();
           }
-          // 如果没有 updated_at，使用 created_at
           if (tag.created_at && tag.created_at !== "-" && tag.created_at !== null) {
             return new Date(tag.created_at).getTime();
           }
@@ -310,7 +305,7 @@ export default function Dashboard({
         return;
       }
 
-      const list = parseListData(result);
+      const list = result.data;
       const inactiveArticles = list.filter((article: Article) => !article.is_active);
       const total = inactiveArticles.length;
 
@@ -329,65 +324,106 @@ export default function Dashboard({
   };
 
   // ===== 获取历史日志（带时间过滤） =====
+
   const fetchLogs = async (
-    page = 1,
-    type = logTypeFilter,
-    dateFilter = logDateFilter,
-    startDate = logStartDate,
-    endDate = logEndDate
-  ) => {
-    try {
-      setLogLoading(true);
-      let url = `/logs?page=${page}&limit=${logPagination.limit}`;
+  page = 1,
+  type = logTypeFilter,
+  dateFilter = logDateFilter,
+  startDate = logStartDate,
+  endDate = logEndDate
+) => {
+  try {
+    setLogs([]); // 清空旧日志，防止显示上次数据
+    setLogLoading(true);
 
-      if (type !== "all") url += `&type=${type}`;
+    let url = `/logs?page=${page}&limit=${logPagination.limit}`;
 
-      if (dateFilter === "custom" && startDate && endDate) {
-        url += `&startDate=${startDate}&endDate=${endDate}`;
-      } else if (dateFilter === "today") {
-        const today = new Date().toISOString().split("T")[0];
-        url += `&date=${today}`;
-      } else if (dateFilter === "week") {
-        const today = new Date();
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        url += `&startDate=${weekAgo.toISOString().split("T")[0]}&endDate=${today.toISOString().split("T")[0]}`;
-      } else if (dateFilter === "month") {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = today.getMonth() + 1;
-        url += `&year=${year}&month=${month}`;
-      } else if (dateFilter === "year") {
-        const year = new Date().getFullYear();
-        url += `&year=${year}`;
-      }
-
-      const res = await apiFetch(url);
-      const result = await res.json();
-
-      if (!result.success) {
-        setMessage(`❌ ${result.message || "Failed to fetch logs"}`);
-        return;
-      }
-
-      setLogs(result.data || []);
-      setLogPagination({
-        page: result.page || page,
-        limit: result.limit || logPagination.limit,
-        total: result.total || 0,
-      });
-    } catch (err) {
-      console.error("Log fetch error:", err);
-      toast.error("Failed to load logs.");
-    } finally {
-      setLogLoading(false);
+    // Type filter
+    if (type !== "all") {
+      url += `&type=${type}`;
     }
-  };
+
+    // Date filter - 🔧 完整修复版本
+    if (dateFilter === "custom" && startDate && endDate) {
+      url += `&startDate=${startDate}&endDate=${endDate}`;
+    } else if (dateFilter === "today") {
+      const today = new Date();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      url += `&startDate=${dateStr}&endDate=${dateStr}`;
+    } else if (dateFilter === "week") {
+      const today = new Date();
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const endDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const startDate = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+      
+      url += `&startDate=${startDate}&endDate=${endDate}`;
+    } else if (dateFilter === "month") {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth(); // 0-11
+      
+      // 🔧 修复：手动格式化日期，避免时区问题
+      const firstDay = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDayDate = new Date(year, month + 1, 0);
+      const lastDay = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+      
+      url += `&startDate=${firstDay}&endDate=${lastDay}`;
+    } else if (dateFilter === "year") {
+      const year = new Date().getFullYear();
+      url += `&startDate=${year}-01-01&endDate=${year}-12-31`;
+    }
+
+    console.log('=== DEBUG LOG FETCH ===');
+    console.log('📡 Request URL:', url);
+    console.log('🎯 Selected filter - type:', type, 'date:', dateFilter);
+
+    const res = await apiFetch(url);
+    const result = await res.json();
+
+    console.log('📥 Backend response:', result);
+    console.log('📊 Total items returned:', result.data?.length || 0);
+
+    if (result.data && result.data.length > 0) {
+      const typeCounts = result.data.reduce((acc: any, log: LogRecord) => {
+        acc[log.type] = (acc[log.type] || 0) + 1;
+        return acc;
+      }, {});
+
+      console.log('🔢 Data type distribution:', typeCounts);
+      console.log('📝 First 3 items details:');
+      result.data.slice(0, 3).forEach((log: LogRecord, index: number) => {
+        console.log(`  ${index + 1}. ID: ${log.id}, Type: ${log.type}, Action: ${log.action}, Date: ${log.changed_at}`);
+      });
+    }
+
+    console.log('=== END DEBUG ===');
+
+    if (!result.success) {
+      setMessage(`❌ ${result.message || "Failed to fetch logs"}`);
+      return;
+    }
+
+    let logs = result.data || [];
+    setLogs(logs);
+    setLogPagination({
+      page: result.page || page,
+      limit: result.limit || logPagination.limit,
+      total: result.total || logs.length,
+    });
+  } catch (err) {
+    console.error("❌ Log fetch error:", err);
+    toast.error("Failed to load logs.");
+  } finally {
+    setLogLoading(false);
+  }
+};
 
   // ===== 恢复文章 =====
   const handleRestoreArticle = async (id: number, title: string) => {
     try {
       const res = await apiFetch(`/articles/restore/${id}`, {
-        method: "POST",
+        method: "PATCH",
       });
       const result = await res.json();
 
@@ -874,24 +910,32 @@ export default function Dashboard({
                                   ? JSON.parse(log.new_data)
                                   : log.new_data;
 
+                                // 根据 type 提取对应字段
                                 if (log.type === 'article' && newData.title) {
                                   return newData.title;
                                 }
-                                if ((log.type === 'tag' || log.type === 'category') && newData.name) {
+                                if (log.type === 'tag' && newData.name) {
+                                  return newData.name;
+                                }
+                                if (log.type === 'category' && newData.name) {
                                   return newData.name;
                                 }
                               }
 
-                              // 如果 new_data 没有，从 old_data 获取（DELETE/SOFT_DELETE 操作）
+                              // 如果 new_data 没有，从 old_data 获取（DELETE/SOFT_DELETE/RESTORE 操作）
                               if (log.old_data) {
                                 const oldData = typeof log.old_data === 'string'
                                   ? JSON.parse(log.old_data)
                                   : log.old_data;
 
+                                // 根据 type 提取对应字段
                                 if (log.type === 'article' && oldData.title) {
                                   return oldData.title;
                                 }
-                                if ((log.type === 'tag' || log.type === 'category') && oldData.name) {
+                                if (log.type === 'tag' && oldData.name) {
+                                  return oldData.name;
+                                }
+                                if (log.type === 'category' && oldData.name) {
                                   return oldData.name;
                                 }
                               }
