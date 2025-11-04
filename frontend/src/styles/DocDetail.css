@@ -16,7 +16,7 @@
 .doc-detail-wrapper {
   display: flex;
   justify-content: space-between;
-  padding: 24px;
+  padding: 70px;
 }
 
 .doc-detail-container {
@@ -194,7 +194,7 @@
 .doc-content code {
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   font-size: 0.9em;
 }
 
@@ -251,7 +251,6 @@
   align-items: center;
   min-height: 400px;
   font-size: 1.1em;
-
 }
 
 /* Not Found State */
@@ -504,7 +503,7 @@
   }
 
   .doc-detail-wrapper {
-    padding: 16px;
+    padding: 40px;
   }
 
   .doc-detail-container {
@@ -515,11 +514,13 @@
     font-size: 2em;
   }
 
-  
-
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }
 
@@ -529,7 +530,7 @@
     width: 280px;
     right: -280px;
   }
-  
+
   .toc-floating-btn.mobile-only {
     bottom: 20px;
     right: 20px;

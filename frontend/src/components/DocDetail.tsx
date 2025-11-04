@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkGemoji from "remark-gemoji";
 import { toast } from "react-toastify";
 import Sidebar from "./Sidebar";
-import Modal from "./Modal";
+import Modal from "./Modal"; // ✅ 新增导入
 import type { User, DocItem } from "./CommonTypes";
 import { apiFetch } from "../utils/api";
 import "../styles/DocDetail.css";
@@ -32,10 +32,11 @@ export default function DocDetail({
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
   const [allTags, setAllTags] = useState<Tag[]>([]);
 
+  // ✅ 新增：Modal state（跟 TagsManagement 一样）
   interface ModalState {
     isOpen: boolean;
     title: string;
-    content: React.ReactNode;
+    content: React.ReactNode; // ✅ 改这里
     confirmText: string;
     targetId: number;
     targetName: string;
@@ -45,19 +46,18 @@ export default function DocDetail({
   const [modalState, setModalState] = useState<ModalState>({
     isOpen: false,
     title: "",
-    content: "",
+    content: "", // 可以是 string 或 JSX
     confirmText: "",
     targetId: 0,
     targetName: "",
     onConfirm: async () => {},
   });
-
+  const closeModal = () =>
+    setModalState((prev) => ({ ...prev, isOpen: false }));
   const [headings, setHeadings] = useState<
     Array<{ id: string; text: string; level: number }>
   >([]);
   const [activeHeading, setActiveHeading] = useState<string>("");
-  const closeModal = () =>
-    setModalState((prev) => ({ ...prev, isOpen: false }));
   const [tocOpen, setTocOpen] = useState(false);
 
   // ------------------- 1️⃣ 初始化加载：分类 + 标签 -------------------
@@ -195,7 +195,7 @@ export default function DocDetail({
     }
   };
 
-  // ------------------- 删除文章 -------------------
+  // ------------------- 删除文章（改用 Modal） -------------------
   const handleDelete = () => {
     if (!doc) return;
 
@@ -359,6 +359,7 @@ export default function DocDetail({
             <div className="doc-content">
               <MDEditor.Markdown
                 source={doc.content}
+                style={{ background: "transparent" }}
                 remarkPlugins={[remarkGfm, remarkGemoji]}
               />
             </div>
@@ -368,18 +369,10 @@ export default function DocDetail({
                 ← Back to Articles
               </button>
             </div>
-          </div>{/* 目录侧边栏 */}
-        {headings.length > 0 && (
-          <>
-            {/* 遮罩层 - 只在移动端显示 */}
-            {tocOpen && (
-              <div 
-                className="toc-overlay" 
-                onClick={() => setTocOpen(false)}
-              />
-            )}
-            
-            {/* 目录侧边栏 */}
+          </div>
+
+          {/* 目录侧边栏 */}
+          {headings.length > 0 && (
             <aside className={`toc-sidebar ${tocOpen ? "toc-open" : ""}`}>
               <div className="toc-container">
                 <div className="toc-header">
@@ -387,8 +380,13 @@ export default function DocDetail({
                     <span className="toc-icon">📋</span>
                     <h3 className="toc-title">Table of Contents</h3>
                   </div>
-                  {/* 只在移动端显示关闭按钮 */}
-                  
+                  <button
+                    className="toc-toggle-btn"
+                    onClick={() => setTocOpen(!tocOpen)}
+                    aria-label="Toggle table of contents"
+                  >
+                    {tocOpen ? "✕" : "☰"}
+                  </button>
                 </div>
                 <nav className="toc-nav">
                   {headings.map((heading) => (
@@ -396,7 +394,7 @@ export default function DocDetail({
                       key={heading.id}
                       onClick={() => {
                         scrollToHeading(heading.id);
-                        // 只在移动端点击后自动关闭
+                        // 小屏幕点击后自动收起
                         if (window.innerWidth <= 1024) {
                           setTocOpen(false);
                         }
@@ -412,20 +410,24 @@ export default function DocDetail({
                 </nav>
               </div>
             </aside>
+          )}
 
-            {/* 浮动按钮 - 只在移动端显示 */}
+          {/* 小屏幕浮动按钮 - 在 aside 外面 */}
+          {headings.length > 0 && (
             <button
-              className="toc-floating-btn mobile-only"
-              onClick={() => setTocOpen(!tocOpen)}
-              aria-label="Toggle table of contents"
+              className="toc-floating-btn"
+              onClick={() => setTocOpen(true)}
+              aria-label="Open table of contents"
             >
               📋
             </button>
-          </>
-        )}
-        </div>
+          )}
 
-        
+          {/* 遮罩层 - 在 aside 外面 */}
+          {tocOpen && (
+            <div className="toc-overlay" onClick={() => setTocOpen(false)} />
+          )}
+        </div>
       </div>
 
       {/* Modal */}
