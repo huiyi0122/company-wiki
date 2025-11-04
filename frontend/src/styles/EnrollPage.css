@@ -308,6 +308,16 @@
   border-radius: 4px;
 }
 
+@media (prefers-color-scheme: dark) {
+  .enroll-card, .users-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+  }
+  .enroll-form input, .enroll-form select {
+    background: #0f172a;
+    border: 1px solid #334155;
+}
+}
 /* Responsive Design */
 @media (max-width: 768px) {
   .enroll-page {

@@ -98,6 +98,7 @@
   margin-bottom: 30px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
+  
 }
 
 .management-card .card-header {
@@ -382,6 +383,17 @@
   transition: border-color 0.25s;
   border-color: #1a1a1a;
 }
+
+.header-actions{
+  display: flex;
+}
+@media (prefers-color-scheme: dark) {
+  .management-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .dashboard-page {
