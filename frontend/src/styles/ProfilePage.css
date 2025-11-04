@@ -1,5 +1,5 @@
 .profile-page {
-  padding: 30px;
+  padding: 112px 30px 0px 72px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -151,6 +151,26 @@
   border-top: 2px solid white;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .profile-form {
+    background: #1e293b;
+  }
+
+  .profile-form input {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+  }
+
+  .profile-card {
+    border: 1px solid #64748b;
+  }
+
+  .current-info {
+    border: 1px solid #64748b;
+  }
 }
 
 @keyframes spin {
