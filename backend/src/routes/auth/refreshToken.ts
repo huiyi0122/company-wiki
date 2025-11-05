@@ -47,7 +47,7 @@ router.post(
       );
     } catch (err) {
       console.error("Refresh token error:", err);
-      res.status(403).json(errorResponse("Refresh token invalid or expired"));
+      res.status(401).json(errorResponse("Refresh token invalid or expired"));
     }
   }
 );

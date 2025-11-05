@@ -36,8 +36,6 @@ router.get(
     const offset = (page - 1) * limit;
 
     try {
-      // 🔧 修复：处理不同的日期过滤场景
-
       if (date) {
         startDate = `${date}T00:00:00`;
 
@@ -61,10 +59,6 @@ router.get(
 
         endDate = `${y}-12-31T23:59:59`;
       } else if (startDate && endDate) {
-        // 🆕 关键修复：处理从前端传来的纯日期格式
-
-        // 前端传来的是 YYYY-MM-DD 格式，需要添加时间部分
-
         startDate = `${startDate}T00:00:00`;
 
         endDate = `${endDate}T23:59:59`;
@@ -230,8 +224,6 @@ router.get(
 
           break;
       }
-
-      // 🆕 添加调试日志（可选，用于排查问题）
 
       console.log("📅 Date Filter Applied:", {
         originalStart: req.query.startDate,
