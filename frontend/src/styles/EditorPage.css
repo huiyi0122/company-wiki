@@ -140,6 +140,7 @@
 
 /* 🌙 Dark Mode Form Inputs */
 @media (prefers-color-scheme: dark) {
+
   .form-input,
   .form-select {
     background: #0f172a;
@@ -307,6 +308,7 @@
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -451,7 +453,7 @@
   font-weight: 500;
 }
 
-.tag-item input[type="checkbox"]:checked + .tag-name {
+.tag-item input[type="checkbox"]:checked+.tag-name {
   color: #4299e1;
   font-weight: 600;
 }
@@ -469,7 +471,7 @@
     background: #1e3a5f;
   }
 
-  .tag-item input[type="checkbox"]:checked + .tag-name {
+  .tag-item input[type="checkbox"]:checked+.tag-name {
     color: #60a5fa;
   }
 }
@@ -638,7 +640,7 @@ li {
   flex-wrap: wrap;
 }
 
-.w-md-editor-toolbar li > button {
+.w-md-editor-toolbar li>button {
   background: transparent !important;
   border: none !important;
   padding: 6px 8px !important;
@@ -647,7 +649,7 @@ li {
   color: #4a5568 !important;
 }
 
-.w-md-editor-toolbar li > button:hover {
+.w-md-editor-toolbar li>button:hover {
   background: #e2e8f0 !important;
   color: #4299e1 !important;
 }
@@ -676,11 +678,11 @@ li {
     border-bottom-color: #334155 !important;
   }
 
-  .w-md-editor-toolbar li > button {
+  .w-md-editor-toolbar li>button {
     color: #94a3b8 !important;
   }
 
-  .w-md-editor-toolbar li > button:hover {
+  .w-md-editor-toolbar li>button:hover {
     background: #334155 !important;
     color: #60a5fa !important;
   }
@@ -691,7 +693,7 @@ li {
     color: #e2e8f0 !important;
   }
 
-  .w-md-editor-text-pre > code,
+  .w-md-editor-text-pre>code,
   .w-md-editor-text-input {
     color: #e2e8f0 !important;
   }
@@ -754,6 +756,7 @@ li {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -814,6 +817,11 @@ li {
     background: #0f172a;
     border-color: #334155;
     color: #e2e8f0;
+  }
+
+  .modal-content {
+    background: #1e293b;
+    color: #ffffff;
   }
 
   .modal-input:focus {
@@ -898,6 +906,6 @@ li {
   height: calc(100vh - 50px) !important;
 }
 
-.w-md-editor-fullscreen ~ * {
+.w-md-editor-fullscreen~* {
   display: none !important;
 }
