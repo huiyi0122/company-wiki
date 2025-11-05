@@ -1,6 +1,6 @@
 /* src/styles/EditorPage.css - 统一配色方案 */
 .editor-page {
-  padding: 80px 30px 0px 72px;
+  padding: 30px 30px 0px 72px;
   max-width: 1200px;
   margin: 0 auto;
   min-height: 100vh;
@@ -113,7 +113,7 @@
 /* 🌙 Dark Mode Label */
 @media (prefers-color-scheme: dark) {
   .form-group label {
-    color: #94a3b8;
+    color: #ffffff;
   }
 }
 
@@ -677,7 +677,7 @@ li {
   }
 
   .w-md-editor-toolbar li > button {
-    color: #94a3b8 !important;
+    color: #ffffff !important;
   }
 
   .w-md-editor-toolbar li > button:hover {

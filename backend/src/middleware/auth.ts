@@ -27,6 +27,6 @@ export const authenticate = (
     next();
   } catch (err) {
     console.error("Token verification failed:", (err as Error).message);
-    res.status(403).json(errorResponse("Token invalid or expired"));
+    res.status(401).json(errorResponse("Token invalid or expired"));
   }
 };

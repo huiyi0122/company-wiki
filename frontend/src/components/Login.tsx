@@ -171,7 +171,6 @@ export default function Login({ setCurrentUser }: LoginProps) {
               {loading ? (
                 <>
                   <span className="spinner"></span>
-                  Signing in...
                 </>
               ) : (
                 "Sign In"

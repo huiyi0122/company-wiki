@@ -110,7 +110,7 @@
 /* 🌙 Dark Mode 菜单项 */
 @media (prefers-color-scheme: dark) {
   .main-menu li {
-    color: #94a3b8;
+    color: #ffffff;
   }
 
   .main-menu li:hover {
@@ -224,7 +224,7 @@
 /* 🌙 Dark Mode 分类头部 */
 @media (prefers-color-scheme: dark) {
   .categories-header {
-    color: #64748b;
+    color: #ffffff;
   }
 }
 
@@ -266,7 +266,7 @@
 /* 🌙 Dark Mode 分类项 */
 @media (prefers-color-scheme: dark) {
   .category-header {
-    color: #94a3b8;
+    color: #ffffff;
   }
 
   .category-header:hover {
@@ -408,7 +408,7 @@
 /* 🌙 Dark Mode 文章项 */
 @media (prefers-color-scheme: dark) {
   .article-item {
-    color: #94a3b8;
+    color: #ffffff;
   }
 
   .article-item::before {

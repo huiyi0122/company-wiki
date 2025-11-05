@@ -392,10 +392,6 @@ export default function EditorPage({
           </div>
 
           <div className="editor-card">
-            <div className="card-header">
-              <h2>Article Details</h2>
-            </div>
-
             <div className="editor-form">
               {/* Title */}
               <div className="form-group">

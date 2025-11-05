@@ -98,7 +98,6 @@
   margin-bottom: 30px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  
 }
 
 .management-card .card-header {
@@ -261,6 +260,7 @@
 }
 
 .activity-item {
+  background: #334155;
   display: flex;
   align-items: flex-start;
   gap: 16px;
@@ -384,7 +384,7 @@
   border-color: #1a1a1a;
 }
 
-.header-actions{
+.header-actions {
   display: flex;
 }
 @media (prefers-color-scheme: dark) {
