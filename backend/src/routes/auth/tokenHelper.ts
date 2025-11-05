@@ -13,7 +13,7 @@ export function generateAccessToken(user: User): string {
       role: user.role,
     },
     ACCESS_SECRET,
-    { expiresIn: "10s" }
+    { expiresIn: "1d" }
   );
 }
 
