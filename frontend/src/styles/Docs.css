@@ -203,7 +203,6 @@
   0% {
     transform: rotate(0deg);
   }
-
   100% {
     transform: rotate(360deg);
   }
@@ -495,6 +494,7 @@
   gap: 16px;
   margin-top: 40px;
   padding: 20px;
+  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   flex-wrap: wrap;
@@ -507,49 +507,15 @@
     background: none;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
-
-  .pagination-btn {
-    background: linear-gradient(135deg, #000000 0%, #2563eb 100%);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.4);
-  }
-
-  .pagination-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(66, 153, 225, 0.4);
-  }
-
-  .pagination-btn:disabled {
-    background: #cbd5e0;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .pagination-btn:disabled {
-    background: #475569;
-  }
-}
-
-@media (prefers-color-scheme: light) {
-  .pagination-btn {
-    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-  }
 }
 
 .pagination-btn {
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+  color: #ffffff;
   border: none;
   padding: 10px 20px;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -557,15 +523,33 @@
 }
 
 .pagination-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #000000 100%);
+  background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(66, 153, 225, 0.4);
 }
 
 .pagination-btn:disabled {
+  background: #cbd5e0;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* 🌙 Dark Mode Pagination Button */
+@media (prefers-color-scheme: dark) {
+  .pagination-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.4);
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.5);
+  }
+
+  .pagination-btn:disabled {
+    background: #475569;
+  }
 }
 
 .page-info {
@@ -589,6 +573,7 @@
 
 .page-number {
   padding: 8px 14px;
+  font-size: 10px;
   border: 2px solid #e2e8f0;
   background: #ffffff;
   color: #4a5568;
@@ -692,7 +677,6 @@
   }
 
   .pagination {
-    flex-direction: column;
     gap: 12px;
   }
 

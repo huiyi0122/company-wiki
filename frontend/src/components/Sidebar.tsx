@@ -26,7 +26,15 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+  // 从 localStorage 读取展开状态
+  const [expandedCategories, setExpandedCategories] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem("expandedCategories");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [categoryArticles, setCategoryArticles] = useState<
     Record<number, Article[]>
   >({});
@@ -47,20 +55,28 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
 
   const PAGE_SIZE = 8;
 
+  // 保存展开状态到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "expandedCategories",
+        JSON.stringify(expandedCategories)
+      );
+    } catch (error) {
+      console.error("Failed to save expanded categories:", error);
+    }
+  }, [expandedCategories]);
+
   // 🔍 防抖搜索
   useEffect(() => {
     const timer = setTimeout(() => {
-      // const isDocsPage =
-      //   location.pathname === "/docs" || location.pathname === "/";
       if (searchTerm.trim()) {
         navigate(`/docs?q=${encodeURIComponent(searchTerm.trim())}`);
-      }// else if (isDocsPage) {
-      //   navigate("/docs");
-      // }
+      }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, navigate, location.pathname]);
+  }, [searchTerm, navigate]);
 
   // 从URL同步搜索词
   useEffect(() => {
@@ -78,14 +94,29 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
     }
   }, [location.search, location.pathname]);
 
-  // 🔥 获取分类列表（带 refresh-token 自动续签）
+  // 当组件挂载时，加载已展开分类的文章
+  useEffect(() => {
+    if (expandedCategories.length > 0 && categories.length > 0) {
+      expandedCategories.forEach((categoryId) => {
+        // 检查分类是否存在且没有文章数据
+        const categoryExists = categories.some((cat) => cat.id === categoryId);
+        if (categoryExists && !categoryArticles[categoryId]) {
+          fetchCategoryArticles(categoryId, false);
+        }
+      });
+    }
+  }, [categories]); // 当分类列表加载完成后触发
+
+  // 🔥 获取分类列表
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const response = await apiFetch("/categories");
 
         if (!response.ok) {
-          console.warn(`Categories fetch failed with status: ${response.status}`);
+          console.warn(
+            `Categories fetch failed with status: ${response.status}`
+          );
           return;
         }
 
@@ -102,8 +133,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
       }
     };
 
-    fetchCategories(); // ✅ 调用函数
-
+    fetchCategories();
   }, []);
 
   const handleLogout = () => {
@@ -149,7 +179,6 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
           return { ...prev, [categoryId]: updated };
         });
 
-        // 🔥 根据 page 和 totalPages 判断是否有更多
         const total = result.meta?.total || 0;
         const currentPageNum = result.meta?.page || 1;
         const totalPages = result.meta?.totalPages || 1;
@@ -158,7 +187,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
         setCategoryPages((prev) => ({ ...prev, [categoryId]: currentPageNum }));
         setCategoryHasMore((prev) => ({
           ...prev,
-          [categoryId]: currentPageNum < totalPages
+          [categoryId]: currentPageNum < totalPages,
         }));
       }
     } catch (err) {
@@ -178,9 +207,8 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
       setExpandedCategories((prev) => prev.filter((id) => id !== categoryId));
     } else {
       setExpandedCategories((prev) => [...prev, categoryId]);
-      if (!categoryArticles[categoryId]) {
-        fetchCategoryArticles(categoryId, false);
-      }
+      // 总是重新加载文章，确保数据是最新的
+      fetchCategoryArticles(categoryId, false);
     }
   };
 
@@ -198,6 +226,7 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
     (location.pathname.startsWith("/editor/") && !isNewArticleActive);
   const isEnrollActive = location.pathname === "/enroll";
   const isTagsActive = location.pathname === "/tags";
+
   const renderMenuItems = () => (
     <>
       <div className="sidebar-search-form">
@@ -328,7 +357,6 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
                           ))}
                         </ul>
 
-                        {/* 🔥 Show More 按钮 */}
                         {hasMore && (
                           <div className="show-more-container">
                             <button
@@ -380,9 +408,14 @@ export default function Sidebar({ currentUser, setCurrentUser }: SidebarProps) {
       </div>
 
       <aside className="sidebar desktop-only">
-        <h2 onClick={() => navigate("/docs")}>Company Wiki</h2>
-        <ul className="main-menu">{renderMenuItems()}</ul>
-        {renderCategories()}
+        <div className="sidebar-header">
+          <h2 onClick={() => navigate("/docs")}>Company Wiki</h2>
+        </div>
+
+        <div className="sidebar-scrollable">
+          <ul className="main-menu">{renderMenuItems()}</ul>
+          {renderCategories()}
+        </div>
 
         <div className="sidebar-user">
           {currentUser ? (

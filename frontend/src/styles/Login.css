@@ -155,7 +155,7 @@
 
 .input-group label {
   display: block;
-  font-size: 0.9em;
+  font-size: 12px;
   font-weight: 600;
   color: #2d3748;
   margin-bottom: 8px;
@@ -184,10 +184,10 @@
 
 .input-wrapper input {
   width: 100%;
-  padding: 14px 16px; /* ← 改成对称的 padding */
+  padding: 14px 16px;
   border: 2px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 16px;
+  font-size: 12px;
   transition: all 0.3s ease;
   background: #f7fafc;
   color: #2d3748;
@@ -294,18 +294,17 @@
 .login-button {
   width: 100%;
   padding: 16px;
-  margin-top: 80px;
+  margin-top: 40px;
   margin-left: 0;
   margin-right: 0;
   background: #3b82f6;
   color: white;
   border: none;
   border-radius: 10px;
-  font-size: 1.1em;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,24 +313,18 @@
 
 .login-button:hover:not(:disabled) {
   background: #2563eb;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   .login-button {
-    background: linear-gradient(135deg, #b91c1c, #ef4444); /* 深红 → 亮红 */
+    background: #4945ff;
     color: #ffffff;
     border: none;
     border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); /* 红色柔光阴影 */
-    transition: all 0.3s ease;
   }
 
   .login-button:hover:not(:disabled) {
-    background: linear-gradient(135deg, #dc2626, #f87171); /* hover 更亮更鲜 */
-    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
-    transform: translateY(-1px);
+    background: #7b79ff;
   }
 
   .login-button:active {
@@ -411,9 +404,17 @@
   }
 }
 
+/* Hide image on tablet and mobile */
 @media (max-width: 768px) {
   .login-container {
     padding: 0;
+    background: white;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .login-container {
+      background: #1e293b;
+    }
   }
 
   .login-split {
@@ -422,27 +423,14 @@
     min-height: 100vh;
   }
 
+  /* Hide the image completely */
   .login-image {
-    min-height: 280px;
-    max-height: 280px;
-    min-width: 100%;
-    flex: none;
-  }
-
-  .login-image-overlay {
-    padding: 40px 30px;
-  }
-
-  .login-brand {
-    font-size: 2.2em;
-  }
-
-  .login-brand-subtitle {
-    font-size: 1em;
+    display: none;
   }
 
   .login-box {
     min-width: 100%;
+    width: 100%;
     padding: 40px 30px;
     flex: 1;
   }
@@ -456,7 +444,7 @@
   }
 
   .input-wrapper input {
-    padding: 12px 14px 12px 44px;
+    padding: 12px 14px;
     font-size: 15px;
   }
 
@@ -472,23 +460,6 @@
 }
 
 @media (max-width: 480px) {
-  .login-image {
-    min-height: 220px;
-    max-height: 220px;
-  }
-
-  .login-image-overlay {
-    padding: 30px 20px;
-  }
-
-  .login-brand {
-    font-size: 1.8em;
-  }
-
-  .login-brand-subtitle {
-    font-size: 0.9em;
-  }
-
   .login-box {
     padding: 30px 20px;
   }

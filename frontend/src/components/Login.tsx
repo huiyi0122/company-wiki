@@ -176,12 +176,6 @@ export default function Login({ setCurrentUser }: LoginProps) {
                 "Sign In"
               )}
             </button>
-
-            <div className="login-footer">
-              <p className="login-footer-text">
-                Protected by enterprise-grade security
-              </p>
-            </div>
           </div>
         </div>
       </div>

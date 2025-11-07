@@ -40,6 +40,7 @@ export default function LogDetailPage({
     old: boolean;
     new: boolean;
   }>({ old: false, new: false });
+  const [viewMode, setViewMode] = useState<"html" | "markdown">("html");
   const { type, id } = useParams<{ type: string; id: string }>();
 
   // 安全地解析 JSON 数据
@@ -238,6 +239,60 @@ export default function LogDetailPage({
     }
   };
 
+  // 渲染 HTML 格式的数据
+  const renderHTMLData = (data: any) => {
+    if (!data) return null;
+
+    return (
+      <div className="html-data-display">
+        {Object.entries(data).map(([key, value]) => {
+          const formattedKey = key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+
+          return (
+            <div key={key} className="data-field">
+              <div className="field-label">{formattedKey}</div>
+              <div className="field-value">
+                {key === "content" && typeof value === "string" ? (
+                  <div className="content-preview">{value}</div>
+                ) : Array.isArray(value) ? (
+                  <div className="array-value">
+                    {value.length === 0 ? (
+                      <span className="empty-value">No items</span>
+                    ) : (
+                      <ul>
+                        {value.map((item, index) => (
+                          <li key={index}>
+                            {typeof item === "object"
+                              ? JSON.stringify(item, null, 2)
+                              : String(item)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : typeof value === "object" && value !== null ? (
+                  <pre className="json-value">
+                    {JSON.stringify(value, null, 2)}
+                  </pre>
+                ) : typeof value === "boolean" ? (
+                  <span className="boolean-value">
+                    {value ? "✅ Yes" : "❌ No"}
+                  </span>
+                ) : value === null ? (
+                  <span className="null-value">null</span>
+                ) : (
+                  <span className="simple-value">{String(value)}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="layout">
@@ -291,6 +346,9 @@ export default function LogDetailPage({
     ? jsonToMarkdown(parsedData.newData, "")
     : "";
 
+  // 使用 getActionColor
+  const actionColor = getActionColor(log.action);
+
   return (
     <div className="layout">
       <Sidebar
@@ -320,24 +378,28 @@ export default function LogDetailPage({
             <span className="breadcrumb-current">Change Details</span>
           </nav>
 
-          {/* Header */}
-          <div className="log-header">
+          {/* Header with dynamic color */}
+          <div className="log-header" style={{ borderLeftColor: actionColor }}>
             <div className="log-header-content">
-              <span className="log-action-icon" style={{ fontSize: "2.5em" }}>
+              <span
+                className="log-action-icon"
+                style={{
+                  background: `${actionColor}15`,
+                  color: actionColor,
+                  border: `2px solid ${actionColor}40`,
+                }}
+              >
                 {getActionIcon(log.action)}
               </span>
-              <div>
-                <h1
-                  style={{
-                    color: getActionColor(log.action),
-                    marginBottom: "8px",
-                  }}
-                >
-                  {getActionText(log.action)}{" "}
+              <div className="log-header-text">
+                <h1>
+                  <span style={{ color: actionColor }}>
+                    {getActionText(log.action)}
+                  </span>{" "}
                   {log.type.charAt(0).toUpperCase() + log.type.slice(1)} #
                   {log.target_id}
                 </h1>
-                <p style={{ color: "#6b7280", fontSize: "0.95em" }}>
+                <p>
                   Changed by <strong>{log.changed_by_name}</strong> •{" "}
                   {new Date(log.changed_at).toLocaleString("en-US", {
                     year: "numeric",
@@ -350,35 +412,61 @@ export default function LogDetailPage({
                 </p>
               </div>
             </div>
+
+            {/* View Mode Toggle */}
+            <div className="view-mode-toggle">
+              <button
+                className={`toggle-btn ${viewMode === "html" ? "active" : ""}`}
+                onClick={() => setViewMode("html")}
+              >
+                🎨 HTML View
+              </button>
+              <button
+                className={`toggle-btn ${
+                  viewMode === "markdown" ? "active" : ""
+                }`}
+                onClick={() => setViewMode("markdown")}
+              >
+                📝 Markdown
+              </button>
+            </div>
           </div>
 
-          {/* Data Comparison - Two Columns with Raw Markdown */}
+          {/* Data Comparison - Two Columns */}
           <div className="data-comparison-grid">
             {/* Old Data Column */}
             {parsedData?.oldData && (
               <div className="data-column old-data">
                 <div className="data-column-header">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      flex: 1,
-                    }}
-                  >
-                    <span>📄</span>
+                  <div className="header-left">
+                    <span className="header-icon">📄</span>
                     <h2>Old Data</h2>
                   </div>
-                  <button
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(oldMarkdown, "old")}
-                    title="Copy Markdown"
-                  >
-                    {copySuccess.old ? "✓ Copied!" : "📋 Copy"}
-                  </button>
+                  {viewMode === "markdown" && (
+                    <button
+                      className="copy-btn"
+                      onClick={() => copyToClipboard(oldMarkdown, "old")}
+                    >
+                      {copySuccess.old ? (
+                        <>
+                          <span>✓</span> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <span>📋</span> Copy
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-                <div className="data-column-content markdown-raw">
-                  <pre>{oldMarkdown}</pre>
+                <div className="data-column-content">
+                  {viewMode === "html" ? (
+                    renderHTMLData(parsedData.oldData)
+                  ) : (
+                    <div className="markdown-raw">
+                      <pre>{oldMarkdown}</pre>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -387,27 +475,35 @@ export default function LogDetailPage({
             {parsedData?.newData && (
               <div className="data-column new-data">
                 <div className="data-column-header">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      flex: 1,
-                    }}
-                  >
-                    <span>📝</span>
+                  <div className="header-left">
+                    <span className="header-icon">📝</span>
                     <h2>New Data</h2>
                   </div>
-                  <button
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(newMarkdown, "new")}
-                    title="Copy Markdown"
-                  >
-                    {copySuccess.new ? "✓ Copied!" : "📋 Copy"}
-                  </button>
+                  {viewMode === "markdown" && (
+                    <button
+                      className="copy-btn"
+                      onClick={() => copyToClipboard(newMarkdown, "new")}
+                    >
+                      {copySuccess.new ? (
+                        <>
+                          <span>✓</span> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <span>📋</span> Copy
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-                <div className="data-column-content markdown-raw">
-                  <pre>{newMarkdown}</pre>
+                <div className="data-column-content">
+                  {viewMode === "html" ? (
+                    renderHTMLData(parsedData.newData)
+                  ) : (
+                    <div className="markdown-raw">
+                      <pre>{newMarkdown}</pre>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -416,39 +512,46 @@ export default function LogDetailPage({
             {parsedData &&
               (!parsedData.oldData || !parsedData.newData) &&
               (parsedData.oldData || parsedData.newData) && (
-                <div
-                  className="data-column single-data"
-                  style={{ gridColumn: "1 / -1" }}
-                >
+                <div className="data-column single-data full-width">
                   <div className="data-column-header">
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        flex: 1,
-                      }}
-                    >
-                      <span>📋</span>
+                    <div className="header-left">
+                      <span className="header-icon">📋</span>
                       <h2>
                         {!parsedData.oldData ? "Created Data" : "Deleted Data"}
                       </h2>
                     </div>
-                    <button
-                      className="copy-btn"
-                      onClick={() =>
-                        copyToClipboard(
-                          parsedData.oldData ? oldMarkdown : newMarkdown,
-                          "old"
-                        )
-                      }
-                      title="Copy Markdown"
-                    >
-                      {copySuccess.old ? "✓ Copied!" : "📋 Copy"}
-                    </button>
+                    {viewMode === "markdown" && (
+                      <button
+                        className="copy-btn"
+                        onClick={() =>
+                          copyToClipboard(
+                            parsedData.oldData ? oldMarkdown : newMarkdown,
+                            "old"
+                          )
+                        }
+                      >
+                        {copySuccess.old ? (
+                          <>
+                            <span>✓</span> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <span>📋</span> Copy
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
-                  <div className="data-column-content markdown-raw">
-                    <pre>{parsedData.oldData ? oldMarkdown : newMarkdown}</pre>
+                  <div className="data-column-content">
+                    {viewMode === "html" ? (
+                      renderHTMLData(parsedData.oldData || parsedData.newData)
+                    ) : (
+                      <div className="markdown-raw">
+                        <pre>
+                          {parsedData.oldData ? oldMarkdown : newMarkdown}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

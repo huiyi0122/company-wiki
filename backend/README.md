@@ -32,6 +32,20 @@
 
 ```
 ├── src/
+├── src/
+│   ├── controllers/      # CRUD and business logic
+│   ├── middleware/       # Authentication, authorization, error handling
+│   ├── models/           # Database models
+│   ├── routes/           # API endpoints
+│   ├── services/         # Database and service logic
+│   ├── utils/            # Helper functions
+│   ├── seeder.ts         # Auto database seeding
+│   └── app.ts            # Express app entry point
+├── .env                  # Environment variables
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+├── Dockerfile            # Defines how to build and run the app in a container
+└── docker-compose.yml    # (Optional) Configures multiple containers like app + database
 │   ├── controllers/      # CRUD and business logic
 │   ├── middleware/       # Authentication, authorization, error handling
 │   ├── models/           # Database models

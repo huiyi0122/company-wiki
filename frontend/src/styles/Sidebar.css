@@ -1,4 +1,4 @@
-/* src/styles/Sidebar.css - 统一配色方案 */
+/* src/styles/Sidebar.css - 优化版本 */
 
 .sidebar {
   width: 230px;
@@ -20,9 +20,23 @@
 /* 🌙 Dark Mode Sidebar */
 @media (prefers-color-scheme: dark) {
   .sidebar {
-    background: #1e293b;
+    background: #212134;
     border-right-color: #334155;
   }
+}
+
+/* ========== 固定头部区域 ========== */
+.sidebar-header {
+  flex-shrink: 0;
+  padding: 8px 0;
+}
+
+/* ========== 可滚动的中间区域 ========== */
+.sidebar-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 /* ========== Logo/标题样式 ========== */
@@ -58,10 +72,6 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-}
-
-.logo-icon {
-  font-size: 20px;
 }
 
 /* ========== 主菜单样式 ========== */
@@ -119,37 +129,16 @@
   }
 
   .main-menu li.active {
-    background: linear-gradient(135deg, #1e3a5f 0%, #1e4d5f 100%);
+    background: #181826;
     color: #60a5fa;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    box-shadow: none;
   }
-}
-
-.menu-icon {
-  font-size: 18px;
-  width: 22px;
-  text-align: center;
-  flex-shrink: 0;
 }
 
 /* ========== 搜索框样式 ========== */
 .sidebar-search-form {
   padding: 0 16px 0 16px;
   margin: 0;
-}
-
-.search-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: #a0aec0;
-  pointer-events: none;
-  font-size: 16px;
 }
 
 .sidebar-search {
@@ -192,16 +181,11 @@
   .sidebar-search::placeholder {
     color: #64748b;
   }
-
-  .search-icon {
-    color: #64748b;
-  }
 }
 
 /* ========== 分类区域样式 ========== */
 .categories-section {
-  flex-grow: 1;
-  overflow-y: auto;
+  padding-bottom: 16px;
 }
 
 .categories-header {
@@ -239,7 +223,6 @@
   list-style: none;
   margin: 0 12px 4px 12px;
   padding: 0;
-  position: relative;
 }
 
 .category-header {
@@ -253,8 +236,6 @@
   font-weight: 600;
   border-radius: 8px;
   user-select: none;
-  position: relative;
-  width: auto;
 }
 
 .category-header:hover {
@@ -280,10 +261,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.category-text {
-  flex-grow: 1;
 }
 
 .article-count {
@@ -343,30 +320,12 @@
   }
 }
 
-/* ========== 文章列表容器 ========== */
-.articles-container {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  position: relative;
-}
-
+/* ========== 文章列表容器 - 移除背景 ========== */
 .articles-list {
   list-style: none;
   margin: 4px 0 0 0;
   padding: 0;
   width: 100%;
-  position: relative;
-  background: #f8fafc;
-  border-radius: 8px;
-  padding: 4px 0;
-}
-
-/* 🌙 Dark Mode 文章列表 */
-@media (prefers-color-scheme: dark) {
-  .articles-list {
-    background: #0f172a;
-  }
 }
 
 .article-item {
@@ -395,7 +354,7 @@
 }
 
 .article-item:hover {
-  background: #ffffff;
+  background: #f7fafc;
   color: #2d3748;
   transform: translateX(4px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -416,7 +375,7 @@
   }
 
   .article-item:hover {
-    background: #1e293b;
+    background: #334155;
     color: #e2e8f0;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
@@ -424,17 +383,6 @@
   .article-item:hover::before {
     color: #60a5fa;
   }
-}
-
-.article-bullet {
-  color: #cbd5e0;
-  font-size: 18px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.article-item:hover .article-bullet {
-  color: #4299e1;
 }
 
 /* ========== Loading 和 Empty 状态 ========== */
@@ -458,17 +406,6 @@
 
 .articles-loading {
   animation: pulse 1.5s ease-in-out infinite;
-}
-
-.category-item > .articles-list,
-.category-item > .articles-loading,
-.category-item > .articles-empty,
-.category-item > .show-more-container {
-  display: block;
-  width: 100%;
-  position: relative;
-  left: 0;
-  right: 0;
 }
 
 @keyframes pulse {
@@ -534,23 +471,6 @@
   }
 }
 
-/* 🎉 All Loaded 提示 */
-.all-loaded-hint {
-  padding: 8px 16px 12px 40px;
-  margin: 0 8px;
-  text-align: center;
-  color: #a0aec0;
-  font-size: 0.75rem;
-  font-style: italic;
-}
-
-/* 🌙 Dark Mode All Loaded */
-@media (prefers-color-scheme: dark) {
-  .all-loaded-hint {
-    color: #64748b;
-  }
-}
-
 /* ========== 无分类状态 ========== */
 .no-categories {
   padding: 24px 16px;
@@ -571,9 +491,10 @@
 /* ========== 用户区域样式 ========== */
 .sidebar-user {
   margin-top: auto;
-  padding: 0 16px;
+  padding: 16px;
   border-top: 1px solid #e2e8f0;
   background: #f8fafc;
+  flex-shrink: 0;
 }
 
 /* 🌙 Dark Mode 用户区域 */
@@ -584,83 +505,17 @@
   }
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
-}
-
-.user-info:hover {
-  background: rgba(66, 153, 225, 0.05);
-}
-
-/* 🌙 Dark Mode 用户信息 */
-@media (prefers-color-scheme: dark) {
-  .user-info:hover {
-    background: rgba(59, 130, 246, 0.1);
-  }
-}
-
-.user-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 700;
-  flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
-}
-
-/* 🌙 Dark Mode Avatar */
-@media (prefers-color-scheme: dark) {
-  .user-avatar {
-    background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-    box-shadow: 0 2px 4px rgba(67, 56, 202, 0.4);
-  }
-}
-
-.user-details {
-  flex-grow: 1;
-  min-width: 0;
-}
-
-.user-name {
+.sidebar-user p {
+  margin: 0 0 12px 0;
   color: #2d3748;
-  margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.user-role {
-  color: #718096;
-  margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.4;
-  text-transform: capitalize;
-  font-weight: 500;
-}
-
-/* 🌙 Dark Mode 用户详情 */
+/* 🌙 Dark Mode 用户文本 */
 @media (prefers-color-scheme: dark) {
-  .user-name {
+  .sidebar-user p {
     color: #e2e8f0;
-  }
-
-  .user-role {
-    color: #94a3b8;
   }
 }
 
@@ -701,160 +556,31 @@
 }
 
 /* ========== 滚动条样式 ========== */
-.sidebar::-webkit-scrollbar,
-.categories-section::-webkit-scrollbar {
+.sidebar-scrollable::-webkit-scrollbar {
   width: 6px;
 }
 
-.sidebar::-webkit-scrollbar-track,
-.categories-section::-webkit-scrollbar-track {
+.sidebar-scrollable::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.sidebar::-webkit-scrollbar-thumb,
-.categories-section::-webkit-scrollbar-thumb {
+.sidebar-scrollable::-webkit-scrollbar-thumb {
   background: #cbd5e0;
   border-radius: 3px;
 }
 
-.sidebar::-webkit-scrollbar-thumb:hover,
-.categories-section::-webkit-scrollbar-thumb:hover {
+.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
   background: #a0aec0;
 }
 
 /* 🌙 Dark Mode 滚动条 */
 @media (prefers-color-scheme: dark) {
-  .sidebar::-webkit-scrollbar-thumb,
-  .categories-section::-webkit-scrollbar-thumb {
+  .sidebar-scrollable::-webkit-scrollbar-thumb {
     background: #475569;
   }
 
-  .sidebar::-webkit-scrollbar-thumb:hover,
-  .categories-section::-webkit-scrollbar-thumb:hover {
+  .sidebar-scrollable::-webkit-scrollbar-thumb:hover {
     background: #64748b;
-  }
-}
-
-/* ========== Tags Section ========== */
-.tags-section {
-  margin-top: 16px;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 16px;
-}
-
-/* 🌙 Dark Mode Tags Section */
-@media (prefers-color-scheme: dark) {
-  .tags-section {
-    border-top-color: #334155;
-  }
-}
-
-.tags-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 16px;
-  margin: 0 12px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #4a5568;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-}
-
-.tags-header:hover {
-  background: #f7fafc;
-  transform: translateX(2px);
-}
-
-/* 🌙 Dark Mode Tags Header */
-@media (prefers-color-scheme: dark) {
-  .tags-header {
-    color: #94a3b8;
-  }
-
-  .tags-header:hover {
-    background: #334155;
-  }
-}
-
-.tags-content {
-  margin-top: 4px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.tags-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.tag-item {
-  padding: 8px 16px 8px 40px;
-  margin: 1px 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  color: #718096;
-  font-size: 0.85rem;
-}
-
-.tag-item:hover {
-  background: #f7fafc;
-  color: #2d3748;
-  transform: translateX(4px);
-}
-
-/* 🌙 Dark Mode Tag Item */
-@media (prefers-color-scheme: dark) {
-  .tag-item {
-    color: #94a3b8;
-  }
-
-  .tag-item:hover {
-    background: #334155;
-    color: #e2e8f0;
-  }
-}
-
-.tag-name {
-  font-size: 0.85rem;
-  color: inherit;
-  font-weight: 500;
-}
-
-.tag-count {
-  font-size: 0.75rem;
-  color: #a0aec0;
-  margin-left: 6px;
-  font-weight: 600;
-}
-
-/* 🌙 Dark Mode Tag Count */
-@media (prefers-color-scheme: dark) {
-  .tag-count {
-    color: #64748b;
-  }
-}
-
-.tags-loading,
-.tags-empty {
-  padding: 12px 16px 12px 40px;
-  margin: 4px 20px;
-  color: #a0aec0;
-  font-size: 0.85rem;
-  font-style: italic;
-}
-
-/* 🌙 Dark Mode Tags Loading/Empty */
-@media (prefers-color-scheme: dark) {
-  .tags-loading,
-  .tags-empty {
-    color: #64748b;
   }
 }
 
@@ -1005,10 +731,6 @@
   }
 }
 
-.mobile-menu .categories-section {
-  border-top: none;
-}
-
 .mobile-menu .categories-header {
   padding: 12px 20px 8px 20px;
 }
@@ -1062,21 +784,4 @@
     padding: 8px 16px 12px 36px;
     width: calc(100% - 16px);
   }
-
-  .tag-item {
-    padding: 8px 16px 8px 36px;
-    margin: 1px 16px;
-  }
-}
-
-/* ========== 辅助工具类 ========== */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
 }
